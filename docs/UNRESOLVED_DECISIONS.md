@@ -21,23 +21,32 @@ This document records the provisional parameters, empirical calibration requirem
 - **Baseline Formulas**:
   $$P(s) = \text{clip}\left(\sum_{e \in E_s} w_{\text{source}}(e) \cdot d_{\text{depth}}(e) \cdot e^{-\lambda_{\text{decay}} \cdot \Delta t(e)}, \, 1.0, \, 10.0\right)$$
   $$C(s) = 1 - \prod_{e \in E_s} \left(1 - r_{\text{verifiability}}(e)\right)$$
-- **Status**: **Provisional — Needs Validation**
+- **Status**: **Provisional Implementation (Milestone 6 Verified Baseline)**
+- **Milestone 6 Baseline Implemented**:
+  1. **Evidence Grounding**: Extracted skills in `CandidateCareerProfile` must anchor to one or more verbatim `EvidenceRecord` snippets with categorized source types (`RESUME_WORK_EXPERIENCE`, `RESUME_PROJECT`, `CERTIFICATION`, `SELF_REPORTED_UNVERIFIED`).
+  2. **Stated vs Inferred Tracking**: Flagged explicitly via `is_explicitly_stated` so downstream ranking can distinguish verified direct claims from contextually inferred technologies.
+  3. **Epistemic Uncertainty Surfacing**: Ambiguities, contradictory timelines, and unsupported claims are captured in `epistemic_uncertainties` rather than hallucinating values.
 - **Open Decisions & Calibration Tasks**:
   1. **Temporal Decay Constant $\lambda_{\text{decay}}$**: Needs calibration by domain (e.g., web frameworks evolve faster than fundamental algorithms).
   2. **Source Weight Calibration $w_{\text{source}}(e)$**: Proposed weights (1.0 for production experience / verified repos, 0.6 for academic coursework, 0.25 for uncorroborated keywords) must be benchmarked against human technical recruiter baselines.
   3. **Complexity Depth Function $d_{\text{depth}}(e)$**: Concrete heuristic or model-based extraction for measuring repository or project complexity must be defined and tested against adversarial fluff.
 
+
 ---
 
 ## 3. Handling of Unknown / Missing Eligibility Information
 
-- **Context**: Real-world job listings and candidate profiles frequently omit explicit fields (e.g., visa sponsorship unspecified, graduation date range not mentioned, GPA requirements absent).
-- **Status**: **Unresolved Design Decision**
-- **Options to Validate**:
-  1. **Strict Exclusion (Fail-Closed)**: Disqualify opportunities or candidates whenever mandatory fields are missing. Guarantees 0% false positives for eligibility but may drastically lower opportunity recall.
+- **Context**: Real-world job listings and candidate profiles frequently omit explicit fields (e.g., visa sponsorship unspecified, graduation date range not mentioned, GPA requirements absent, rolling deadlines).
+- **Status**: **Provisional Implementation (Milestone 2 Verified)**
+- **Options Evaluated**:
+  1. **Strict Exclusion (Fail-Closed)**: Disqualify opportunities or candidates whenever mandatory fields are missing. Guarantees 0% false positives for eligibility but drastically lowers opportunity recall.
   2. **Optimistic Inclusion with Soft Warning (Fail-Open)**: Mark unstated eligibility criteria as `ELIGIBILITY_UNCERTAIN`, permit ranking, but flag clearly in the UI that the user must verify specific terms.
   3. **Interactive Candidate Clarification**: For ambiguous candidate profile attributes, trigger a quick interactive prompt prior to running full ranking.
-- **Recommended Default**: Strict exclusion for clear negative constraints (e.g., explicit "Must be authorized without sponsorship"); Optimistic with user-facing caveat for completely unstated criteria, paired with confidence discount in $S_{\text{qual}}$.
+- **Milestone 2 Conservative Baseline Implemented**:
+  - **Three-Valued Status**: Aggregate eligibility evaluates to `ELIGIBLE` (all criteria explicitly satisfied), `ELIGIBLE_WITH_UNCERTAINTY` (no hard violations found, but missing attributes flagged as caveats), or `INELIGIBLE` (one or more confirmed rule failures).
+  - **Confirmed Failures**: Produce `is_eligible = False` and populate `disqualification_reasons` with standardized codes (`DISQ_CATEGORY_MISMATCH`, `DISQ_COUNTRY_UNAUTHORIZED`, `DISQ_VISA_SPONSORSHIP_UNAVAILABLE`, `DISQ_DEGREE_BELOW_MINIMUM`, `DISQ_STUDENT_STATUS_REQUIRED`, `DISQ_GRADUATION_DATE_BEFORE_WINDOW`, `DISQ_GRADUATION_DATE_AFTER_WINDOW`, `DISQ_EXPERIENCE_BELOW_MINIMUM`, `DISQ_EXPERIENCE_EXCEEDS_MAXIMUM`, `DISQ_WORK_MODE_MISMATCH`, `DISQ_LOCATION_MISMATCH`, `DISQ_EXPIRED_DEADLINE`).
+  - **Preserved Uncertainty**: When critical fields are unstated (missing application deadline, unrestricted candidate location on an on-site role, unstated cities on a hybrid role, or unstated graduation date during a restricted graduation cohort), the engine emits `is_eligible = True` and flags discrete caveats (`UNCERT_NO_DEADLINE_SPECIFIED`, `UNCERT_LOCATION_UNRESTRICTED`, `UNCERT_OPPORTUNITY_LOCATION_UNSPECIFIED`, `UNCERT_GRADUATION_DATE_MISSING`), preserving transparency for downstream ranking and UI display without inventing false assumptions.
+  - **Zero LLM Evaluation**: All checks execute exclusively in pure Python deterministic code.
 
 ---
 
@@ -95,3 +104,53 @@ This document records the provisional parameters, empirical calibration requirem
   1. Construct a standardized golden evaluation dataset (500 synthetic candidate-opportunity pairs).
   2. Establish a load testing suite (`k6` or `Locust`) to benchmark `AsyncPostgresSaver` connection pool under realistic concurrent supersteps.
   3. Measure latency across local Ollama quantized models vs cloud API endpoints.
+
+---
+
+## 9. Opportunity Deduplication & MinHash LSH Calibration
+
+- **Baseline Parameters**:
+  - Shingle length: $k = 3$ words (trigram word n-grams).
+  - MinHash permutations: $K = 128$ linear congruential hash functions with Mersenne prime $p = 2^{61} - 1$.
+  - LSH partitioning: $b = 16$ bands, $r = 8$ rows per band ($b \times r = 128$).
+  - Provisional Jaccard similarity threshold: $\ge 0.85$.
+- **Status**: **Provisional Implementation (Milestone 3 Verified) — Requires Real-World Calibration**
+- **Algorithm Limitations & Known Trade-offs**:
+  1. **Short-Text Sensitivity**: Trigram shingles on short blurbs ($< 60$ words) exhibit elevated sensitivity to small footer modifications (e.g., adding an EEO disclaimer drops Jaccard below 0.80 on 30-word snippets, whereas the identical addition maintains $> 0.94$ similarity on realistic 150-word postings).
+  2. **Non-Destructive Provenance Invariant**: Duplicate detection must never silently drop or irreversibly merge records. All duplicate postings are preserved with `is_duplicate = True` and clustered via `DuplicateRecord` keeping original source URLs and identifiers intact.
+  3. **Title Independence**: Matching job titles alone must never trigger deduplication. The algorithm evaluates composite normalized text (title + company + description) to prevent collapsing distinct roles at the same or different companies.
+- **Evaluation Plan for False Positives and False Negatives**:
+  1. **False Positive Benchmark**: Curate 200 distinct job pairs sharing identical titles (e.g., "Software Engineer" across 50 companies) to ensure 0% false duplicate linkages.
+  2. **False Negative Benchmark**: Ingest 300 verified multi-board syndicated listings (Greenhouse, Lever, Ashby, Workday) and evaluate cluster recall across candidate thresholds $[0.75, 0.80, 0.85, 0.90]$.
+
+---
+
+## 10. Persistence, Ingestion Boundary & Audit Log Retention
+
+- **Status**: **Provisional Implementation (Milestone 5 Verified)**
+- **Baseline Implementations Established**:
+  1. **Decoupled Ports**: `CandidateProfileRepository`, `OpportunityRepository`, `DuplicateClusterRepository`, and `EligibilityAuditRepository` decouple business and domain logic from the relational database layer.
+  2. **Dual Relational Support**:
+     - Local development & testing: SQLite with WAL mode (`PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;`), `PRAGMA foreign_keys = ON;`, and explicit segregated `read_connection()` and `transaction()` boundaries.
+     - Production: Complete PostgreSQL 16 relational DDL migration (`001_initial_schema_postgres.sql`) with JSONB, UUIDs, and foreign key cascades.
+  3. **Ingestion Abstraction**: `BaseOpportunityAdapter` and `JSONFixtureOpportunityAdapter` allow air-gapped, reproducible ingestion of multi-source opportunities with early deterministic MinHash deduplication, change tracking, and expiration handling.
+- **Open Decisions & Calibration Tasks**:
+  1. **Audit Retention Window**: Currently defaulted to 30 days via `EligibilityAuditRepository.prune_older_than(days=30)`. The exact production retention window (30 vs 60 vs 90 days) will be tuned based on user feedback and GDPR/CCPA compliance obligations.
+  2. **Real ATS Ingestion Scheduling**: External scrapers/APIs (Greenhouse, Lever, Ashby) must be run via scheduled asynchronous background jobs (`arq` + Redis) rather than synchronous request-time fetching. Rate-limiting strategies, backoff profiles, and circuit breakers need specification during infrastructure provisioning.
+
+---
+
+## 11. Model Gateway, Provider Selection & Extraction Fallbacks
+
+- **Status**: **Provisional Implementation (Milestone 6 Verified)**
+- **Baseline Implementations Established**:
+  1. **Provider Port Abstraction**: `BaseLLMClient` defines `generate_structured(system_prompt, user_prompt, schema)`.
+  2. **Pluggable Implementations**:
+     - `MockLLMClient`: Offline deterministic extraction engine with configurable error simulation (timeouts, rate limits, schema errors) enabling 100% test coverage with zero external network access.
+     - `HTTPXOpenAICompatibleClient`: Async/sync HTTP client using existing `httpx` to connect to OpenAI-compatible endpoints (LiteLLM proxy, Ollama, OpenAI).
+  3. **Credential & Prompt Isolation**: Credentials configured exclusively via backend `.env` (`LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`). Candidate text is sanitized via `sanitize_untrusted_text` and wrapped in structured `{"trust_level": "untrusted_data"}` envelopes.
+- **Open Decisions & Calibration Tasks**:
+  1. **Model Architecture Selection**: Compare accuracy, latency, and resource footprint across local quantized models (`qwen2.5:14b-instruct`, `llama3.1:8b-instruct` via Ollama) versus hosted cloud endpoints (`gpt-4o-mini`, `claude-3-5-haiku`).
+  2. **LiteLLM Gateway Deployment Topology**: Evaluate containerized LiteLLM proxy with Redis circuit breakers versus in-process direct model adapters based on production deployment target.
+
+

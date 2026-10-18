@@ -21,9 +21,9 @@ develop-eggs/
 dist/
 downloads/
 eggs/
-.eggs/
-lib/
-lib64/
+/lib/
+/lib64/
+!**/src/lib/**
 parts/
 sdist/
 var/
@@ -56,6 +56,8 @@ yarn-error.log*
 # Database & Local Storage
 *.sqlite3
 *.db
+*.db-wal
+*.db-shm
 /data/
 /storage/
 minio_data/

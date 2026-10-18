@@ -1,0 +1,221 @@
+[
+  {
+    "opportunity_id": "opp_greenhouse_001",
+    "minhash_signature_hex": "ee93255c74a16ba21f5b0cb96d5b72cd460680884e90956450b53ead691b00e3",
+    "title": "Senior Distributed Systems Engineer",
+    "company_name": "Falcon Cloud Infrastructure",
+    "company_domain_verified": true,
+    "mapped_occupation_code": "15-1252.00",
+    "eligibility_rules": {
+      "opportunity_category": "FULL_TIME_JOB",
+      "work_mode": "HYBRID",
+      "eligible_country_codes": ["US"],
+      "minimum_degree_required": "BACHELORS",
+      "requires_active_student_status": false,
+      "sponsors_work_visa": false,
+      "min_experience_months": 60,
+      "location_city_country": ["San Francisco, CA"],
+      "application_deadline": "2027-01-01T00:00:00Z"
+    },
+    "skill_requirements": [
+      {
+        "skill_name": "Distributed Systems",
+        "canonical_skill_id": "skill_dist_sys_01",
+        "minimum_proficiency_expected": 8.0,
+        "is_mandatory": true
+      },
+      {
+        "skill_name": "Go",
+        "canonical_skill_id": "skill_go_01",
+        "minimum_proficiency_expected": 7.0,
+        "is_mandatory": true
+      }
+    ],
+    "category_specific_attributes": {
+      "source_system": "greenhouse",
+      "source_job_id": "gh-401",
+      "department": "Core Infrastructure"
+    },
+    "sanitized_summary": "Falcon Cloud Infrastructure seeks a Senior Distributed Systems Engineer to design, build, and maintain our high-throughput distributed state engine and consensus protocols. Responsibilities include implementing Byzantine fault tolerance, benchmark evaluation, and kernel tuning. Qualifications: BS/MS in CS, 5+ years with distributed consensus algorithms like Raft or Paxos, and proficiency in Go or Rust.",
+    "source_url": "https://boards.greenhouse.io/falconcloud/jobs/401",
+    "posted_at": "2026-09-01T12:00:00Z",
+    "discovered_at": "2026-09-02T08:30:00Z",
+    "completeness_score": 0.95,
+    "trust_score": 0.98,
+    "is_duplicate": false
+  },
+  {
+    "opportunity_id": "opp_lever_002",
+    "minhash_signature_hex": "3b32115ac39a3837c02adf1152fa1499b33bc7b66f721bf7d896712b4570d659",
+    "title": "Sr Distributed Systems Engineer",
+    "company_name": "Falcon Cloud Infrastructure",
+    "company_domain_verified": true,
+    "mapped_occupation_code": "15-1252.00",
+    "eligibility_rules": {
+      "opportunity_category": "FULL_TIME_JOB",
+      "work_mode": "HYBRID",
+      "eligible_country_codes": ["US"],
+      "minimum_degree_required": "BACHELORS",
+      "requires_active_student_status": false,
+      "sponsors_work_visa": false,
+      "min_experience_months": 60,
+      "location_city_country": ["San Francisco, CA"],
+      "application_deadline": "2027-01-01T00:00:00Z"
+    },
+    "skill_requirements": [
+      {
+        "skill_name": "Distributed Systems",
+        "canonical_skill_id": "skill_dist_sys_01",
+        "minimum_proficiency_expected": 8.0,
+        "is_mandatory": true
+      },
+      {
+        "skill_name": "Go",
+        "canonical_skill_id": "skill_go_01",
+        "minimum_proficiency_expected": 7.0,
+        "is_mandatory": true
+      }
+    ],
+    "category_specific_attributes": {
+      "source_system": "lever",
+      "source_job_id": "lever-401-dup",
+      "department": "Core Infrastructure"
+    },
+    "sanitized_summary": "Falcon Cloud Infrastructure seeks a Sr Distributed Systems Engineer to design, build, and maintain our high-throughput distributed state engine and consensus protocols. Responsibilities include implementing Byzantine fault tolerance, benchmark evaluation, and kernel tuning. Qualifications: BS/MS in CS, 5+ years with distributed consensus algorithms like Raft or Paxos, and proficiency in Go or Rust.",
+    "source_url": "https://jobs.lever.co/falconcloud/401-dup",
+    "posted_at": "2026-09-02T14:00:00Z",
+    "discovered_at": "2026-09-03T09:00:00Z",
+    "completeness_score": 0.94,
+    "trust_score": 0.95,
+    "is_duplicate": false
+  },
+  {
+    "opportunity_id": "opp_remote_003",
+    "minhash_signature_hex": "bc0f3c42eacc8361bba5aa22687925c8b39c21d2fa7ac75fb002e191e2286c6e",
+    "title": "Full Stack Python/React Developer",
+    "company_name": "RemoteFirst Labs",
+    "company_domain_verified": true,
+    "mapped_occupation_code": "15-1254.00",
+    "eligibility_rules": {
+      "opportunity_category": "FULL_TIME_JOB",
+      "work_mode": "REMOTE",
+      "eligible_country_codes": ["US", "CA"],
+      "minimum_degree_required": "ASSOCIATE",
+      "requires_active_student_status": false,
+      "sponsors_work_visa": false,
+      "min_experience_months": 24,
+      "location_city_country": [],
+      "application_deadline": "2026-12-31T23:59:59Z"
+    },
+    "skill_requirements": [
+      {
+        "skill_name": "Python",
+        "canonical_skill_id": "skill_python_01",
+        "minimum_proficiency_expected": 7.0,
+        "is_mandatory": true
+      },
+      {
+        "skill_name": "React",
+        "canonical_skill_id": "skill_react_01",
+        "minimum_proficiency_expected": 7.0,
+        "is_mandatory": true
+      }
+    ],
+    "category_specific_attributes": {
+      "source_system": "greenhouse",
+      "source_job_id": "gh-remote-88",
+      "remote_stipend_usd": 1500
+    },
+    "sanitized_summary": "RemoteFirst Labs is hiring a Full Stack Python and React Developer to architect our real-time customer intelligence portal using FastAPI, Next.js, and PostgreSQL in a fully remote environment.",
+    "source_url": "https://remotefirst.io/careers/python-react-88",
+    "posted_at": "2026-09-10T10:00:00Z",
+    "discovered_at": "2026-09-11T11:00:00Z",
+    "completeness_score": 0.90,
+    "trust_score": 0.92,
+    "is_duplicate": false
+  },
+  {
+    "opportunity_id": "opp_doctorate_004",
+    "minhash_signature_hex": "cddfdf41f6c1a7c276252fa9aa2a1b98a99a17d888b76671ca45311da134c870",
+    "title": "Staff AI Research Scientist",
+    "company_name": "Falcon Intelligence Institute",
+    "company_domain_verified": true,
+    "mapped_occupation_code": "15-1221.00",
+    "eligibility_rules": {
+      "opportunity_category": "FULL_TIME_JOB",
+      "work_mode": "ON_SITE",
+      "eligible_country_codes": ["US"],
+      "minimum_degree_required": "DOCTORATE",
+      "requires_active_student_status": false,
+      "sponsors_work_visa": true,
+      "min_experience_months": 36,
+      "location_city_country": ["Cambridge, MA"],
+      "application_deadline": "2027-06-30T00:00:00Z"
+    },
+    "skill_requirements": [
+      {
+        "skill_name": "Deep Learning",
+        "canonical_skill_id": "skill_dl_01",
+        "minimum_proficiency_expected": 9.0,
+        "is_mandatory": true
+      },
+      {
+        "skill_name": "PyTorch",
+        "canonical_skill_id": "skill_pytorch_01",
+        "minimum_proficiency_expected": 8.5,
+        "is_mandatory": true
+      }
+    ],
+    "category_specific_attributes": {
+      "source_system": "workday",
+      "source_job_id": "wd-sci-909",
+      "lab": "Neural-Symbolic Architecture Lab"
+    },
+    "sanitized_summary": "Falcon Intelligence Institute is seeking a Staff AI Research Scientist to conduct foundational research in multimodal language models and neural symbolic reasoning. Requires PhD in Computer Science, Machine Learning, or related quantitative field.",
+    "source_url": "https://falcon-intelligence.org/careers/sci-909",
+    "posted_at": "2026-08-15T09:00:00Z",
+    "discovered_at": "2026-08-16T10:00:00Z",
+    "completeness_score": 0.98,
+    "trust_score": 0.99,
+    "is_duplicate": false
+  },
+  {
+    "opportunity_id": "opp_expired_005",
+    "minhash_signature_hex": "c67587399e3f40eef459ccba8d1dcc4c333ea1f5b5e84fdf02c089eb4866d010",
+    "title": "Summer 2024 Systems Software Intern",
+    "company_name": "Falcon Systems Corp",
+    "company_domain_verified": true,
+    "mapped_occupation_code": "15-1252.00",
+    "eligibility_rules": {
+      "opportunity_category": "INTERNSHIP",
+      "work_mode": "ON_SITE",
+      "eligible_country_codes": ["US"],
+      "minimum_degree_required": "NONE",
+      "requires_active_student_status": true,
+      "sponsors_work_visa": false,
+      "min_experience_months": 0,
+      "location_city_country": ["Austin, TX"],
+      "application_deadline": "2024-05-01T00:00:00Z"
+    },
+    "skill_requirements": [
+      {
+        "skill_name": "C++",
+        "canonical_skill_id": "skill_cpp_01",
+        "minimum_proficiency_expected": 5.0,
+        "is_mandatory": true
+      }
+    ],
+    "category_specific_attributes": {
+      "source_system": "greenhouse",
+      "source_job_id": "gh-intern-24",
+      "is_closed": true
+    },
+    "sanitized_summary": "Falcon Systems Corp offers a Summer 2024 Systems Software Intern position to contribute to kernel tracing and low-level performance profiling tools. Active university enrollment required.",
+    "source_url": "https://boards.greenhouse.io/falconsystems/intern-24",
+    "posted_at": "2024-01-10T12:00:00Z",
+    "discovered_at": "2024-01-11T09:00:00Z",
+    "completeness_score": 0.88,
+    "trust_score": 0.90,
+    "is_duplicate": false
+  }
+]
