@@ -278,4 +278,90 @@ export interface CandidateProfilingResponse {
   };
 }
 
+export type ConnectorStatus =
+  | 'CONNECTED'
+  | 'MOCKED_FALLBACK'
+  | 'UNAVAILABLE_MISSING_BINARY'
+  | 'RATE_LIMITED'
+  | 'ERROR';
+
+export interface DiscoverySearchQuery {
+  query_id: string;
+  role_title: string;
+  query_string: string;
+  expanded_keywords: string[];
+  category: OpportunityCategory;
+  work_modes: WorkMode[];
+  target_locations: string[];
+  target_country_codes: string[];
+  seniority_level: string;
+  relationship_type: CareerPathRelationship;
+}
+
+export interface RoleMappingTarget {
+  role_title: string;
+  canonical_occupation_code: string;
+  relationship_type: CareerPathRelationship;
+  confidence_score: number;
+  matched_skill_names: string[];
+  missing_skill_names: string[];
+  queries: DiscoverySearchQuery[];
+}
+
+export interface DiscoveryQueryPlan {
+  candidate_id: string;
+  target_roles: RoleMappingTarget[];
+  all_queries: DiscoverySearchQuery[];
+  generated_at: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface ConnectorHealthReport {
+  connector_id: string;
+  source_name: string;
+  connector_type: string;
+  status: ConnectorStatus;
+  is_mock_fallback: boolean;
+  details: Record<string, unknown>;
+  last_checked: string;
+}
+
+export interface DiscoveryConnectorReport {
+  connector_id: string;
+  source_name: string;
+  status: ConnectorStatus;
+  raw_count: number;
+  latency_ms: number;
+  error_message?: string | null;
+}
+
+export interface DiscoveryRunRequest {
+  candidate_profile?: CandidateCareerProfile | null;
+  user_id?: string | null;
+  connector_ids?: string[] | null;
+  max_results_per_connector?: number;
+  deduplication_threshold?: number;
+  simulate_failure_connector?: string | null;
+  persist_to_repository?: boolean;
+}
+
+export interface DiscoveryRunResponse {
+  candidate_id: string;
+  query_plan: DiscoveryQueryPlan;
+  connector_reports: DiscoveryConnectorReport[];
+  total_discovered: number;
+  canonical_count: number;
+  duplicate_count: number;
+  eligible_count: number;
+  uncertain_count: number;
+  ineligible_count: number;
+  canonical_opportunities: PolymorphicOpportunity[];
+  eligible_opportunities: PolymorphicOpportunity[];
+  duplicate_clusters: Record<string, OpportunityCluster>;
+  duplicate_records: DuplicateRecord[];
+  eligibility_results: EligibilityResult[];
+  execution_metadata: Record<string, unknown>;
+}
+
+
 

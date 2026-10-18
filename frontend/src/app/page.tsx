@@ -3,6 +3,7 @@ import { Header } from '@/components/layout/Header';
 import { HealthMonitor } from '@/components/health/HealthMonitor';
 import { DeterministicPipelineDemo } from '@/components/pipeline/DeterministicPipelineDemo';
 import { CandidateProfilingDemo } from '@/components/profiling/CandidateProfilingDemo';
+import { DiscoveryDemo } from '@/components/discovery/DiscoveryDemo';
 
 export default function Home() {
   return (
@@ -33,6 +34,14 @@ export default function Home() {
             AI-Powered Candidate Skill Profiling & Evidence Grounding
           </h3>
           <CandidateProfilingDemo />
+        </section>
+
+        {/* Milestone 7: Skill-to-Role Mapping & Multi-Source Discovery */}
+        <section aria-labelledby="discovery-demo-heading" className="space-y-4">
+          <h3 id="discovery-demo-heading" className="text-sm font-semibold uppercase tracking-wider text-zinc-500">
+            Multi-Source Discovery Foundation & Skill-to-Role Mapping
+          </h3>
+          <DiscoveryDemo />
         </section>
 
         {/* Milestone 4: Deterministic Core Integration Demo */}

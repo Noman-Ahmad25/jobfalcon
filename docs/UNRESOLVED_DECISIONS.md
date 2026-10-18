@@ -82,13 +82,32 @@ This document records the provisional parameters, empirical calibration requirem
 
 ---
 
-## 7. External Opportunity-Source Integrations & Permitted Usage
+## 7. External Opportunity-Source Integrations & Multi-Source Discovery
 
-- **Status**: **Unresolved Design Decision**
+- **Status**: **Provisional Implementation (Milestone 7 Verified Baseline)**
+- **Milestone 7 Baseline Implemented**:
+  1. **Skill-to-Role Mapping Engine (`role_mapper.py`)**:
+     - Deterministically maps candidate skills and preferences to O*NET occupation codes (e.g., 15-1252.00, 15-1254.00, 15-1251.00, 15-2051.00).
+     - Distinguishes explicit candidate career ambitions (`TARGET`, confidence = 1.0) from inferred skill-cluster expansions (`ADJACENT`, confidence = 0.50-0.85).
+     - Identifies matched core skills and surfaces missing role competencies without false equivalences.
+     - Generates parameterized search queries with seniority heuristics, category constraints, and geographic filters.
+  2. **Multi-Source Discovery Interface & Connectors**:
+     - Unified `BaseDiscoveryConnector` contract with independent lifecycle and honest availability reporting.
+     - 4 discovery adapters:
+       - `WebSearchConnector`: Career search engine aggregator (SearXNG / Google Jobs simulation).
+       - `IndiaJobsMCPConnector`: `@borgius/india-jobs-mcp` adapter for Indian tech platforms (Naukri, Foundit, Hirist) with INR compensation and metro filters.
+       - `JobSpyMCPConnector`: `jobspy-mcp-server` adapter for LinkedIn, Indeed, Glassdoor, ZipRecruiter.
+       - `CompanyCareerPageConnector`: Direct employer ATS boards (Greenhouse, Lever, Ashby) with verified domains and high trust scores.
+     - Honest Capability Invariant: Connectors explicitly report `MOCKED_FALLBACK` or `UNAVAILABLE_MISSING_BINARY` when running in offline sandboxes without claiming falsified live execution.
+  3. **Discovery Coordinator with Partial Failure Resilience (`coordinator.py`)**:
+     - Bounded concurrent retrieval via `asyncio.gather` with error shielding and timeouts (5.0s per connector).
+     - Fault Isolation: Exceptions, rate limits, or crashes in any individual connector are recorded as `ConnectorStatus.ERROR` while all listings from healthy connectors are preserved.
+     - Early cross-source MinHash LSH deduplication (Jaccard $\ge 0.85$) clusters multi-board syndicated postings into `OpportunityCluster` without losing source provenance.
+     - Feeds canonical opportunities into the deterministic eligibility engine with full audit breakdown.
 - **Open Decisions & Calibration Tasks**:
-  1. **Permitted Feeds**: Validate integration boundaries for direct employer ATS feeds (Greenhouse, Lever, Ashby public job boards) versus syndicated aggregators.
-  2. **Terms of Service & Rate Limits**: Ensure compliance with platform rate limits, robots.txt, and terms of service; implement cached ingestion via background workers (`arq`) rather than on-demand unauthenticated scraping during user requests.
-  3. **Candidate-Submitted Listings**: Support ad-hoc opportunity URL ingestion with automated adversarial sanitization and MinHash deduplication.
+  1. **Permitted Live Feeds & Rate Limits**: Validate production integration boundaries and rate-limit backoff profiles for direct employer ATS feeds versus syndicated job board MCP tools.
+  2. **Terms of Service Compliance**: Ensure compliance with platform rate limits, robots.txt, and terms of service; implement cached ingestion via background workers (`arq` + Redis) rather than on-demand unauthenticated scraping during user requests.
+  3. **Ad-Hoc Candidate Ingestion**: Support candidate-provided job posting URLs with automated adversarial sanitization and MinHash deduplication.
 
 ---
 

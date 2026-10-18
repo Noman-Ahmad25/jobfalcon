@@ -3,6 +3,10 @@ import {
   CandidateCareerProfile,
   CandidateProfilingRequest,
   CandidateProfilingResponse,
+  ConnectorHealthReport,
+  DiscoveryQueryPlan,
+  DiscoveryRunRequest,
+  DiscoveryRunResponse,
   PipelineEvaluationRequest,
   PipelineEvaluationResponse,
 } from '@/types/domain';
@@ -107,5 +111,34 @@ export async function getCandidateProfile(
     timeoutMs: 5000,
   });
 }
+
+export async function getDiscoveryConnectors(): Promise<ConnectorHealthReport[]> {
+  return fetchFromApi<ConnectorHealthReport[]>('/api/v1/discovery/connectors', {
+    method: 'GET',
+    timeoutMs: 5000,
+  });
+}
+
+export async function generateDiscoveryPlan(payload: {
+  candidate_profile?: CandidateCareerProfile | null;
+  user_id?: string | null;
+}): Promise<DiscoveryQueryPlan> {
+  return fetchFromApi<DiscoveryQueryPlan>('/api/v1/discovery/plan', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    timeoutMs: 8000,
+  });
+}
+
+export async function runDiscovery(
+  payload: DiscoveryRunRequest
+): Promise<DiscoveryRunResponse> {
+  return fetchFromApi<DiscoveryRunResponse>('/api/v1/discovery/run', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    timeoutMs: 15000,
+  });
+}
+
 
 

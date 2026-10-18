@@ -49,6 +49,17 @@ from app.schemas.profile import (
     CareerPathNode,
 )
 
+from app.schemas.discovery import (
+    ConnectorHealthReport,
+    ConnectorStatus,
+    DiscoveryConnectorReport,
+    DiscoveryConnectorResult,
+    DiscoveryQueryPlan,
+    DiscoveryRunRequest,
+    DiscoveryRunResponse,
+    DiscoverySearchQuery,
+    RoleMappingTarget,
+)
 from app.schemas.pipeline import (
     PipelineEvaluationRequest,
     PipelineEvaluationResponse,
@@ -125,5 +136,15 @@ __all__ = [
     "ExtractedEducation",
     "EpistemicUncertainties",
     "LLMCandidateFactExtraction",
+    # Discovery
+    "ConnectorStatus",
+    "DiscoverySearchQuery",
+    "RoleMappingTarget",
+    "DiscoveryQueryPlan",
+    "ConnectorHealthReport",
+    "DiscoveryConnectorResult",
+    "DiscoveryConnectorReport",
+    "DiscoveryRunRequest",
+    "DiscoveryRunResponse",
 ]
 
