@@ -11,11 +11,13 @@ from app.db.repositories.interfaces import (
     CandidateProfileRepository,
     DuplicateClusterRepository,
     OpportunityRepository,
+    RecommendationRepository,
 )
 from app.db.repositories.sqlite_repository import (
     SQLiteCandidateProfileRepository,
     SQLiteDuplicateClusterRepository,
     SQLiteOpportunityRepository,
+    SQLiteRecommendationRepository,
 )
 from app.modules.discovery.connectors import (
     BaseDiscoveryConnector,
@@ -36,6 +38,8 @@ from app.modules.orchestration.tools import (
     PersistenceTool,
     ProfileRetrievalArgs,
     ProfileRetrievalTool,
+    RankingArgs,
+    RankingTool,
     RoleMappingArgs,
     RoleMappingTool,
 )
@@ -76,12 +80,14 @@ class AdaptiveDiscoveryWorkflow:
         opp_repo: Optional[OpportunityRepository] = None,
         cluster_repo: Optional[DuplicateClusterRepository] = None,
         profile_repo: Optional[CandidateProfileRepository] = None,
+        rec_repo: Optional[RecommendationRepository] = None,
         connectors: Optional[list[BaseDiscoveryConnector]] = None,
         llm_client: Optional[BaseLLMClient] = None,
     ) -> None:
         self.opp_repo = opp_repo or SQLiteOpportunityRepository()
         self.cluster_repo = cluster_repo or SQLiteDuplicateClusterRepository()
         self.profile_repo = profile_repo or SQLiteCandidateProfileRepository()
+        self.rec_repo = rec_repo or SQLiteRecommendationRepository()
         self._raw_connectors = connectors
         self.llm_client = llm_client
 
@@ -91,6 +97,7 @@ class AdaptiveDiscoveryWorkflow:
         self.dedup_tool = DeduplicationTool()
         self.eligibility_tool = DeterministicEligibilityTool()
         self.persistence_tool = PersistenceTool(self.opp_repo, self.cluster_repo)
+        self.ranking_tool = RankingTool()
         self.agent_decision_maker = DiscoveryAgentDecisionMaker(self.llm_client)
 
     async def run(self, request: AdaptiveDiscoveryRequest) -> AdaptiveDiscoveryResponse:
@@ -125,8 +132,9 @@ class AdaptiveDiscoveryWorkflow:
             raise ValueError("Candidate profile could not be resolved. Please provide candidate_profile or valid user_id.")
 
         # 2. Check health of available connectors
+        mock_mode = not request.enable_live_discovery
         active_connectors = self._raw_connectors or get_default_connectors(
-            mock_mode=True,
+            mock_mode=mock_mode,
             simulate_failure_connector=request.simulate_failure_connector,
         )
         if request.connector_ids:
@@ -345,7 +353,52 @@ class AdaptiveDiscoveryWorkflow:
 
             iteration += 1
 
-        # 5. Finalize & Persist
+        # 5. Multi-Dimensional Fit Scoring & Candidate-Job Ranking
+        recommendations_data = None
+        if request.rank_recommendations and canonical_opportunities:
+            emit_event(
+                WorkflowStage.RANKING,
+                "RANKING_STARTED",
+                "Evaluating multi-dimensional candidate-job fit scores for discovered opportunities.",
+                {
+                    "weight_profile": request.weight_profile_name,
+                    "candidates_to_rank": len(canonical_opportunities),
+                },
+            )
+            rank_tool_res = self.ranking_tool.execute(
+                RankingArgs(
+                    candidate_profile=profile,
+                    opportunities=canonical_opportunities,
+                    eligibility_results=eligibility_results,
+                    weight_profile_name=request.weight_profile_name,
+                )
+            )
+            tool_call_count += 1
+            if rank_tool_res.success and rank_tool_res.data:
+                recommendations_data = rank_tool_res.data
+                if request.persist_to_repository and self.rec_repo:
+                    try:
+                        self.rec_repo.save_evaluation(recommendations_data)
+                    except Exception as rec_save_err:
+                        logger.warning("Could not persist ranking evaluation: %s", rec_save_err)
+
+                top_score = (
+                    recommendations_data.ranked_recommendations[0].overall_fit_score
+                    if recommendations_data.ranked_recommendations
+                    else 0.0
+                )
+                emit_event(
+                    WorkflowStage.RANKING,
+                    "RANKING_COMPLETED",
+                    f"Ranked {recommendations_data.total_eligible_ranked} eligible opportunities (top fit score: {top_score:.2f}).",
+                    {
+                        "total_ranked": recommendations_data.total_eligible_ranked,
+                        "total_ineligible": recommendations_data.total_ineligible_excluded,
+                        "top_fit_score": top_score,
+                    },
+                )
+
+        # 6. Finalize & Persist
         emit_event(WorkflowStage.FINALIZING, "FINALIZING_STARTED", "Persisting discovered listings and compiling final telemetry.")
         if request.persist_to_repository and accumulated_raw:
             persist_res = self.persistence_tool.execute(
@@ -420,6 +473,7 @@ class AdaptiveDiscoveryWorkflow:
             duplicate_records=duplicate_records,
             eligibility_results=eligibility_results,
             connector_health=connector_health,
+            recommendations=recommendations_data,
             timeline_events=timeline,
             execution_metadata={
                 "duration_ms": elapsed_ms,

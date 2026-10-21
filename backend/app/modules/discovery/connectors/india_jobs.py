@@ -127,6 +127,19 @@ class IndiaJobsMCPConnector(BaseDiscoveryConnector):
                 error_message="India Jobs MCP stdio process failed with exit code 1.",
             )
 
+        if not self._binary_available and not self._mock_mode:
+            elapsed = round((time.perf_counter() - t0) * 1000, 2)
+            return DiscoveryConnectorResult(
+                connector_id=self.connector_id,
+                source_name=self.source_name,
+                query_id=query.query_id,
+                status=ConnectorStatus.UNAVAILABLE_MISSING_BINARY,
+                opportunities=[],
+                raw_count=0,
+                latency_ms=elapsed,
+                error_message="India Jobs MCP binary ('india-jobs-mcp') is not installed on PATH.",
+            )
+
         # Indian tech companies & startups
         company_profiles = [
             ("Swiggy Labs", "Bengaluru, India", "18-24 LPA"),

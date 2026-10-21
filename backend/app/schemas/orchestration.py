@@ -14,6 +14,7 @@ from app.schemas.discovery import (
 from app.schemas.eligibility import EligibilityResult
 from app.schemas.opportunity import PolymorphicOpportunity
 from app.schemas.profile import CandidateCareerProfile
+from app.schemas.ranking import RankingResponse
 
 
 class WorkflowStage(str, Enum):
@@ -25,6 +26,7 @@ class WorkflowStage(str, Enum):
     EVALUATING = "EVALUATING"
     GAP_ANALYSIS = "GAP_ANALYSIS"
     ADAPTING = "ADAPTING"
+    RANKING = "RANKING"
     FINALIZING = "FINALIZING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
@@ -199,6 +201,18 @@ class AdaptiveDiscoveryRequest(BaseModel):
         default=True,
         description="Whether to persist canonical listings and clusters to the database.",
     )
+    enable_live_discovery: bool = Field(
+        default=False,
+        description="Whether to query live external career APIs and job aggregators.",
+    )
+    rank_recommendations: bool = Field(
+        default=True,
+        description="Whether to execute multi-dimensional ranking and fit scoring on discovered opportunities.",
+    )
+    weight_profile_name: str = Field(
+        default="DEFAULT",
+        description="Weight profile name for candidate-job ranking (e.g. DEFAULT, EARLY_CAREER, EXPERIENCED).",
+    )
 
 
 class AdaptiveDiscoveryResponse(BaseModel):
@@ -285,6 +299,10 @@ class AdaptiveDiscoveryResponse(BaseModel):
     connector_health: list[ConnectorHealthReport] = Field(
         default_factory=list,
         description="Operational health status of connectors during workflow.",
+    )
+    recommendations: Optional[RankingResponse] = Field(
+        default=None,
+        description="Multi-dimensional evidence-grounded candidate-job rankings and fit scores.",
     )
     timeline_events: list[WorkflowTimelineEvent] = Field(
         default_factory=list,

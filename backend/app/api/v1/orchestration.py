@@ -7,11 +7,13 @@ from app.db.repositories.interfaces import (
     CandidateProfileRepository,
     DuplicateClusterRepository,
     OpportunityRepository,
+    RecommendationRepository,
 )
 from app.db.repositories.sqlite_repository import (
     SQLiteCandidateProfileRepository,
     SQLiteDuplicateClusterRepository,
     SQLiteOpportunityRepository,
+    SQLiteRecommendationRepository,
 )
 from app.modules.orchestration.workflow import AdaptiveDiscoveryWorkflow
 from app.schemas.orchestration import (
@@ -39,16 +41,23 @@ def get_cluster_repository() -> DuplicateClusterRepository:
     return SQLiteDuplicateClusterRepository()
 
 
+def get_recommendation_repository() -> RecommendationRepository:
+    """Dependency provider for RecommendationRepository."""
+    return SQLiteRecommendationRepository()
+
+
 def get_orchestration_workflow(
     profile_repo: CandidateProfileRepository = Depends(get_profile_repository),
     opp_repo: OpportunityRepository = Depends(get_opportunity_repository),
     cluster_repo: DuplicateClusterRepository = Depends(get_cluster_repository),
+    rec_repo: RecommendationRepository = Depends(get_recommendation_repository),
 ) -> AdaptiveDiscoveryWorkflow:
     """Dependency provider for AdaptiveDiscoveryWorkflow."""
     return AdaptiveDiscoveryWorkflow(
         opp_repo=opp_repo,
         cluster_repo=cluster_repo,
         profile_repo=profile_repo,
+        rec_repo=rec_repo,
     )
 
 

@@ -6,11 +6,12 @@ import {
   AdaptiveDiscoveryResponse,
   CandidateCareerProfile,
   CareerPathRelationship,
+  ConstraintCheckResult,
   DegreeLevel,
   EvidenceSourceType,
   OpportunityCategory,
-  ConstraintCheckResult,
-  WorkflowStage,
+  RankedOpportunity,
+  RankingDimension,
   WorkMode,
 } from '@/types/domain';
 import { runAdaptiveDiscovery } from '@/lib/api';
@@ -99,20 +100,132 @@ const SAMPLE_PROFILES: Record<string, { label: string; description: string; prof
         requires_visa_sponsorship: false,
         highest_degree_level: 'BACHELORS' as DegreeLevel,
         is_currently_enrolled_student: false,
-        expected_graduation_date: null,
         total_full_time_experience_months: 18,
         allowed_opportunity_categories: ['FULL_TIME_JOB' as OpportunityCategory],
         allowed_work_modes: ['REMOTE' as WorkMode, 'HYBRID' as WorkMode],
-        preferred_locations: ['San Francisco, US'],
+        preferred_locations: ['San Francisco, US', 'Remote'],
       },
       overall_profile_confidence: 0.88,
     },
   },
-  priyansh: {
-    label: 'Priyansh Sharma — Student Intern (India)',
-    description: 'Enrolled B.Tech student graduating 2026. Python, React, SQL. Target: Software Engineering Intern. Authorized: IN.',
+  alex: {
+    label: 'Alex Rivera — Senior Full Stack Engineer (US & Remote)',
+    description: '48 months experience, advanced TypeScript, React, Python, PostgreSQL, AWS, Microservices.',
     profile: {
-      user_id: 'priyansh-student-in',
+      user_id: 'alex-rivera-senior',
+      profile_version: 1,
+      assessed_skills: [
+        {
+          canonical_skill_id: 'esco:typescript',
+          skill_name: 'TypeScript',
+          proficiency_score: 9.0,
+          confidence_score: 0.95,
+          evidence_records: [
+            {
+              evidence_id: 'ev-a-1',
+              source_type: 'RESUME_WORK_EXPERIENCE' as EvidenceSourceType,
+              extracted_snippet: 'Led frontend architecture across 4 engineering pods in React/TypeScript.',
+              observed_at: '2026-01-10T00:00:00Z',
+              verifiability_weight: 0.95,
+            },
+          ],
+        },
+        {
+          canonical_skill_id: 'esco:react',
+          skill_name: 'React',
+          proficiency_score: 8.8,
+          confidence_score: 0.92,
+          evidence_records: [
+            {
+              evidence_id: 'ev-a-2',
+              source_type: 'RESUME_WORK_EXPERIENCE' as EvidenceSourceType,
+              extracted_snippet: 'Built real-time collaborative workspace interface.',
+              observed_at: '2026-01-10T00:00:00Z',
+              verifiability_weight: 0.90,
+            },
+          ],
+        },
+        {
+          canonical_skill_id: 'esco:python',
+          skill_name: 'Python',
+          proficiency_score: 8.2,
+          confidence_score: 0.88,
+          evidence_records: [
+            {
+              evidence_id: 'ev-a-3',
+              source_type: 'RESUME_WORK_EXPERIENCE' as EvidenceSourceType,
+              extracted_snippet: 'Built ETL pipelines and FastAPI endpoints.',
+              observed_at: '2026-01-10T00:00:00Z',
+              verifiability_weight: 0.88,
+            },
+          ],
+        },
+        {
+          canonical_skill_id: 'esco:postgresql',
+          skill_name: 'PostgreSQL',
+          proficiency_score: 8.0,
+          confidence_score: 0.86,
+          evidence_records: [
+            {
+              evidence_id: 'ev-a-4',
+              source_type: 'RESUME_WORK_EXPERIENCE' as EvidenceSourceType,
+              extracted_snippet: 'Designed high-concurrency relational schema.',
+              observed_at: '2026-01-10T00:00:00Z',
+              verifiability_weight: 0.85,
+            },
+          ],
+        },
+        {
+          canonical_skill_id: 'esco:docker',
+          skill_name: 'Docker',
+          proficiency_score: 7.8,
+          confidence_score: 0.82,
+          evidence_records: [
+            {
+              evidence_id: 'ev-a-5',
+              source_type: 'RESUME_PROJECT' as EvidenceSourceType,
+              extracted_snippet: 'Containerized CI/CD builds with GitHub Actions.',
+              observed_at: '2026-01-10T00:00:00Z',
+              verifiability_weight: 0.80,
+            },
+          ],
+        },
+      ],
+      target_career_paths: [
+        {
+          occupation_code: '15-1254.00',
+          title: 'Frontend Engineer',
+          relationship_type: 'TARGET' as CareerPathRelationship,
+          adjacency_similarity: 1.0,
+          missing_core_skill_ids: [],
+        },
+        {
+          occupation_code: '15-1252.00',
+          title: 'Backend Software Engineer',
+          relationship_type: 'TARGET' as CareerPathRelationship,
+          adjacency_similarity: 0.95,
+          missing_core_skill_ids: [],
+        },
+      ],
+      adjacent_career_paths: [],
+      eligibility_constraints: {
+        authorized_country_codes: ['US'],
+        requires_visa_sponsorship: false,
+        highest_degree_level: 'BACHELORS' as DegreeLevel,
+        is_currently_enrolled_student: false,
+        total_full_time_experience_months: 48,
+        allowed_opportunity_categories: ['FULL_TIME_JOB' as OpportunityCategory],
+        allowed_work_modes: ['REMOTE' as WorkMode, 'HYBRID' as WorkMode, 'ON_SITE' as WorkMode],
+        preferred_locations: ['Remote', 'San Francisco, US'],
+      },
+      overall_profile_confidence: 0.92,
+    },
+  },
+  priya: {
+    label: 'Priya Sharma — Student Software Engineer (India)',
+    description: 'Final-year student, Java, Python, SQL, REST APIs. Authorized: IN. Looking for Internships & Entry roles.',
+    profile: {
+      user_id: 'priya-sharma-student',
       profile_version: 1,
       assessed_skills: [
         {
@@ -124,39 +237,39 @@ const SAMPLE_PROFILES: Record<string, { label: string; description: string; prof
             {
               evidence_id: 'ev-p-1',
               source_type: 'RESUME_PROJECT' as EvidenceSourceType,
-              extracted_snippet: 'Developed full stack automated testing toolkit in Python.',
-              observed_at: '2026-02-01T00:00:00Z',
-              verifiability_weight: 0.85,
+              extracted_snippet: 'Developed backend API in Flask for college portal.',
+              observed_at: '2026-01-10T00:00:00Z',
+              verifiability_weight: 0.80,
             },
           ],
         },
         {
-          canonical_skill_id: 'esco:react',
-          skill_name: 'React',
-          proficiency_score: 7.0,
-          confidence_score: 0.80,
+          canonical_skill_id: 'esco:java',
+          skill_name: 'Java',
+          proficiency_score: 7.8,
+          confidence_score: 0.85,
           evidence_records: [
             {
               evidence_id: 'ev-p-2',
-              source_type: 'RESUME_PROJECT' as EvidenceSourceType,
-              extracted_snippet: 'Constructed responsive student event portal with React & Tailwind.',
-              observed_at: '2026-02-01T00:00:00Z',
-              verifiability_weight: 0.80,
+              source_type: 'RESUME_WORK_EXPERIENCE' as EvidenceSourceType,
+              extracted_snippet: 'Completed 6-month software internship building Spring Boot microservices.',
+              observed_at: '2026-01-10T00:00:00Z',
+              verifiability_weight: 0.85,
             },
           ],
         },
         {
           canonical_skill_id: 'esco:sql',
           skill_name: 'SQL',
-          proficiency_score: 6.8,
-          confidence_score: 0.78,
+          proficiency_score: 7.0,
+          confidence_score: 0.80,
           evidence_records: [
             {
               evidence_id: 'ev-p-3',
-              source_type: 'ACADEMIC_TRANSCRIPT' as EvidenceSourceType,
-              extracted_snippet: 'Relational Database Management coursework (Grade: A).',
-              observed_at: '2025-11-15T00:00:00Z',
-              verifiability_weight: 0.78,
+              source_type: 'CERTIFICATION' as EvidenceSourceType,
+              extracted_snippet: 'Certified Database Developer with MySQL and PostgreSQL.',
+              observed_at: '2026-01-10T00:00:00Z',
+              verifiability_weight: 0.80,
             },
           ],
         },
@@ -164,7 +277,7 @@ const SAMPLE_PROFILES: Record<string, { label: string; description: string; prof
       target_career_paths: [
         {
           occupation_code: '15-1252.00',
-          title: 'Software Developer',
+          title: 'Backend Software Engineer',
           relationship_type: 'TARGET' as CareerPathRelationship,
           adjacency_similarity: 1.0,
           missing_core_skill_ids: [],
@@ -174,45 +287,35 @@ const SAMPLE_PROFILES: Record<string, { label: string; description: string; prof
       eligibility_constraints: {
         authorized_country_codes: ['IN'],
         requires_visa_sponsorship: false,
-        highest_degree_level: 'HIGH_SCHOOL' as DegreeLevel,
+        highest_degree_level: 'BACHELORS' as DegreeLevel,
         is_currently_enrolled_student: true,
         expected_graduation_date: '2026-06-30',
-        total_full_time_experience_months: 0,
-        allowed_opportunity_categories: [
-          'INTERNSHIP' as OpportunityCategory,
-          'FULL_TIME_JOB' as OpportunityCategory,
-        ],
-        allowed_work_modes: ['REMOTE' as WorkMode, 'HYBRID' as WorkMode, 'ON_SITE' as WorkMode],
-        preferred_locations: ['Bengaluru, India', 'Pune, India'],
+        total_full_time_experience_months: 6,
+        allowed_opportunity_categories: ['INTERNSHIP' as OpportunityCategory, 'FULL_TIME_JOB' as OpportunityCategory],
+        allowed_work_modes: ['HYBRID' as WorkMode, 'REMOTE' as WorkMode, 'ON_SITE' as WorkMode],
+        preferred_locations: ['Bengaluru, India', 'Pune, India', 'Remote'],
       },
       overall_profile_confidence: 0.82,
     },
   },
 };
 
-const STAGES: { id: WorkflowStage; label: string }[] = [
-  { id: 'INITIALIZING', label: 'Init' },
-  { id: 'STRATEGY_FORMULATION', label: 'Strategy' },
-  { id: 'SEARCHING', label: 'Searching' },
-  { id: 'EVALUATING', label: 'Evaluating' },
-  { id: 'GAP_ANALYSIS', label: 'Gap Analysis' },
-  { id: 'ADAPTING', label: 'Adapting' },
-  { id: 'FINALIZING', label: 'Finalizing' },
-  { id: 'COMPLETED', label: 'Completed' },
-];
-
 export function AdaptiveDiscoveryDemo() {
-  const [selectedCandidate, setSelectedCandidate] = useState<string>('maya');
+  const [selectedCandidate, setSelectedCandidate] = useState<string>('alex');
   const [targetCoverageGoal, setTargetCoverageGoal] = useState<number>(3);
-  const [maxIterations, setMaxIterations] = useState<number>(3);
-  const [maxToolCalls, setMaxToolCalls] = useState<number>(10);
+  const [maxIterations, setMaxIterations] = useState<number>(2);
+  const [maxToolCalls, setMaxToolCalls] = useState<number>(12);
   const [simulateFailure, setSimulateFailure] = useState<string>('none');
   const [forceGap, setForceGap] = useState<boolean>(false);
+  const [enableLiveDiscovery, setEnableLiveDiscovery] = useState<boolean>(true);
+  const [rankRecommendations, setRankRecommendations] = useState<boolean>(true);
+  const [weightProfile, setWeightProfile] = useState<string>('DEFAULT');
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [response, setResponse] = useState<AdaptiveDiscoveryResponse | null>(null);
-  const [activeTab, setActiveTab] = useState<'timeline' | 'adaptations' | 'opportunities' | 'connectors'>('timeline');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [activeTab, setActiveTab] = useState<'recommendations' | 'timeline' | 'adaptations' | 'opportunities' | 'connectors'>('recommendations');
   const [expandedEventIdx, setExpandedEventIdx] = useState<number | null>(null);
 
   const candidateData = SAMPLE_PROFILES[selectedCandidate];
@@ -231,11 +334,16 @@ export function AdaptiveDiscoveryDemo() {
         simulate_failure_connector: simulateFailure === 'none' ? null : simulateFailure,
         force_adaptive_gap_for_testing: forceGap,
         persist_to_repository: true,
+        enable_live_discovery: enableLiveDiscovery,
+        rank_recommendations: rankRecommendations,
+        weight_profile_name: weightProfile,
       };
 
       const res = await runAdaptiveDiscovery(payload);
       setResponse(res);
-      if (res.adaptation_history && res.adaptation_history.length > 0) {
+      if (res.recommendations && res.recommendations.ranked_recommendations?.length > 0) {
+        setActiveTab('recommendations');
+      } else if (res.adaptation_history && res.adaptation_history.length > 0) {
         setActiveTab('adaptations');
       } else {
         setActiveTab('timeline');
@@ -264,7 +372,6 @@ export function AdaptiveDiscoveryDemo() {
     }
   }
 
-  // Map opportunity_id to eligibility result for quick lookup
   const eligibilityMap = React.useMemo(() => {
     if (!response?.eligibility_results) return new Map();
     return new Map(response.eligibility_results.map((r) => [r.opportunity_id, r]));
@@ -277,24 +384,23 @@ export function AdaptiveDiscoveryDemo() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-violet-500/20 text-violet-300 border border-violet-500/30">
-                Milestone 8
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                Milestone 10
               </span>
-              <span className="text-xs text-zinc-400">Agent Orchestration & Adaptive Discovery</span>
+              <span className="text-xs text-zinc-400">End-to-End Career Intelligence & Live Discovery Validation</span>
             </div>
             <h3 className="text-xl font-bold tracking-tight mt-1 text-white">
-              Autonomous Adaptive Discovery Coordinator
+              End-to-End Career Intelligence & Live Discovery System
             </h3>
-            <p className="text-xs text-zinc-300 mt-1 max-w-2xl">
-              An LLM-driven agent formulates search strategies, executes controlled tools, inspects result
-              freshness & coverage, autonomously adapts queries/roles when gaps occur, and subjects all findings
-              to deterministic deduplication and eligibility gating.
+            <p className="text-xs text-zinc-300 mt-1 max-w-3xl leading-relaxed">
+              Unified agentic pipeline executing from candidate evidence profiling to multi-source discovery (Greenhouse, Ashby, JobSpy/Indeed),
+              deterministic MinHash deduplication, hard eligibility gating, and 6-dimensional candidate-job fit ranking with honest source transparency.
             </p>
           </div>
           <div className="flex items-center gap-2 self-start sm:self-auto">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium border border-zinc-700 bg-zinc-800 text-zinc-300">
-              <span className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
-              Bounded State Machine
+              <span className={`w-2 h-2 rounded-full ${enableLiveDiscovery ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+              {enableLiveDiscovery ? 'Live External Mode' : 'Deterministic Fixture Mode'}
             </span>
           </div>
         </div>
@@ -308,50 +414,107 @@ export function AdaptiveDiscoveryDemo() {
             <div className="flex-1 leading-relaxed">{errorMessage}</div>
             <button
               onClick={() => setErrorMessage(null)}
-              className="text-rose-500 hover:text-rose-700 font-bold ml-2"
+              className="text-rose-500 hover:text-rose-700 text-xs font-bold"
             >
-              ✕
+              Dismiss
             </button>
           </div>
         )}
 
-        {/* Section 1: Candidate Selection & Parameters */}
-        <div className="space-y-4">
-          <label className="text-xs font-bold uppercase tracking-wider text-zinc-500">
-            1. Select Candidate Profile & Orchestration Limits
-          </label>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {Object.entries(SAMPLE_PROFILES).map(([key, item]) => {
-              const isSelected = selectedCandidate === key;
-              return (
-                <div
-                  key={key}
-                  onClick={() => setSelectedCandidate(key)}
-                  className={`p-4 rounded-xl border cursor-pointer transition ${
-                    isSelected
-                      ? 'border-violet-600 bg-violet-50/30 ring-1 ring-violet-600'
-                      : 'border-zinc-200 bg-white hover:border-zinc-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-zinc-900">{item.label}</span>
-                    {isSelected && (
-                      <span className="text-[10px] uppercase font-bold text-violet-700 bg-violet-100 px-2 py-0.5 rounded">
-                        Active
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-zinc-600 mt-1.5 leading-relaxed">{item.description}</p>
-                </div>
-              );
-            })}
+        {/* Configuration Console */}
+        <div className="p-5 rounded-xl border border-zinc-200 bg-zinc-50/50 space-y-5">
+          <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-700">
+              Pipeline Execution Controls
+            </h4>
+            <span className="text-xs font-mono text-zinc-500">
+              Candidate: {candidateData.label.split(' — ')[0]}
+            </span>
           </div>
 
-          {/* Workflow Parameters Grid */}
-          <div className="p-4 rounded-xl border border-zinc-200 bg-zinc-50/50 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {/* Candidate Selection */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-zinc-700">Select Candidate Career Profile</label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {Object.entries(SAMPLE_PROFILES).map(([key, data]) => {
+                const isSelected = selectedCandidate === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setSelectedCandidate(key)}
+                    className={`p-3 rounded-lg border text-left transition ${
+                      isSelected
+                        ? 'border-violet-600 bg-violet-50/50 ring-1 ring-violet-600 text-zinc-900'
+                        : 'border-zinc-200 bg-white hover:border-zinc-300 text-zinc-700'
+                    }`}
+                  >
+                    <div className="font-bold text-xs">{data.label}</div>
+                    <div className="text-[11px] text-zinc-500 mt-1 line-clamp-2 leading-relaxed">
+                      {data.description}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Milestone 10 Mode & Ranking Controls */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+            <div className="p-3.5 rounded-lg border border-emerald-200 bg-emerald-50/40 space-y-1">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="liveDiscoveryToggle"
+                  checked={enableLiveDiscovery}
+                  onChange={(e) => setEnableLiveDiscovery(e.target.checked)}
+                  className="h-4 w-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <label htmlFor="liveDiscoveryToggle" className="text-xs font-bold text-emerald-900 cursor-pointer">
+                  Query Live External APIs & Scrapers
+                </label>
+              </div>
+              <p className="text-[10px] text-emerald-800 leading-relaxed pl-6">
+                Queries Greenhouse, Ashby, and Indeed live. Falling back gracefully if offline.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-lg border border-violet-200 bg-violet-50/40 space-y-1">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="rankRecsToggle"
+                  checked={rankRecommendations}
+                  onChange={(e) => setRankRecommendations(e.target.checked)}
+                  className="h-4 w-4 rounded border-zinc-300 text-violet-600 focus:ring-violet-500"
+                />
+                <label htmlFor="rankRecsToggle" className="text-xs font-bold text-violet-900 cursor-pointer">
+                  Run 6-D Fit Scoring & Ranking
+                </label>
+              </div>
+              <p className="text-[10px] text-violet-800 leading-relaxed pl-6">
+                Applies multi-dimensional evidence fit math to compute personalized recommendations.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-lg border border-zinc-200 bg-white space-y-1">
+              <label className="text-[11px] font-bold text-zinc-700">Ranking Weight Profile</label>
+              <select
+                value={weightProfile}
+                onChange={(e) => setWeightProfile(e.target.value)}
+                className="w-full px-2.5 py-1 rounded-md border border-zinc-200 bg-zinc-50 text-xs text-zinc-900 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              >
+                <option value="DEFAULT">DEFAULT (30/20/20/12/10/8)</option>
+                <option value="EARLY_CAREER">EARLY_CAREER (25/20/28/12/10/5)</option>
+                <option value="EXPERIENCED">EXPERIENCED (35/20/15/10/10/10)</option>
+              </select>
+              <p className="text-[10px] text-zinc-400">Calibrated scoring weights</p>
+            </div>
+          </div>
+
+          {/* Loop Guard Parameters */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
             <div className="space-y-1">
-              <label className="text-[11px] font-semibold text-zinc-700">Target Coverage Goal</label>
+              <label className="text-[11px] font-semibold text-zinc-700">Coverage Goal</label>
               <input
                 type="number"
                 min={1}
@@ -360,7 +523,7 @@ export function AdaptiveDiscoveryDemo() {
                 onChange={(e) => setTargetCoverageGoal(Number(e.target.value))}
                 className="w-full px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-xs font-mono text-zinc-900 focus:outline-none focus:ring-1 focus:ring-violet-500"
               />
-              <span className="text-[10px] text-zinc-400">Stop when met</span>
+              <span className="text-[10px] text-zinc-400">Target count</span>
             </div>
 
             <div className="space-y-1">
@@ -373,7 +536,7 @@ export function AdaptiveDiscoveryDemo() {
                 onChange={(e) => setMaxIterations(Number(e.target.value))}
                 className="w-full px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-xs font-mono text-zinc-900 focus:outline-none focus:ring-1 focus:ring-violet-500"
               />
-              <span className="text-[10px] text-zinc-400">Loop budget guard</span>
+              <span className="text-[10px] text-zinc-400">Loop budget</span>
             </div>
 
             <div className="space-y-1">
@@ -386,17 +549,17 @@ export function AdaptiveDiscoveryDemo() {
                 onChange={(e) => setMaxToolCalls(Number(e.target.value))}
                 className="w-full px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-xs font-mono text-zinc-900 focus:outline-none focus:ring-1 focus:ring-violet-500"
               />
-              <span className="text-[10px] text-zinc-400">Cost limit guard</span>
+              <span className="text-[10px] text-zinc-400">Cost guard</span>
             </div>
 
             <div className="space-y-1">
-              <label className="text-[11px] font-semibold text-zinc-700">Simulate Source Failure</label>
+              <label className="text-[11px] font-semibold text-zinc-700">Simulate Failure</label>
               <select
                 value={simulateFailure}
                 onChange={(e) => setSimulateFailure(e.target.value)}
                 className="w-full px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-xs text-zinc-900 focus:outline-none focus:ring-1 focus:ring-violet-500"
               >
-                <option value="none">None (All Available)</option>
+                <option value="none">None (All Healthy)</option>
                 <option value="web_search">Web Search Error</option>
                 <option value="india_jobs_mcp">India Jobs MCP Error</option>
                 <option value="jobspy_mcp">JobSpy MCP Error</option>
@@ -407,7 +570,7 @@ export function AdaptiveDiscoveryDemo() {
 
             <div className="space-y-1 flex flex-col justify-between">
               <div>
-                <label className="text-[11px] font-semibold text-zinc-700">Adaptive Decision Trigger</label>
+                <label className="text-[11px] font-semibold text-zinc-700">Adaptive Shift</label>
                 <div className="flex items-center gap-2 mt-2">
                   <input
                     type="checkbox"
@@ -417,11 +580,11 @@ export function AdaptiveDiscoveryDemo() {
                     className="h-4 w-4 rounded border-zinc-300 text-violet-600 focus:ring-violet-500"
                   />
                   <label htmlFor="forceGapToggle" className="text-xs text-zinc-700 font-medium cursor-pointer">
-                    Force Initial Gap
+                    Force Gap
                   </label>
                 </div>
               </div>
-              <span className="text-[10px] text-zinc-400">Forces agent into query/role adaptation</span>
+              <span className="text-[10px] text-zinc-400">Test adaptation</span>
             </div>
           </div>
 
@@ -429,17 +592,17 @@ export function AdaptiveDiscoveryDemo() {
             <button
               onClick={handleRunWorkflow}
               disabled={isLoading}
-              className="px-5 py-2.5 rounded-lg text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white transition shadow-sm disabled:opacity-50 flex items-center gap-2"
+              className="px-6 py-2.5 rounded-lg text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white transition shadow-sm disabled:opacity-50 flex items-center gap-2"
             >
               {isLoading ? (
                 <>
                   <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Agent Reasoning & Orchestrating...</span>
+                  <span>Executing End-to-End Career Intelligence Pipeline...</span>
                 </>
               ) : (
                 <>
                   <span>▶</span>
-                  <span>Execute Adaptive Discovery Workflow</span>
+                  <span>Execute End-to-End Career Intelligence</span>
                 </>
               )}
             </button>
@@ -460,49 +623,33 @@ export function AdaptiveDiscoveryDemo() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-zinc-500">Candidate: {response.candidate_id}</span>
-                    <span className="text-zinc-300">•</span>
-                    <span className="text-xs text-zinc-500">
-                      Duration: {Number(response.execution_metadata?.duration_ms || 0).toFixed(1)}ms
+                    <span className="text-xs text-zinc-500 font-medium">Termination Reason:</span>
+                    <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${getTerminationBadgeClass(response.termination_reason)}`}>
+                      {response.termination_reason}
                     </span>
-                    <span className="text-zinc-300">•</span>
-                    <span className="text-xs text-zinc-500">Iterations: {response.iterations_completed}</span>
-                    <span className="text-zinc-300">•</span>
-                    <span className="text-xs text-zinc-500">Tool Calls: {response.total_tool_calls}</span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-zinc-500">Status:</span>
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${getTerminationBadgeClass(response.termination_reason)}`}>
-                    {response.termination_reason}
-                  </span>
-                </div>
-              </div>
-
-              {/* Progress Stepper */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">
-                  <span>Workflow Execution Stepper</span>
-                  <span className="font-mono text-zinc-400">Completed: {response.termination_reason}</span>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-1.5">
-                  {STAGES.map((s, idx) => (
-                    <div
-                      key={idx}
-                      className="px-2 py-1.5 rounded-lg border text-center transition bg-violet-50 border-violet-200 text-violet-800 font-bold"
-                    >
-                      <div className="text-[10px] font-mono text-violet-500">{idx + 1}</div>
-                      <div className="text-[11px] truncate">{s.label}</div>
-                    </div>
-                  ))}
+                <div className="flex items-center gap-3 text-xs font-mono">
+                  <div className="px-3 py-1.5 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-700">
+                    <span className="text-zinc-400 font-sans text-[11px]">Iterations: </span>
+                    <span className="font-bold">{response.iterations_completed}</span>
+                  </div>
+                  <div className="px-3 py-1.5 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-700">
+                    <span className="text-zinc-400 font-sans text-[11px]">Tool Calls: </span>
+                    <span className="font-bold">{response.total_tool_calls}</span>
+                  </div>
+                  <div className="px-3 py-1.5 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-700">
+                    <span className="text-zinc-400 font-sans text-[11px]">Duration: </span>
+                    <span className="font-bold">{response.execution_metadata.duration_ms as number}ms</span>
+                  </div>
                 </div>
               </div>
 
               {/* Key Metrics Counter Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
                 <div className="p-3 rounded-lg bg-zinc-50 border border-zinc-200">
-                  <div className="text-[10px] uppercase font-bold text-zinc-500">Raw Retrieved</div>
+                  <div className="text-[10px] uppercase font-bold text-zinc-500">Raw Discovered</div>
                   <div className="text-lg font-bold text-zinc-900 mt-0.5">{response.total_discovered_raw}</div>
                   <div className="text-[10px] text-zinc-400">Across all sources</div>
                 </div>
@@ -514,61 +661,54 @@ export function AdaptiveDiscoveryDemo() {
                 </div>
 
                 <div className="p-3 rounded-lg bg-zinc-50 border border-zinc-200">
-                  <div className="text-[10px] uppercase font-bold text-zinc-500">Eligible Canonical</div>
-                  <div className="text-lg font-bold text-emerald-700 mt-0.5">{response.eligible_count}</div>
-                  <div className="text-[10px] text-zinc-400">Deterministic gate passed</div>
+                  <div className="text-[10px] uppercase font-bold text-zinc-500">Duplication Rate</div>
+                  <div className="text-lg font-bold text-amber-700 mt-0.5">
+                    {response.total_discovered_raw > 0
+                      ? `${Math.round((response.duplicate_count / response.total_discovered_raw) * 100)}%`
+                      : '0%'}
+                  </div>
+                  <div className="text-[10px] text-zinc-400">{response.duplicate_count} syndicated postings</div>
                 </div>
 
                 <div className="p-3 rounded-lg bg-zinc-50 border border-zinc-200">
-                  <div className="text-[10px] uppercase font-bold text-zinc-500">Adaptation Events</div>
-                  <div className="text-lg font-bold text-indigo-700 mt-0.5">{response.adaptation_history.length}</div>
-                  <div className="text-[10px] text-zinc-400">Search strategy shifts</div>
+                  <div className="text-[10px] uppercase font-bold text-zinc-500">Eligible Qualified</div>
+                  <div className="text-lg font-bold text-emerald-700 mt-0.5">
+                    {response.eligible_count + response.uncertain_count}
+                  </div>
+                  <div className="text-[10px] text-zinc-400">
+                    {response.eligible_count} clean / {response.uncertain_count} caveats
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-zinc-50 border border-zinc-200">
+                  <div className="text-[10px] uppercase font-bold text-zinc-500">Ranked Recs</div>
+                  <div className="text-lg font-bold text-indigo-700 mt-0.5">
+                    {response.recommendations?.total_eligible_ranked ?? 0}
+                  </div>
+                  <div className="text-[10px] text-zinc-400">
+                    Top fit: {response.recommendations?.ranked_recommendations?.[0] ? `${(response.recommendations.ranked_recommendations[0].overall_fit_score * 100).toFixed(1)}%` : 'N/A'}
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Strategy Card */}
-            {response.search_strategy && (
-              <div className="p-5 rounded-xl border border-zinc-200 bg-zinc-50/50 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-zinc-700">
-                    Formulated Search Strategy
-                  </span>
-                  <span className="text-[11px] font-mono text-zinc-500">
-                    Goal: {response.search_strategy.target_coverage_goal} eligible listings
-                  </span>
-                </div>
-                <div className="p-3 rounded-lg bg-white border border-zinc-200 text-xs text-zinc-700 leading-relaxed font-sans">
-                  <span className="font-semibold text-zinc-900">Agent Rationale: </span>
-                  {response.search_strategy.strategy_summary}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                  <div className="p-3 rounded-lg bg-white border border-zinc-200 space-y-1">
-                    <span className="text-[11px] font-bold text-zinc-500 uppercase">Target Role Priorities</span>
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {response.search_strategy.target_role_priorities.map((r, i) => (
-                        <span key={i} className="px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-100 text-zinc-800">
-                          {r}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="p-3 rounded-lg bg-white border border-zinc-200 space-y-1">
-                    <span className="text-[11px] font-bold text-zinc-500 uppercase">Selected Connectors</span>
-                    <div className="flex flex-wrap gap-1.5 pt-1">
-                      {response.search_strategy.selected_connector_ids.map((c, i) => (
-                        <span key={i} className="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-violet-50 text-violet-700 border border-violet-200">
-                          {c}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Navigation Tabs */}
-            <div className="border-b border-zinc-200 flex items-center gap-4 text-xs font-semibold">
+            <div className="border-b border-zinc-200 flex items-center gap-4 text-xs font-semibold overflow-x-auto">
+              {response.recommendations && (
+                <button
+                  onClick={() => setActiveTab('recommendations')}
+                  className={`pb-2.5 transition border-b-2 flex items-center gap-1.5 ${
+                    activeTab === 'recommendations'
+                      ? 'border-violet-600 text-violet-700 font-bold'
+                      : 'border-transparent text-zinc-500 hover:text-zinc-800'
+                  }`}
+                >
+                  <span>Ranked Recommendations</span>
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-violet-100 text-violet-800 font-mono">
+                    {response.recommendations.ranked_recommendations?.length ?? 0}
+                  </span>
+                </button>
+              )}
               <button
                 onClick={() => setActiveTab('timeline')}
                 className={`pb-2.5 transition border-b-2 ${
@@ -578,16 +718,6 @@ export function AdaptiveDiscoveryDemo() {
                 }`}
               >
                 Workflow Timeline ({response.timeline_events.length})
-              </button>
-              <button
-                onClick={() => setActiveTab('adaptations')}
-                className={`pb-2.5 transition border-b-2 ${
-                  activeTab === 'adaptations'
-                    ? 'border-violet-600 text-violet-700 font-bold'
-                    : 'border-transparent text-zinc-500 hover:text-zinc-800'
-                }`}
-              >
-                Adaptive Decisions & Gaps ({response.adaptation_history.length})
               </button>
               <button
                 onClick={() => setActiveTab('opportunities')}
@@ -600,6 +730,16 @@ export function AdaptiveDiscoveryDemo() {
                 Canonical Opportunities ({response.canonical_opportunities.length})
               </button>
               <button
+                onClick={() => setActiveTab('adaptations')}
+                className={`pb-2.5 transition border-b-2 ${
+                  activeTab === 'adaptations'
+                    ? 'border-violet-600 text-violet-700 font-bold'
+                    : 'border-transparent text-zinc-500 hover:text-zinc-800'
+                }`}
+              >
+                Adaptive Shifts ({response.adaptation_history.length})
+              </button>
+              <button
                 onClick={() => setActiveTab('connectors')}
                 className={`pb-2.5 transition border-b-2 ${
                   activeTab === 'connectors'
@@ -607,9 +747,175 @@ export function AdaptiveDiscoveryDemo() {
                     : 'border-transparent text-zinc-500 hover:text-zinc-800'
                 }`}
               >
-                Connector Health ({response.connector_health.length})
+                Source Connectors ({response.connector_health.length})
               </button>
             </div>
+
+            {/* Tab 0: Ranked Recommendations (Milestone 10 Core) */}
+            {activeTab === 'recommendations' && response.recommendations && (
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-zinc-600 bg-zinc-50 p-3 rounded-lg border border-zinc-200">
+                  <div>
+                    <span className="font-semibold text-zinc-900">Ranking Profile: </span>
+                    <span className="font-mono">{response.recommendations.weight_profile_used}</span>
+                    <span className="mx-2">•</span>
+                    <span>Evaluated: {response.recommendations.total_candidates_evaluated}</span>
+                    <span className="mx-2">•</span>
+                    <span className="text-emerald-700 font-semibold">Ranked: {response.recommendations.total_eligible_ranked}</span>
+                    <span className="mx-2">•</span>
+                    <span className="text-rose-700 font-semibold">Ineligible Excluded: {response.recommendations.total_ineligible_excluded}</span>
+                  </div>
+                  <div className="text-[11px] text-zinc-500 font-mono">
+                    Evaluation ID: {response.recommendations.evaluation_id.slice(0, 14)}...
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {response.recommendations.ranked_recommendations.map((rec: RankedOpportunity) => {
+                    const opp = rec.opportunity;
+                    const isLive = opp.category_specific_attributes?.is_live_retrieval === true;
+                    const dimScores = rec.dimension_scores as Record<RankingDimension, { raw_score: number; weight: number }>;
+
+                    return (
+                      <div
+                        key={opp.opportunity_id}
+                        className="p-5 rounded-xl border border-zinc-200 bg-white hover:border-zinc-300 transition shadow-sm space-y-4"
+                      >
+                        {/* Header: Rank + Title + Company + Live Badge */}
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                          <div className="flex items-center gap-3">
+                            <span className="w-8 h-8 rounded-lg bg-zinc-900 text-white font-bold text-xs flex items-center justify-center font-mono">
+                              #{rec.rank}
+                            </span>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="text-sm font-bold text-zinc-900">{opp.title}</h4>
+                                {isLive ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    Live External Listing
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-100 text-zinc-600 border border-zinc-200">
+                                    Simulated Fixture
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs text-zinc-600 mt-0.5 flex items-center gap-2">
+                                <span className="font-semibold text-zinc-800">{opp.company_name}</span>
+                                <span>•</span>
+                                <span>{opp.eligibility_rules.work_mode}</span>
+                                <span>•</span>
+                                <span className="font-mono text-[11px]">
+                                  {opp.category_specific_attributes?.source_system as string || 'ats'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3 self-end sm:self-center">
+                            <div className="text-right">
+                              <div className="text-xs font-mono text-zinc-400 uppercase">Fit Score</div>
+                              <div className="text-lg font-bold text-violet-700 font-mono">
+                                {(rec.overall_fit_score * 100).toFixed(1)}%
+                              </div>
+                            </div>
+                            {opp.source_url && (
+                              <a
+                                href={opp.source_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-violet-600 hover:bg-violet-700 text-white transition flex items-center gap-1 shadow-sm"
+                              >
+                                <span>Apply / View</span>
+                                <span>↗</span>
+                              </a>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 6-Dimension Score Breakdown */}
+                        <div className="p-3.5 rounded-lg bg-zinc-50 border border-zinc-200 space-y-2">
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                            Multi-Dimensional Score Breakdown
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+                            {([
+                              ['SKILL_ALIGNMENT', 'Skill Fit'],
+                              ['CAREER_ALIGNMENT', 'Career Alignment'],
+                              ['GROWTH_POTENTIAL', 'Growth Potential'],
+                              ['MARKET_RELEVANCE', 'Market Match'],
+                              ['PREFERENCE_FIT', 'Preferences'],
+                              ['QUALIFICATION_FIT', 'Qualifications'],
+                            ] as [RankingDimension, string][]).map(([dimKey, dimLabel]) => {
+                              const scoreObj = dimScores?.[dimKey];
+                              const rawScore = scoreObj ? scoreObj.raw_score : 0;
+                              return (
+                                <div key={dimKey} className="p-2 rounded bg-white border border-zinc-200 text-center">
+                                  <div className="text-[9px] uppercase font-bold text-zinc-400 truncate">{dimLabel}</div>
+                                  <div className="text-xs font-bold text-zinc-800 font-mono mt-0.5">
+                                    {(rawScore * 100).toFixed(0)}%
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Matched Skills & Growth Skills */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                          <div className="p-3 rounded-lg border border-emerald-100 bg-emerald-50/30 space-y-1.5">
+                            <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
+                              Verified Matched Skills ({rec.matched_skills.length})
+                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {rec.matched_skills.map((s, idx) => (
+                                <span
+                                  key={idx}
+                                  className="px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-100/70 text-emerald-800 border border-emerald-200"
+                                >
+                                  {s.skill_name}
+                                </span>
+                              ))}
+                              {rec.matched_skills.length === 0 && (
+                                <span className="text-[11px] text-zinc-400 italic">No direct keyword overlap</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="p-3 rounded-lg border border-indigo-100 bg-indigo-50/30 space-y-1.5">
+                            <span className="text-[10px] font-bold text-indigo-800 uppercase tracking-wider">
+                              Growth & Missing Competencies ({rec.missing_skills.length})
+                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {rec.missing_skills.map((s, idx) => (
+                                <span
+                                  key={idx}
+                                  className="px-2 py-0.5 rounded text-[11px] font-medium bg-indigo-100/70 text-indigo-800 border border-indigo-200"
+                                >
+                                  {s.skill_name}
+                                </span>
+                              ))}
+                              {rec.missing_skills.length === 0 && (
+                                <span className="text-[11px] text-zinc-400 italic">Prerequisites fully satisfied</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Recommendation Rationale */}
+                        {rec.recommendation_rationale && (
+                          <div className="text-xs text-zinc-600 leading-relaxed bg-zinc-50/60 p-3 rounded-lg border border-zinc-100">
+                            <span className="font-semibold text-zinc-800">Recommendation Rationale: </span>
+                            {rec.recommendation_rationale}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Tab 1: Workflow Timeline */}
             {activeTab === 'timeline' && (
@@ -630,7 +936,9 @@ export function AdaptiveDiscoveryDemo() {
                             <span className="font-mono text-[10px] text-zinc-400">
                               {new Date(evt.timestamp).toLocaleTimeString()}
                             </span>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-zinc-100 text-zinc-700">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold ${
+                              evt.stage === 'RANKING' ? 'bg-violet-100 text-violet-800' : 'bg-zinc-100 text-zinc-700'
+                            }`}>
                               {evt.stage}
                             </span>
                             <span className="font-bold text-zinc-900">{evt.event_type}</span>
@@ -638,17 +946,19 @@ export function AdaptiveDiscoveryDemo() {
                           {Object.keys(evt.details || {}).length > 0 && (
                             <button
                               onClick={() => setExpandedEventIdx(isExpanded ? null : idx)}
-                              className="text-[11px] text-violet-600 hover:text-violet-800 font-medium self-start sm:self-auto"
+                              className="text-[11px] text-violet-600 hover:text-violet-800 font-medium self-end sm:self-auto"
                             >
-                              {isExpanded ? 'Hide Payload' : 'View Payload'}
+                              {isExpanded ? 'Hide Payload' : 'Inspect Payload'}
                             </button>
                           )}
                         </div>
-                        <p className="text-zinc-600 mt-1 leading-relaxed">{evt.summary}</p>
+
+                        <div className="text-zinc-600 mt-1.5 leading-relaxed">{evt.summary}</div>
+
                         {isExpanded && (
-                          <pre className="mt-2.5 p-3 rounded bg-zinc-900 text-zinc-100 text-[10px] font-mono overflow-x-auto">
-                            {JSON.stringify(evt.details, null, 2)}
-                          </pre>
+                          <div className="mt-2.5 p-3 rounded bg-zinc-900 text-zinc-200 font-mono text-[11px] overflow-x-auto">
+                            <pre>{JSON.stringify(evt.details, null, 2)}</pre>
+                          </div>
                         )}
                       </div>
                     );
@@ -657,257 +967,178 @@ export function AdaptiveDiscoveryDemo() {
               </div>
             )}
 
-            {/* Tab 2: Adaptive Decisions & Gaps */}
+            {/* Tab 2: Canonical Opportunities & Deduplication */}
+            {activeTab === 'opportunities' && (
+              <div className="space-y-4">
+                <div className="text-xs text-zinc-500">
+                  Deduplicated canonical opportunities after MinHash LSH evaluation and deterministic eligibility evaluation.
+                </div>
+
+                <div className="space-y-3">
+                  {response.canonical_opportunities.map((opp) => {
+                    const elig = eligibilityMap.get(opp.opportunity_id);
+                    const cluster = response.duplicate_clusters[opp.opportunity_id];
+                    const clusterSize = cluster ? cluster.cluster_size : 1;
+                    const isLive = opp.category_specific_attributes?.is_live_retrieval === true;
+
+                    return (
+                      <div
+                        key={opp.opportunity_id}
+                        className="p-4 rounded-xl border border-zinc-200 bg-white hover:border-zinc-300 transition space-y-3"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-xs font-bold text-zinc-900">{opp.title}</h4>
+                              {isLive ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  Live External
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-100 text-zinc-600">
+                                  Simulated
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-zinc-500 mt-0.5">
+                              {opp.company_name} • {opp.eligibility_rules.work_mode}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                            {clusterSize > 1 && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-violet-50 text-violet-700 border border-violet-200">
+                                Clustered ({clusterSize} syndicated)
+                              </span>
+                            )}
+                            {opp.source_url && (
+                              <a
+                                href={opp.source_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs font-semibold text-violet-600 hover:text-violet-800 underline"
+                              >
+                                Source ↗
+                              </a>
+                            )}
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-zinc-600 leading-relaxed line-clamp-2">
+                          {opp.sanitized_summary}
+                        </p>
+
+                        {/* Deterministic Audit Breakdown */}
+                        {elig && (
+                          <div className="p-3 rounded-lg bg-zinc-50 border border-zinc-200 text-[11px] space-y-1.5">
+                            <div className="flex items-center justify-between text-zinc-500 font-semibold text-[10px] uppercase">
+                              <span>Deterministic Eligibility Rules Audit</span>
+                              <span className="font-mono">
+                                {elig.status}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 font-mono text-[10px]">
+                              {Object.entries(elig.constraint_checks || {}).map(([key, rawCheck]) => {
+                                const check = rawCheck as ConstraintCheckResult;
+                                return (
+                                  <div key={key}>
+                                    <span className="text-zinc-400">{key}: </span>
+                                    <span className={`font-semibold ${
+                                      check.status === 'PASSED' ? 'text-emerald-700' : check.status === 'UNCERTAIN' ? 'text-sky-700' : 'text-rose-700'
+                                    }`}>
+                                      {check.status}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Tab 3: Adaptive Shifts */}
             {activeTab === 'adaptations' && (
               <div className="space-y-4">
                 <div className="text-xs text-zinc-500">
-                  When discovery results fail coverage goals or encounter zero results, the agent shifts its search strategy.
+                  Adaptive decisions made by the agent to overcome coverage deficiencies or zero-result search queries.
                 </div>
 
                 {response.adaptation_history.length === 0 ? (
-                  <div className="p-8 text-center rounded-xl border border-dashed border-zinc-300 text-xs text-zinc-500">
-                    No adaptations were required. Initial queries satisfied the coverage goal of {response.search_strategy?.target_coverage_goal} listings in Iteration 1.
+                  <div className="p-6 rounded-xl border border-dashed border-zinc-200 text-center text-xs text-zinc-400">
+                    No adaptive shifts required — initial search strategy satisfied target coverage goals directly.
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {response.adaptation_history.map((ad, idx) => (
-                      <div key={idx} className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/20 space-y-3">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-indigo-100 pb-2.5">
-                          <div className="flex items-center gap-2">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-600 text-white">
-                              Shift #{idx + 1} (Iter {ad.iteration})
-                            </span>
-                            <span className="text-xs font-bold text-zinc-900">{ad.adaptation_type}</span>
-                          </div>
-                          <span className="text-[11px] font-mono text-indigo-700 bg-indigo-100/60 px-2 py-0.5 rounded">
-                            Gap: {ad.identified_gap}
+                    {response.adaptation_history.map((adapt, idx) => (
+                      <div key={idx} className="p-4 rounded-xl border border-zinc-200 bg-white space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            {adapt.adaptation_type}
                           </span>
+                          <span className="text-[11px] font-mono text-zinc-400">Shift #{idx + 1}</span>
                         </div>
-
-                        <div className="text-xs text-zinc-700 leading-relaxed">
-                          <span className="font-semibold text-zinc-900">Agent Action: </span>
-                          {ad.action_summary}
-                        </div>
-
-                        <div className="p-3 rounded-lg bg-white border border-indigo-100 text-[11px] font-mono text-zinc-800 space-y-1">
-                          <div className="text-[10px] uppercase font-bold text-zinc-400 font-sans">
-                            New Query Formulated
-                          </div>
-                          <div className="text-xs font-semibold text-zinc-900">
-                            Query: &quot;{ad.new_query.query_string}&quot;
-                          </div>
-                          <div className="text-[10px] text-zinc-500">
-                            Target Role: {ad.new_query.role_title} • Target Connectors: {ad.target_connector_ids.join(', ')}
-                          </div>
+                        <div className="text-xs font-bold text-zinc-800">{adapt.action_summary}</div>
+                        <div className="text-xs text-zinc-500">
+                          Identified Gap: <span className="text-zinc-700">{adapt.identified_gap}</span>
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
-
-                {/* Final Coverage Assessment */}
-                {response.coverage_assessment && (
-                  <div className="p-4 rounded-xl border border-zinc-200 bg-white space-y-3 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-zinc-900 uppercase tracking-wider text-[11px]">
-                        Final Coverage Assessment
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          response.coverage_assessment.is_coverage_sufficient
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : 'bg-amber-50 text-amber-700 border border-amber-200'
-                        }`}
-                      >
-                        {response.coverage_assessment.is_coverage_sufficient ? 'Coverage Met' : 'Coverage Incomplete'}
-                      </span>
-                    </div>
-
-                    <div className="text-zinc-600">
-                      Total Eligible Canonical: <span className="font-bold text-zinc-900">{response.coverage_assessment.total_eligible_canonical}</span>
-                    </div>
-
-                    {Object.keys(response.coverage_assessment.target_role_coverage).length > 0 && (
-                      <div className="space-y-1">
-                        <span className="text-[10px] font-bold uppercase text-zinc-400">Coverage by Role</span>
-                        <div className="flex flex-wrap gap-2">
-                          {Object.entries(response.coverage_assessment.target_role_coverage).map(([role, count]) => (
-                            <span key={role} className="px-2 py-1 rounded bg-zinc-50 border border-zinc-200 font-mono text-[11px]">
-                              {role}: {count}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {response.coverage_assessment.identified_gaps.length > 0 && (
-                      <div className="text-amber-700 font-medium">
-                        Identified Gaps: {response.coverage_assessment.identified_gaps.join('; ')}
-                      </div>
-                    )}
-
-                    <div className="text-zinc-500 text-[11px]">
-                      Recommended Directive: <span className="font-mono text-zinc-800 font-bold">{response.coverage_assessment.recommended_action}</span>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
-            {/* Tab 3: Canonical Opportunities & Deterministic Eligibility */}
-            {activeTab === 'opportunities' && (
-              <div className="space-y-4">
-                <div className="text-xs text-zinc-500">
-                  Every discovered opportunity is deduplicated via MinHash LSH and evaluated through the deterministic
-                  Python eligibility gate (zero LLM evaluation).
-                </div>
-
-                {response.canonical_opportunities.length === 0 ? (
-                  <div className="p-8 text-center rounded-xl border border-dashed border-zinc-300 text-xs text-zinc-500">
-                    No canonical opportunities discovered. Check connector configurations or simulated failure flags.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 gap-4">
-                    {response.canonical_opportunities.map((opp) => {
-                      const elig = eligibilityMap.get(opp.opportunity_id);
-                      const eligStatus = elig ? elig.status : (opp.is_duplicate ? 'DUPLICATE' : 'PENDING');
-                      let badgeClass = 'bg-zinc-100 text-zinc-700 border-zinc-200';
-                      if (eligStatus === 'ELIGIBLE') {
-                        badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
-                      } else if (eligStatus === 'ELIGIBLE_WITH_UNCERTAINTY') {
-                        badgeClass = 'bg-sky-50 text-sky-700 border-sky-200';
-                      } else if (eligStatus === 'INELIGIBLE') {
-                        badgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
-                      }
-
-                      // Check if canonical master in cluster
-                      const cluster = response.duplicate_clusters[opp.opportunity_id];
-                      const clusterSize = cluster ? cluster.cluster_size : 1;
-
-                      return (
-                        <div key={opp.opportunity_id} className="p-4 rounded-xl border border-zinc-200 bg-white space-y-3">
-                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <h4 className="text-sm font-bold text-zinc-900">{opp.title}</h4>
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${badgeClass}`}>
-                                  {eligStatus}
-                                </span>
-                              </div>
-                              <div className="text-xs text-zinc-600 mt-0.5">
-                                <span className="font-semibold text-zinc-800">{opp.company_name}</span> • {opp.eligibility_rules.location_city_country.join(', ')} ({opp.eligibility_rules.work_mode})
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1.5 self-start sm:self-auto">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-100 text-zinc-600">
-                                {opp.mapped_occupation_code}
-                              </span>
-                              {clusterSize > 1 && (
-                                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-violet-50 text-violet-700 border border-violet-200">
-                                  Canonical Master ({clusterSize} obs)
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          <p className="text-xs text-zinc-600 leading-relaxed line-clamp-2">
-                            {opp.sanitized_summary}
-                          </p>
-
-                          {/* Deterministic Audit Breakdown */}
-                          {elig && (
-                            <div className="p-3 rounded-lg bg-zinc-50 border border-zinc-200 text-[11px] space-y-1.5">
-                              <div className="flex items-center justify-between text-zinc-500 font-semibold text-[10px] uppercase">
-                                <span>Deterministic Eligibility Rules Audit</span>
-                                <span className="font-mono">Result: {elig.is_eligible ? 'QUALIFIED' : 'UNQUALIFIED'}</span>
-                              </div>
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 font-mono text-[10px]">
-                                {Object.entries(elig.constraint_checks || {}).map(([key, rawCheck]) => {
-                                  const check = rawCheck as ConstraintCheckResult;
-                                  return (
-                                    <div key={key}>
-                                      <span className="text-zinc-400">{key}: </span>
-                                      <span className={`font-semibold ${check.status === 'PASSED' ? 'text-emerald-700' : check.status === 'UNCERTAIN' ? 'text-sky-700' : 'text-rose-700'}`}>
-                                        {check.status}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              {elig.uncertainty_caveats && elig.uncertainty_caveats.length > 0 && (
-                                <div className="text-[10px] text-sky-700 pt-0.5">
-                                  Caveat: {elig.uncertainty_caveats.join('; ')}
-                                </div>
-                              )}
-                              {elig.disqualification_reasons && elig.disqualification_reasons.length > 0 && (
-                                <div className="text-[10px] text-rose-700 pt-0.5">
-                                  Reason: {elig.disqualification_reasons.join('; ')}
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Provenance & Links */}
-                          <div className="flex items-center justify-between text-[11px] pt-1">
-                            <span className="font-mono text-zinc-400 text-[10px]">
-                              ID: {opp.opportunity_id.slice(0, 16)}...
-                            </span>
-                            <div className="flex items-center gap-3">
-                              {opp.source_url && (
-                                <a
-                                  href={opp.source_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-violet-600 hover:text-violet-800 font-medium underline"
-                                >
-                                  Source Listing ↗
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Tab 4: Connector Health Breakdown */}
+            {/* Tab 4: Connector Health & Honesty */}
             {activeTab === 'connectors' && (
               <div className="space-y-4">
                 <div className="text-xs text-zinc-500">
-                  Operational status and transport details of all configured discovery source adapters.
+                  Operational status, transport details, and honest availability reporting for all discovery adapters.
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {response.connector_health.map((ch) => (
-                    <div key={ch.connector_id} className="p-4 rounded-xl border border-zinc-200 bg-white space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-zinc-900">{ch.source_name}</span>
-                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                          ch.status === 'CONNECTED'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : ch.status === 'MOCKED_FALLBACK'
-                            ? 'bg-sky-50 text-sky-700 border-sky-200'
-                            : 'bg-amber-50 text-amber-700 border-amber-200'
-                        }`}>
-                          {ch.status}
-                        </span>
-                      </div>
-                      <div className="text-xs text-zinc-600">
-                        Type: <span className="font-mono text-zinc-800">{ch.connector_type}</span>
-                      </div>
-                      <div className="text-[11px] text-zinc-500">
-                        Transport: {ch.is_mock_fallback ? 'Offline Safe Adapter' : 'Live Transport Active'}
-                      </div>
-                      {typeof ch.details?.error_message === 'string' && (
-                        <div className="text-[10px] text-rose-600 bg-rose-50 p-2 rounded">
-                          {ch.details.error_message}
+                  {response.connector_health.map((ch) => {
+                    const isConnected = ch.status === 'CONNECTED';
+                    const isMock = ch.status === 'MOCKED_FALLBACK';
+                    const isMissing = ch.status === 'UNAVAILABLE_MISSING_BINARY';
+
+                    return (
+                      <div key={ch.connector_id} className="p-4 rounded-xl border border-zinc-200 bg-white space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-zinc-900">{ch.source_name}</span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            isConnected
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : isMock
+                              ? 'bg-sky-50 text-sky-700 border-sky-200'
+                              : 'bg-amber-50 text-amber-700 border-amber-200'
+                          }`}>
+                            {ch.status}
+                          </span>
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        <div className="text-xs text-zinc-600">
+                          Connector ID: <span className="font-mono text-zinc-800">{ch.connector_id}</span>
+                        </div>
+                        <div className="text-xs text-zinc-600">
+                          Transport Type: <span className="font-mono text-zinc-800">{ch.connector_type}</span>
+                        </div>
+                        <div className="text-[11px] text-zinc-500">
+                          Execution Mode:{' '}
+                          <span className={isConnected ? 'text-emerald-700 font-semibold' : isMissing ? 'text-amber-700 font-semibold' : 'text-zinc-700'}>
+                            {isConnected ? '🟢 Live Network Transport Verified' : isMissing ? '⚠️ Missing Binary / Prerequisite' : '⚪ Offline Simulated Fixtures'}
+                          </span>
+                        </div>
+                        {ch.details && Object.keys(ch.details).length > 0 && (
+                          <div className="text-[10px] text-zinc-600 bg-zinc-50 p-2.5 rounded font-mono border border-zinc-100 overflow-x-auto">
+                            <pre>{JSON.stringify(ch.details, null, 2)}</pre>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

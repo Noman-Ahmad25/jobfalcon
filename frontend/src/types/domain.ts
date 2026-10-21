@@ -370,6 +370,7 @@ export type WorkflowStage =
   | 'EVALUATING'
   | 'GAP_ANALYSIS'
   | 'ADAPTING'
+  | 'RANKING'
   | 'FINALIZING'
   | 'COMPLETED'
   | 'FAILED';
@@ -425,6 +426,9 @@ export interface AdaptiveDiscoveryRequest {
   simulate_failure_connector?: string | null;
   force_adaptive_gap_for_testing?: boolean;
   persist_to_repository?: boolean;
+  enable_live_discovery?: boolean;
+  rank_recommendations?: boolean;
+  weight_profile_name?: string;
 }
 
 export interface AdaptiveDiscoveryResponse {
@@ -448,6 +452,7 @@ export interface AdaptiveDiscoveryResponse {
   duplicate_records: DuplicateRecord[];
   eligibility_results: EligibilityResult[];
   connector_health: ConnectorHealthReport[];
+  recommendations?: RankingResponse | null;
   timeline_events: WorkflowTimelineEvent[];
   execution_metadata: Record<string, unknown>;
 }

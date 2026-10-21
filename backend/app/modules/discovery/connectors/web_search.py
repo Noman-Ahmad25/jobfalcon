@@ -62,14 +62,19 @@ class WebSearchConnector(BaseDiscoveryConnector):
                 is_mock_fallback=self.is_mock_fallback,
                 details={"error": "Simulated search engine network gateway error"},
             )
-        status = ConnectorStatus.MOCKED_FALLBACK if self._mock_mode else ConnectorStatus.CONNECTED
+        # Search engine aggregator requires live SearXNG host or Google Jobs API key
         return ConnectorHealthReport(
             connector_id=self.connector_id,
             source_name=self.source_name,
             connector_type=self.connector_type,
-            status=status,
-            is_mock_fallback=self.is_mock_fallback,
-            details={"search_provider": "SearXNG / Google for Jobs Aggregator", "rate_limit_per_min": 60},
+            status=ConnectorStatus.MOCKED_FALLBACK,
+            is_mock_fallback=True,
+            details={
+                "search_provider": "SearXNG / Google for Jobs Aggregator",
+                "rate_limit_per_min": 60,
+                "configured": False,
+                "note": "No external search gateway credentials configured; running in deterministic simulated mode.",
+            },
         )
 
     async def search(
@@ -150,7 +155,8 @@ class WebSearchConnector(BaseDiscoveryConnector):
             opportunities.append(opp)
 
         elapsed = round((time.perf_counter() - t0) * 1000, 2)
-        status = ConnectorStatus.MOCKED_FALLBACK if self._mock_mode else ConnectorStatus.CONNECTED
+        # Always reports MOCKED_FALLBACK because no live search provider backend is connected
+        status = ConnectorStatus.MOCKED_FALLBACK
         return DiscoveryConnectorResult(
             connector_id=self.connector_id,
             source_name=self.source_name,

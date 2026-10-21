@@ -91,22 +91,19 @@ This document records the provisional parameters, empirical calibration requirem
 
 ## 7. External Opportunity-Source Integrations & Multi-Source Discovery
 
-- **Status**: **Provisional Implementation (Milestone 7 Verified Baseline)**
-- **Milestone 7 Baseline Implemented**:
-  1. **Skill-to-Role Mapping Engine (`role_mapper.py`)**:
-     - Deterministically maps candidate skills and preferences to O*NET occupation codes (e.g., 15-1252.00, 15-1254.00, 15-1251.00, 15-2051.00).
-     - Distinguishes explicit candidate career ambitions (`TARGET`, confidence = 1.0) from inferred skill-cluster expansions (`ADJACENT`, confidence = 0.50-0.85).
-     - Identifies matched core skills and surfaces missing role competencies without false equivalences.
-     - Generates parameterized search queries with seniority heuristics, category constraints, and geographic filters.
-  2. **Multi-Source Discovery Interface & Connectors**:
-     - Unified `BaseDiscoveryConnector` contract with independent lifecycle and honest availability reporting.
-     - 4 discovery adapters:
-       - `WebSearchConnector`: Career search engine aggregator (SearXNG / Google Jobs simulation).
-       - `IndiaJobsMCPConnector`: `@borgius/india-jobs-mcp` adapter for Indian tech platforms (Naukri, Foundit, Hirist) with INR compensation and metro filters.
-       - `JobSpyMCPConnector`: `jobspy-mcp-server` adapter for LinkedIn, Indeed, Glassdoor, ZipRecruiter.
-       - `CompanyCareerPageConnector`: Direct employer ATS boards (Greenhouse, Lever, Ashby) with verified domains and high trust scores.
-     - Honest Capability Invariant: Connectors explicitly report `MOCKED_FALLBACK` or `UNAVAILABLE_MISSING_BINARY` when running in offline sandboxes without claiming falsified live execution.
-  3. **Discovery Coordinator with Partial Failure Resilience (`coordinator.py`)**:
+- **Status**: **Milestone 10 Live Discovery & Honest Connectivity Verified Baseline**
+- **Milestone 10 Baseline Implemented & Verified**:
+  1. **Verified Live Connectors**:
+     - `CompanyCareerPageConnector` (`ATS_DIRECT_API`): Verified live querying of public Greenhouse endpoints (`boards-api.greenhouse.io/v1/boards/{board}/jobs?content=true` across Vercel, Cloudflare, GitLab, Figma) and Ashby (`api.ashbyhq.com/posting-api/job-board/linear`). Normalizes real-world job records, strips HTML tags, extracts skills using canonical taxonomy, parses experience requirements, and retains real application URLs (`absolute_url`, `jobUrl`).
+     - `JobSpyMCPConnector` (`MCP_STDIO`): Verified live scraping via `python-jobspy` on Indeed, LinkedIn, and Glassdoor. Normalizes pandas DataFrames into `PolymorphicOpportunity` schemas with direct application URLs and salary intervals.
+  2. **Honest Capability & Missing Prerequisite Reporting**:
+     - `IndiaJobsMCPConnector`: Verified that `@borgius/india-jobs-mcp` returns 404 on npm registry and no binary is installed on PATH. In live mode, honestly reports `ConnectorStatus.UNAVAILABLE_MISSING_BINARY` without claiming false connectivity.
+     - `WebSearchConnector`: Operates in deterministic simulated fallback (`ConnectorStatus.MOCKED_FALLBACK`) because no SearXNG gateway or Google Jobs credentials are configured in local environment.
+  3. **End-to-End Career Intelligence Pipeline**:
+     - Integrates Candidate Evidence Profile $\to$ O*NET Role Mapping $\to$ Multi-Source Discovery $\to$ MinHash LSH Deduplication $\to$ Deterministic Eligibility $\to$ 6-Dimensional Fit Ranking $\to$ Idempotent Persistence.
+     - Real listings with unstated deadlines evaluate safely as `ELIGIBLE_WITH_UNCERTAINTY` with `UNCERT_NO_DEADLINE_SPECIFIED` caveat, preventing false rejection of real opportunities.
+     - Differentiated fit scores on real listings (e.g., 0.579 to 0.722) with verified skill matches and growth explanations.
+  4. **Discovery Coordinator with Partial Failure Resilience (`coordinator.py`)**:
      - Bounded concurrent retrieval via `asyncio.gather` with error shielding and timeouts (5.0s per connector).
      - Fault Isolation: Exceptions, rate limits, or crashes in any individual connector are recorded as `ConnectorStatus.ERROR` while all listings from healthy connectors are preserved.
      - Early cross-source MinHash LSH deduplication (Jaccard $\ge 0.85$) clusters multi-board syndicated postings into `OpportunityCluster` without losing source provenance.
