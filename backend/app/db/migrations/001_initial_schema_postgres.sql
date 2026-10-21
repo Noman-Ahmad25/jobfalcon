@@ -112,3 +112,21 @@ CREATE TABLE IF NOT EXISTS eligibility_audits (
 
 CREATE INDEX IF NOT EXISTS ix_eligibility_audits_user_opp ON eligibility_audits(user_id, opportunity_id);
 CREATE INDEX IF NOT EXISTS ix_eligibility_audits_evaluated_at ON eligibility_audits(evaluated_at);
+
+-- 8. Candidate Recommendations & Ranking Evaluations
+CREATE TABLE IF NOT EXISTS recommendation_evaluations (
+    evaluation_id VARCHAR(255) PRIMARY KEY,
+    candidate_id VARCHAR(255) NOT NULL,
+    model_version VARCHAR(100) NOT NULL,
+    weight_profile VARCHAR(100) NOT NULL,
+    weights_json JSONB NOT NULL,
+    total_evaluated INTEGER NOT NULL,
+    total_ranked INTEGER NOT NULL,
+    total_excluded INTEGER NOT NULL,
+    ranked_recommendations_json JSONB NOT NULL,
+    excluded_ineligible_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+    evaluated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_recommendation_evaluations_candidate ON recommendation_evaluations(candidate_id, evaluated_at);
+

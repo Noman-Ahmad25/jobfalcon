@@ -7,6 +7,7 @@ from app.schemas.deduplication import DuplicateRecord, OpportunityCluster
 from app.schemas.eligibility import EligibilityResult
 from app.schemas.opportunity import PolymorphicOpportunity
 from app.schemas.profile import CandidateCareerProfile
+from app.schemas.ranking import RankingResponse
 
 
 class CandidateProfileRepository(ABC):
@@ -126,3 +127,23 @@ class EligibilityAuditRepository(ABC):
     def prune_older_than(self, days: int) -> int:
         """Prunes historical evaluation audit logs older than the specified retention window."""
         raise NotImplementedError
+
+
+class RecommendationRepository(ABC):
+    """Abstract port for recommendation evaluations and score breakdowns."""
+
+    @abstractmethod
+    def save_evaluation(self, response: RankingResponse) -> None:
+        """Persists a full ranking evaluation run."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_latest_evaluation(self, user_id: str) -> Optional[RankingResponse]:
+        """Retrieves the latest ranking evaluation for a candidate."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_evaluations_for_user(self, user_id: str) -> list[RankingResponse]:
+        """Lists historical ranking evaluations for a candidate."""
+        raise NotImplementedError
+

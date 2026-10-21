@@ -1,5 +1,7 @@
 import { HealthStatusResponse } from '@/types/api';
 import {
+  AdaptiveDiscoveryRequest,
+  AdaptiveDiscoveryResponse,
   CandidateCareerProfile,
   CandidateProfilingRequest,
   CandidateProfilingResponse,
@@ -9,6 +11,8 @@ import {
   DiscoveryRunResponse,
   PipelineEvaluationRequest,
   PipelineEvaluationResponse,
+  RankingRequest,
+  RankingResponse,
 } from '@/types/domain';
 
 const DEFAULT_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -139,6 +143,27 @@ export async function runDiscovery(
     timeoutMs: 15000,
   });
 }
+
+export async function runAdaptiveDiscovery(
+  payload: AdaptiveDiscoveryRequest
+): Promise<AdaptiveDiscoveryResponse> {
+  return fetchFromApi<AdaptiveDiscoveryResponse>('/api/v1/orchestration/discovery/run', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    timeoutMs: 25000,
+  });
+}
+
+export async function evaluateAndRankOpportunities(
+  payload: RankingRequest
+): Promise<RankingResponse> {
+  return fetchFromApi<RankingResponse>('/api/v1/ranking/evaluate', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    timeoutMs: 15000,
+  });
+}
+
 
 
 

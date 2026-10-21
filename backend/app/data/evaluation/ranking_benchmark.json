@@ -1,0 +1,88 @@
+{
+  "metadata": {
+    "benchmark_name": "JobFalcon Candidate-Opportunity Fit Benchmark v1.0",
+    "description": "Standardized evaluation dataset for measuring Precision@K, NDCG@K, eligibility invariant enforcement, target vs adjacent role separation, and baseline comparison against naive skill Jaccard.",
+    "is_synthetic": true,
+    "label_scale": {
+      "3": "Excellent Match — Target role, high verified evidence overlap, optimal growth",
+      "2": "Good Match — Taxonomy-adjacent or target role with minor skill stretch / uncertain deadline",
+      "1": "Weak Match — High overstretch or current lateral role with limited career progression",
+      "0": "Ineligible / Irrelevant — Hard constraint violation or completely unrelated domain"
+    }
+  },
+  "test_cases": [
+    {
+      "test_case_id": "tc_maya_backend",
+      "candidate_id": "maya-chen-junior",
+      "candidate_description": "Junior Backend Engineer (18mo experience, US authorized, Bachelors CS, Python 8.5, FastAPI 8.0, PostgreSQL 7.5, Docker 7.0)",
+      "target_role": "Backend Software Engineer",
+      "evaluations": [
+        {
+          "opportunity_id": "opp_maya_ideal_backend",
+          "title": "Junior Backend Engineer (Python / FastAPI)",
+          "company_name": "CloudScale Systems",
+          "occupation_code": "15-1252.00",
+          "expected_relevance": 3,
+          "expected_eligibility": "ELIGIBLE",
+          "description": "Ideal target role matching verified Python, FastAPI, and PostgreSQL skills."
+        },
+        {
+          "opportunity_id": "opp_maya_growth_backend",
+          "title": "Backend Systems Engineer",
+          "company_name": "Apex Data Labs",
+          "occupation_code": "15-1252.00",
+          "expected_relevance": 3,
+          "expected_eligibility": "ELIGIBLE",
+          "description": "Target role offering optimal ZPD growth in Kubernetes and Redis caching."
+        },
+        {
+          "opportunity_id": "opp_maya_adjacent_data_eng",
+          "title": "Junior Data Platform Engineer",
+          "company_name": "Quantico Metrics",
+          "occupation_code": "15-1251.00",
+          "expected_relevance": 2,
+          "expected_eligibility": "ELIGIBLE",
+          "description": "Adjacent career path (Data Engineering) leveraging strong Python and SQL."
+        },
+        {
+          "opportunity_id": "opp_maya_uncertain_deadline",
+          "title": "Python API Developer",
+          "company_name": "FinTech Stream",
+          "occupation_code": "15-1252.00",
+          "expected_relevance": 2,
+          "expected_eligibility": "ELIGIBLE_WITH_UNCERTAINTY",
+          "description": "High skill match with unstated rolling deadline caveat."
+        },
+        {
+          "opportunity_id": "opp_maya_senior_overstretch",
+          "title": "Principal Distributed Systems Architect",
+          "company_name": "MegaCloud Global",
+          "occupation_code": "15-1252.00",
+          "expected_relevance": 1,
+          "expected_eligibility": "ELIGIBLE",
+          "description": "Extreme seniority and massive skill deficit beyond zone of proximal development."
+        },
+        {
+          "opportunity_id": "opp_maya_ineligible_visa",
+          "title": "Python Backend Engineer (UK On-site, No Sponsorship)",
+          "company_name": "London Tech Works",
+          "occupation_code": "15-1252.00",
+          "expected_relevance": 0,
+          "expected_eligibility": "INELIGIBLE",
+          "disqualification_reasons": ["DISQ_COUNTRY_UNAUTHORIZED", "DISQ_VISA_SPONSORSHIP_UNAVAILABLE"],
+          "description": "High skill match but strictly ineligible due to foreign work authorization."
+        },
+        {
+          "opportunity_id": "opp_maya_unrelated_nursing",
+          "title": "Registered Critical Care Nurse",
+          "company_name": "City General Hospital",
+          "occupation_code": "29-1141.00",
+          "expected_relevance": 0,
+          "expected_eligibility": "INELIGIBLE",
+          "disqualification_reasons": ["DISQ_DEGREE_BELOW_MINIMUM"],
+          "description": "Completely unrelated occupation and missing healthcare credentials."
+        }
+      ]
+    }
+  ]
+}

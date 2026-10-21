@@ -10,6 +10,7 @@ from app.db.repositories.interfaces import (
     DuplicateClusterRepository,
     EligibilityAuditRepository,
     OpportunityRepository,
+    RecommendationRepository,
 )
 from app.schemas.deduplication import DuplicateRecord, OpportunityCluster
 from app.schemas.eligibility import (
@@ -29,6 +30,7 @@ from app.schemas.profile import (
     CandidateEligibilityProfile,
     CareerPathNode,
 )
+from app.schemas.ranking import RankedOpportunity, RankingResponse
 
 
 class SQLiteCandidateProfileRepository(CandidateProfileRepository):
@@ -621,3 +623,99 @@ class SQLiteEligibilityAuditRepository(EligibilityAuditRepository):
                 "DELETE FROM eligibility_audits WHERE evaluated_at < ?;", (cutoff,)
             )
             return res.rowcount
+
+
+class SQLiteRecommendationRepository(RecommendationRepository):
+    """SQLite implementation of RecommendationRepository for candidate ranking evaluations."""
+
+    def __init__(self, manager: Optional[DatabaseManager] = None) -> None:
+        self.manager = manager or db_manager
+
+    def save_evaluation(self, response: RankingResponse) -> None:
+        ranked_json = json.dumps([r.model_dump(mode="json") for r in response.ranked_recommendations])
+        excluded_json = json.dumps(response.excluded_ineligible)
+        weights_json = json.dumps(response.weights)
+
+        with self.manager.transaction() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO recommendation_evaluations (
+                    evaluation_id,
+                    candidate_id,
+                    model_version,
+                    weight_profile,
+                    weights_json,
+                    total_evaluated,
+                    total_ranked,
+                    total_excluded,
+                    ranked_recommendations_json,
+                    excluded_ineligible_json,
+                    evaluated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    response.evaluation_id,
+                    response.candidate_id,
+                    response.model_version,
+                    response.weight_profile_used,
+                    weights_json,
+                    response.total_candidates_evaluated,
+                    response.total_eligible_ranked,
+                    response.total_ineligible_excluded,
+                    ranked_json,
+                    excluded_json,
+                    response.evaluation_timestamp.isoformat(),
+                ),
+            )
+
+    def get_latest_evaluation(self, user_id: str) -> Optional[RankingResponse]:
+        with self.manager.read_connection() as conn:
+            row = conn.execute(
+                """
+                SELECT * FROM recommendation_evaluations
+                WHERE candidate_id = ?
+                ORDER BY evaluated_at DESC
+                LIMIT 1;
+                """,
+                (user_id,),
+            ).fetchone()
+
+            if not row:
+                return None
+
+            return self._row_to_response(row)
+
+    def list_evaluations_for_user(self, user_id: str) -> list[RankingResponse]:
+        with self.manager.read_connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM recommendation_evaluations
+                WHERE candidate_id = ?
+                ORDER BY evaluated_at DESC;
+                """,
+                (user_id,),
+            ).fetchall()
+
+            return [self._row_to_response(r) for r in rows]
+
+    def _row_to_response(self, row: Any) -> RankingResponse:
+        raw_ranked = json.loads(row["ranked_recommendations_json"])
+        ranked_recs = [RankedOpportunity.model_validate(r) for r in raw_ranked]
+        excluded = json.loads(row["excluded_ineligible_json"])
+        weights = json.loads(row["weights_json"])
+
+        return RankingResponse(
+            evaluation_id=row["evaluation_id"],
+            candidate_id=row["candidate_id"],
+            model_version=row["model_version"],
+            weight_profile_used=row["weight_profile"],
+            weights=weights,
+            total_candidates_evaluated=row["total_evaluated"],
+            total_eligible_ranked=row["total_ranked"],
+            total_ineligible_excluded=row["total_excluded"],
+            ranked_recommendations=ranked_recs,
+            excluded_ineligible=excluded,
+            evaluation_timestamp=datetime.fromisoformat(row["evaluated_at"]),
+            execution_metadata={},
+        )
+

@@ -60,6 +60,28 @@ from app.schemas.discovery import (
     DiscoverySearchQuery,
     RoleMappingTarget,
 )
+from app.schemas.orchestration import (
+    AdaptationEvent,
+    AdaptiveDiscoveryRequest,
+    AdaptiveDiscoveryResponse,
+    CoverageAssessment,
+    SearchStrategy,
+    TerminationReason,
+    WorkflowStage,
+    WorkflowTimelineEvent,
+)
+from app.schemas.ranking import (
+    DEFAULT_RANKING_WEIGHTS,
+    EARLY_CAREER_WEIGHTS,
+    EXPERIENCED_WEIGHTS,
+    DimensionScoreBreakdown,
+    RankedOpportunity,
+    RankingDimension,
+    RankingRequest,
+    RankingResponse,
+    SkillGap,
+    SkillMatchEvidence,
+)
 from app.schemas.pipeline import (
     PipelineEvaluationRequest,
     PipelineEvaluationResponse,
@@ -146,5 +168,25 @@ __all__ = [
     "DiscoveryConnectorReport",
     "DiscoveryRunRequest",
     "DiscoveryRunResponse",
+    # Orchestration
+    "WorkflowStage",
+    "TerminationReason",
+    "WorkflowTimelineEvent",
+    "SearchStrategy",
+    "CoverageAssessment",
+    "AdaptationEvent",
+    "AdaptiveDiscoveryRequest",
+    "AdaptiveDiscoveryResponse",
+    # Ranking
+    "RankingDimension",
+    "DEFAULT_RANKING_WEIGHTS",
+    "EARLY_CAREER_WEIGHTS",
+    "EXPERIENCED_WEIGHTS",
+    "SkillMatchEvidence",
+    "SkillGap",
+    "DimensionScoreBreakdown",
+    "RankedOpportunity",
+    "RankingRequest",
+    "RankingResponse",
 ]
 

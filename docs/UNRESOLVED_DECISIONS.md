@@ -8,11 +8,14 @@ This document records the provisional parameters, empirical calibration requirem
 
 - **Baseline Formula**:
   $$S_{\text{growth}}(u, o) = \frac{\sum_{s \in G(u, o)} M_{\text{demand}}(s, c_{\text{target}}) \cdot \left(1 - \frac{P_u(s)}{10}\right) \cdot \mathcal{B}\left(\Delta_{\text{gap}}(u, o, s)\right)}{\sum_{s \in \text{TargetSkills}(c_{\text{target}})} M_{\text{demand}}(s, c_{\text{target}})}$$
-- **Status**: **Provisional — Needs Validation**
+- **Status**: **Provisional Implementation (Milestone 9 Verified Baseline)**
+- **Milestone 9 Baseline Implemented**:
+  1. **Gaussian Zone of Proximal Development Curve $\mathcal{B}(g)$**: Implemented continuous response curve $\mathcal{B}(g) = \exp\left(-\frac{(g - 0.30)^2}{2(0.20)^2}\right)$ where $g$ represents the skill stretch ratio.
+  2. **Foundational Competency Gating**: Requires candidate to satisfy $\ge 40\%$ of mandatory prerequisites; candidates lacking foundational competencies receive a $50\%$ penalty to prevent stunting growth through cognitive overwhelm.
+  3. **Near-Mastery Guard**: Roles with $<10\%$ new skill requirements receive a capped growth score ($0.40$), prioritizing candidates toward opportunities with balanced career expansion.
 - **Open Decisions & Calibration Tasks**:
-  1. **Bell-Curve Factor $\mathcal{B}(\Delta_{\text{gap}})$**: The exact mathematical function and variance for the zone of proximal development must be parameterized. If a gap is too wide, $\mathcal{B}$ must strongly penalize over-stretching; if too narrow, growth value is negligible.
-  2. **Skill-Gap Boundary**: The current cutoff $P_u(s) < 6.0$ for defining a gap $G(u, o)$ is provisional and requires tuning against entry-level vs experienced roles.
-  3. **Prerequisite Gating**: A mechanism must be established to ensure candidates possess necessary foundational skills before growth points are credited on dependent competencies (e.g., Python proficiency before advanced distributed computing).
+  1. **Labor Market Demand Integration $M_{\text{demand}}(s)$**: Currently weights missing skills uniformly; live labor market dynamic demand weighting ($M_{\text{demand}} \in [1.0, 3.0]$) will be calibrated when live labor market telemetry is connected.
+  2. **Career Stage Variance Tuning**: Calibrate $\sigma$ across internship cohorts ($\sigma = 0.25$) versus executive leadership transitions ($\sigma = 0.12$).
 
 ---
 
@@ -54,11 +57,15 @@ This document records the provisional parameters, empirical calibration requirem
 
 - **Baseline Formula**:
   $$\text{Score}_{\text{total}} = 0.30 S_{\text{skill}} + 0.20 S_{\text{career}} + 0.20 S_{\text{growth}} + 0.12 S_{\text{market}} + 0.10 S_{\text{pref}} + 0.08 S_{\text{qual}}$$
-- **Status**: **Provisional — Needs Validation**
+- **Status**: **Provisional Implementation (Milestone 9 Verified Baseline)**
+- **Milestone 9 Baseline Implemented**:
+  1. **Multi-Dimensional Engine (`engine.py`)**: Computes all 6 dimensions deterministically in pure Python; normalizes each dimension and aggregate score strictly to $[0.0, 1.0]$.
+  2. **Configurable Weight Profiles**: Supports `'DEFAULT'` (30/20/20/12/10/8), `'EARLY_CAREER'` (25/20/28/12/10/5), and `'EXPERIENCED'` (35/20/15/10/10/10) with automatic normalization to $\sum w = 1.00$.
+  3. **Deterministic Separation of Eligibility**: Ineligible opportunities (`INELIGIBLE`) are strictly excluded from recommendations regardless of skill scores. Opportunities with caveats (`ELIGIBLE_WITH_UNCERTAINTY`) are ranked with explicit caveat transparency.
+  4. **Deterministic Tie-Breaking**: Ordinal ranks determined by `overall_fit_score` (descending, 4 decimals) $\to$ `skill_alignment` (descending) $\to$ `completeness_score` (descending) $\to$ `opportunity_id` (alphabetical ascending).
 - **Open Decisions & Calibration Tasks**:
-  1. **Weights Balance**: The linear weights (0.30, 0.20, 0.20, 0.12, 0.10, 0.08) represent a proposed baseline. For specific categories (e.g., internships vs senior staff roles), the balance between $S_{\text{skill}}$ and $S_{\text{growth}}$ should be configurable or calibrated.
-  2. **Eligible Pool Minimum Cardinality ($K_{\text{min}} = 5$)**: If fewer than 5 opportunities pass deterministic eligibility, the supervisor expands discovery (Level 1 soft preference relaxation, Level 2 adjacent career fan-out). The threshold of 5 and pass score cutoff (0.55) must be validated against real search volumes.
-  3. **Candidate Pool Sizing ($M = 20$ for deep scoring, $K = 10$ for explanations)**: Sizing must balance latency and computational cost against recommendation diversity.
+  1. **Weights Validation Against Human Recruiter Judgments**: The linear weights are provisional baselines; ongoing calibration against human technical hiring manager judgments will fine-tune the balance between $S_{\text{skill}}$ and $S_{\text{growth}}$.
+  2. **Candidate Pool Sizing**: Recommended top-K defaults to 10 for presentation; evaluate optimal batch sizes for deep multi-page candidate exploration.
 
 ---
 
@@ -171,5 +178,40 @@ This document records the provisional parameters, empirical calibration requirem
 - **Open Decisions & Calibration Tasks**:
   1. **Model Architecture Selection**: Compare accuracy, latency, and resource footprint across local quantized models (`qwen2.5:14b-instruct`, `llama3.1:8b-instruct` via Ollama) versus hosted cloud endpoints (`gpt-4o-mini`, `claude-3-5-haiku`).
   2. **LiteLLM Gateway Deployment Topology**: Evaluate containerized LiteLLM proxy with Redis circuit breakers versus in-process direct model adapters based on production deployment target.
+
+---
+
+## 12. Agent Orchestration, Adaptive Discovery & Loop Bounds
+
+- **Status**: **Provisional Implementation (Milestone 8 Verified Baseline)**
+- **Milestone 8 Baseline Implemented**:
+  1. **Typed Orchestration State Machine (`AdaptiveDiscoveryWorkflow`)**:
+     - Coordinates candidate profile retrieval, role mapping, multi-source discovery, MinHash LSH deduplication, deterministic eligibility evaluation, coverage gap analysis, adaptive search decisions, and persistence.
+     - Discrete lifecycle stages: `INITIALIZING` $\to$ `STRATEGY_FORMULATION` $\to$ `SEARCHING` $\to$ `EVALUATING` $\to$ `GAP_ANALYSIS` $\to$ `ADAPTING` $\to$ `FINALIZING` $\to$ `COMPLETED` (or `FAILED`).
+     - Observable timeline emission: Every stage transition, tool call, error, and adaptive shift emits typed `WorkflowTimelineEvent` telemetry with precise UTC timestamps and structured payloads.
+  2. **Controlled Agent Tools (`tools.py`)**:
+     - Six modular, typed tools (`ProfileRetrievalTool`, `RoleMappingTool`, `OpportunitySearchTool`, `DeduplicationTool`, `DeterministicEligibilityTool`, `PersistenceTool`).
+     - Strict Pydantic v2 input schemas, timeout shielding, and sanitized untrusted text.
+     - Standardized `ToolResult[T]` envelopes returning execution latency, status (`SUCCESS`, `ERROR`, `EMPTY`), and shielded exception diagnostics.
+  3. **Adaptive Decision Making & Coverage Gap Analysis (`agent.py`)**:
+     - `DiscoveryAgentDecisionMaker` supports LLM structured extraction with automatic, deterministic heuristic fallback on model timeout, rate limiting, or malformed responses.
+     - Epistemic gap detection: Distinguishes zero-result queries, under-covered target roles, and insufficient overall canonical count against the user's coverage goal.
+     - Three-tier adaptation hierarchy:
+       - Level 1 (Query Relaxation): Drops narrow modifiers, broadens keywords.
+       - Level 2 (Adjacent Role Expansion): Queries taxonomy-adjacent occupations identified during O*NET skill mapping.
+       - Level 3 (Connector Replacement): Shifts queries to alternate healthy discovery adapters.
+  4. **Strict Loop Guards & Termination Guarantees**:
+     - Query deduplication via `compute_query_hash`: Guarantees identical query strings are never re-issued to the same connector across iterations.
+     - Hard iteration budget (`max_iterations`, default 3, max 5).
+     - Tool invocation budget (`max_tool_calls`, default 10, max 20).
+     - Standardized termination reasons: `COVERAGE_SATISFIED`, `MAX_ITERATIONS_REACHED`, `BUDGET_EXHAUSTED`, `ALL_SOURCES_EXHAUSTED`, `ABORTED_ERROR`.
+  5. **Deterministic Primacy & Truthfulness**:
+     - Hard eligibility, MinHash LSH deduplication, and database writes execute exclusively in pure Python deterministic code; models cannot evaluate or override candidate eligibility.
+     - Honest connector reporting: Zero fabricated live claims; missing binaries (`india_jobs_mcp`, `jobspy_mcp`) are reported honestly as `UNAVAILABLE_MISSING_BINARY` or `MOCKED_FALLBACK`.
+- **Open Decisions & Calibration Tasks**:
+  1. **Full LangGraph Cyclic Integration**: When Python 3.14 LangGraph wheel binaries stabilize, wrap the state machine in a cyclic `StateGraph` with `AsyncPostgresSaver` checkpointing and `checkpoint_ns` isolation.
+  2. **Dynamic Coverage Goal Tuning**: Calibrate whether $K_{\text{target}}$ should be dynamically suggested based on candidate seniority (e.g., higher for entry-level, lower for niche specialist roles).
+  3. **Multi-Turn User Steering**: Permit human-in-the-loop candidate intervention (e.g., approving adjacent role suggestions before adaptive searching resumes).
+
 
 

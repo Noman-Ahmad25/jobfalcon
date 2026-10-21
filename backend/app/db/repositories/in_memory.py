@@ -8,11 +8,13 @@ from app.db.repositories.interfaces import (
     DuplicateClusterRepository,
     EligibilityAuditRepository,
     OpportunityRepository,
+    RecommendationRepository,
 )
 from app.schemas.deduplication import DuplicateRecord, OpportunityCluster
 from app.schemas.eligibility import EligibilityResult
 from app.schemas.opportunity import PolymorphicOpportunity
 from app.schemas.profile import CandidateCareerProfile
+from app.schemas.ranking import RankingResponse
 
 
 class InMemoryCandidateProfileRepository(CandidateProfileRepository):
@@ -215,3 +217,31 @@ class InMemoryEligibilityAuditRepository(EligibilityAuditRepository):
 
     def clear(self) -> None:
         self._audits.clear()
+
+
+class InMemoryRecommendationRepository(RecommendationRepository):
+    """In-memory dictionary-backed repository for RankingResponse evaluations."""
+
+    def __init__(self) -> None:
+        self._evaluations: List[RankingResponse] = []
+
+    def save_evaluation(self, response: RankingResponse) -> None:
+        self._evaluations.append(
+            RankingResponse.model_validate(response.model_dump())
+        )
+
+    def get_latest_evaluation(self, user_id: str) -> Optional[RankingResponse]:
+        matching = [e for e in self._evaluations if e.candidate_id == user_id]
+        if not matching:
+            return None
+        matching.sort(key=lambda e: e.evaluation_timestamp, reverse=True)
+        return RankingResponse.model_validate(matching[0].model_dump())
+
+    def list_evaluations_for_user(self, user_id: str) -> List[RankingResponse]:
+        matching = [e for e in self._evaluations if e.candidate_id == user_id]
+        matching.sort(key=lambda e: e.evaluation_timestamp, reverse=True)
+        return [RankingResponse.model_validate(e.model_dump()) for e in matching]
+
+    def clear(self) -> None:
+        self._evaluations.clear()
+

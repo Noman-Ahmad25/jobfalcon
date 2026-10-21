@@ -363,5 +363,174 @@ export interface DiscoveryRunResponse {
   execution_metadata: Record<string, unknown>;
 }
 
+export type WorkflowStage =
+  | 'INITIALIZING'
+  | 'STRATEGY_FORMULATION'
+  | 'SEARCHING'
+  | 'EVALUATING'
+  | 'GAP_ANALYSIS'
+  | 'ADAPTING'
+  | 'FINALIZING'
+  | 'COMPLETED'
+  | 'FAILED';
+
+export type TerminationReason =
+  | 'COVERAGE_SATISFIED'
+  | 'MAX_ITERATIONS_REACHED'
+  | 'BUDGET_EXHAUSTED'
+  | 'ALL_SOURCES_EXHAUSTED'
+  | 'ABORTED_ERROR';
+
+export interface WorkflowTimelineEvent {
+  timestamp: string;
+  stage: WorkflowStage;
+  event_type: string;
+  summary: string;
+  details: Record<string, unknown>;
+}
+
+export interface SearchStrategy {
+  strategy_summary: string;
+  target_role_priorities: string[];
+  target_coverage_goal: number;
+  selected_connector_ids: string[];
+  initial_queries: DiscoverySearchQuery[];
+}
+
+export interface CoverageAssessment {
+  is_coverage_sufficient: boolean;
+  total_eligible_canonical: number;
+  target_role_coverage: Record<string, number>;
+  identified_gaps: string[];
+  recommended_action: string;
+}
+
+export interface AdaptationEvent {
+  iteration: number;
+  identified_gap: string;
+  adaptation_type: string;
+  action_summary: string;
+  new_query: DiscoverySearchQuery;
+  target_connector_ids: string[];
+}
+
+export interface AdaptiveDiscoveryRequest {
+  candidate_profile?: CandidateCareerProfile | null;
+  user_id?: string | null;
+  target_coverage_goal?: number;
+  max_iterations?: number;
+  max_tool_calls?: number;
+  connector_ids?: string[] | null;
+  deduplication_threshold?: number;
+  simulate_failure_connector?: string | null;
+  force_adaptive_gap_for_testing?: boolean;
+  persist_to_repository?: boolean;
+}
+
+export interface AdaptiveDiscoveryResponse {
+  workflow_id: string;
+  candidate_id: string;
+  termination_reason: TerminationReason;
+  iterations_completed: number;
+  total_tool_calls: number;
+  search_strategy: SearchStrategy;
+  coverage_assessment: CoverageAssessment;
+  adaptation_history: AdaptationEvent[];
+  total_discovered_raw: number;
+  canonical_count: number;
+  duplicate_count: number;
+  eligible_count: number;
+  uncertain_count: number;
+  ineligible_count: number;
+  canonical_opportunities: PolymorphicOpportunity[];
+  eligible_opportunities: PolymorphicOpportunity[];
+  duplicate_clusters: Record<string, OpportunityCluster>;
+  duplicate_records: DuplicateRecord[];
+  eligibility_results: EligibilityResult[];
+  connector_health: ConnectorHealthReport[];
+  timeline_events: WorkflowTimelineEvent[];
+  execution_metadata: Record<string, unknown>;
+}
+
+export type RankingDimension =
+  | 'SKILL_ALIGNMENT'
+  | 'CAREER_ALIGNMENT'
+  | 'GROWTH_POTENTIAL'
+  | 'MARKET_RELEVANCE'
+  | 'PREFERENCE_FIT'
+  | 'QUALIFICATION_FIT';
+
+export interface SkillMatchEvidence {
+  canonical_skill_id: string;
+  skill_name: string;
+  candidate_proficiency: number;
+  expected_proficiency: number;
+  confidence_score: number;
+  is_mandatory: boolean;
+  evidence_snippets: string[];
+  match_quality: number;
+}
+
+export interface SkillGap {
+  canonical_skill_id: string;
+  skill_name: string;
+  is_mandatory: boolean;
+  expected_proficiency: number;
+  candidate_proficiency?: number | null;
+  gap_type: string;
+}
+
+export interface DimensionScoreBreakdown {
+  dimension: RankingDimension;
+  raw_score: number;
+  weight: number;
+  weighted_score: number;
+  rationale: string;
+  caveats_or_missing_data: string[];
+}
+
+export interface RankedOpportunity {
+  rank: number;
+  overall_fit_score: number;
+  opportunity: PolymorphicOpportunity;
+  eligibility_status: EligibilityStatus;
+  is_eligible: boolean;
+  eligibility_caveats: string[];
+  dimension_scores: Record<RankingDimension, DimensionScoreBreakdown>;
+  matched_skills: SkillMatchEvidence[];
+  missing_skills: SkillGap[];
+  growth_skills: string[];
+  recommendation_rationale: string;
+  key_tradeoffs_or_risks: string[];
+  provenance_info: Record<string, unknown>;
+}
+
+export interface RankingRequest {
+  candidate_profile?: CandidateCareerProfile | null;
+  user_id?: string | null;
+  opportunities?: PolymorphicOpportunity[] | null;
+  weight_profile_name?: string;
+  custom_weights?: Record<string, number> | null;
+  include_ineligible_in_audit?: boolean;
+  top_k?: number;
+}
+
+export interface RankingResponse {
+  evaluation_id: string;
+  candidate_id: string;
+  model_version: string;
+  weight_profile_used: string;
+  weights: Record<string, number>;
+  total_candidates_evaluated: number;
+  total_eligible_ranked: number;
+  total_ineligible_excluded: number;
+  ranked_recommendations: RankedOpportunity[];
+  excluded_ineligible: Record<string, unknown>[];
+  evaluation_timestamp: string;
+  execution_metadata: Record<string, unknown>;
+}
+
+
+
 
 

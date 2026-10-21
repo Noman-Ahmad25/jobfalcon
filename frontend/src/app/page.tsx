@@ -4,6 +4,8 @@ import { HealthMonitor } from '@/components/health/HealthMonitor';
 import { DeterministicPipelineDemo } from '@/components/pipeline/DeterministicPipelineDemo';
 import { CandidateProfilingDemo } from '@/components/profiling/CandidateProfilingDemo';
 import { DiscoveryDemo } from '@/components/discovery/DiscoveryDemo';
+import { AdaptiveDiscoveryDemo } from '@/components/orchestration/AdaptiveDiscoveryDemo';
+import { RecommendationDemo } from '@/components/ranking/RecommendationDemo';
 
 export default function Home() {
   return (
@@ -27,6 +29,22 @@ export default function Home() {
         <div className="flex flex-col items-start gap-4">
           <HealthMonitor />
         </div>
+
+        {/* Milestone 9: Candidate-Job Ranking & Fit Scoring */}
+        <section aria-labelledby="recommendation-demo-heading" className="space-y-4">
+          <h3 id="recommendation-demo-heading" className="text-sm font-semibold uppercase tracking-wider text-zinc-500">
+            Milestone 9: Evidence-Grounded Candidate–Job Ranking & Fit Scoring
+          </h3>
+          <RecommendationDemo />
+        </section>
+
+        {/* Milestone 8: Agent Orchestration & Adaptive Discovery */}
+        <section aria-labelledby="orchestration-demo-heading" className="space-y-4">
+          <h3 id="orchestration-demo-heading" className="text-sm font-semibold uppercase tracking-wider text-zinc-500">
+            Autonomous Agent Orchestration & Adaptive Discovery Loop
+          </h3>
+          <AdaptiveDiscoveryDemo />
+        </section>
 
         {/* Milestone 6: Candidate Skill Profiling & Evidence Extraction */}
         <section aria-labelledby="profiling-demo-heading" className="space-y-4">
