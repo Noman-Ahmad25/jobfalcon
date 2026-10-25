@@ -238,6 +238,14 @@ class MockLLMClient(BaseLLMClient):
 
     def _extract_deterministic_fallback(self, user_prompt: str, schema: Type[T]) -> T:
         """Deterministic heuristic extraction fallback for candidate fact extraction."""
+        if schema.__name__ == "LLMPolishedExplanation":
+            return schema.model_validate({
+                "why_matches_summary": "Strong candidate match supported by verified evidence across core technical competencies.",
+                "career_relevance": "Direct alignment with target career trajectory and primary occupational ambition.",
+                "growth_opportunity": "Expands practical architectural competencies and technical ownership.",
+                "limitations_and_uncertainties": ["Compensation is unstated in the listing.", "Application deadline is rolling."],
+            })
+
         from app.schemas.common import DegreeLevel, EvidenceSourceType
         from app.schemas.profiling import (
             EpistemicUncertainties,

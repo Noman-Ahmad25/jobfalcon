@@ -210,5 +210,29 @@ This document records the provisional parameters, empirical calibration requirem
   2. **Dynamic Coverage Goal Tuning**: Calibrate whether $K_{\text{target}}$ should be dynamically suggested based on candidate seniority (e.g., higher for entry-level, lower for niche specialist roles).
   3. **Multi-Turn User Steering**: Permit human-in-the-loop candidate intervention (e.g., approving adjacent role suggestions before adaptive searching resumes).
 
+---
+
+## 13. Evidence-Grounded Recommendation Explanations & Candidate Career Gap Analysis
+
+- **Status**: **Milestone 11 Verified Baseline**
+- **Milestone 11 Baseline Implemented**:
+  1. **Evidence Traceability & Provenance Citations**:
+     - All matched requirements link directly to backing `EvidenceRecord` provenance (`evidence_id`, `source_type`, `snippet`, `verifiability_weight`).
+     - Citations are preserved through downstream APIs and frontend UI cards with expandable audits.
+  2. **Three-State Evidence Status for Skill Requirements**:
+     - `NOT_DEMONSTRATED`: Skill is not demonstrated by the available candidate evidence. Crucially, missing evidence is never presented as proof of inability or negative disqualification.
+     - `PROFICIENCY_UNCERTAIN`: Skill is demonstrated in profile, but candidate proficiency is below opportunity expectation OR epistemic confidence is low ($< 0.65$).
+     - `REQUIREMENT_UNCLEAR`: Opportunity requirement lacks calibrated proficiency expectations or has ambiguous criteria.
+  3. **Deterministic Primacy with Safe AI Polishing**:
+     - Factual scores, eligibility checks, evidence citations, and gap categorization are generated strictly by pure Python deterministic logic.
+     - Optional LLM polisher converts raw facts into readable prose via strict `LLMPolishedExplanation` Pydantic v2 schemas.
+     - Anti-hallucination and safety checks reject false hiring promises (e.g. "guaranteed job", "100% chance of hire") and prompt injections embedded in untrusted job descriptions, with zero-delay fallback to deterministic templates.
+  4. **Stage-Proportional Learning & Portfolio Actions**:
+     - Suggested improvements calibrate to candidate experience stage: Early Career / Junior candidates receive focused portfolio demonstration recommendations (`PORTFOLIO_BUILD`), while Mid/Senior candidates receive deep performance, benchmarking, or architectural projects (`PROJECT_ENHANCEMENT`, `EVIDENCE_COLLECTION`).
+     - Every suggestion enforces a mandatory ethical disclaimer: *"Completing this action provides verifiable evidence of your capabilities but does not guarantee employment or interview selection."*
+- **Open Decisions & Calibration Tasks**:
+  1. **Taxonomic Expansion for Career Paths**: Map more specialized occupational titles beyond the core 7 O*NET archetypes.
+  2. **Dynamic Evidence Freshness Decay in Gap Priority**: Adjust gap urgency dynamically based on how recently evidence was demonstrated (`last_practiced_date`).
+
 
 

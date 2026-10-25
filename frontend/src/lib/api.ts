@@ -13,6 +13,9 @@ import {
   PipelineEvaluationResponse,
   RankingRequest,
   RankingResponse,
+  OpportunityExplanation,
+  CandidateCareerGapAnalysisResponse,
+  CareerImprovementSuggestion,
 } from '@/types/domain';
 
 const DEFAULT_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -163,6 +166,65 @@ export async function evaluateAndRankOpportunities(
     timeoutMs: 15000,
   });
 }
+
+export async function getOpportunityExplanation(
+  userId: string,
+  oppId: string,
+  useLlm: boolean = true
+): Promise<OpportunityExplanation> {
+  return fetchFromApi<OpportunityExplanation>(
+    `/api/v1/explanation/candidate/${encodeURIComponent(userId)}/opportunity/${encodeURIComponent(oppId)}?use_llm=${useLlm}`,
+    {
+      method: 'GET',
+      timeoutMs: 10000,
+    }
+  );
+}
+
+export async function getLatestExplanations(
+  userId: string,
+  limit: number = 10,
+  useLlm: boolean = true
+): Promise<OpportunityExplanation[]> {
+  return fetchFromApi<OpportunityExplanation[]>(
+    `/api/v1/explanation/candidate/${encodeURIComponent(userId)}/latest?limit=${limit}&use_llm=${useLlm}`,
+    {
+      method: 'GET',
+      timeoutMs: 15000,
+    }
+  );
+}
+
+export async function runCareerGapAnalysis(
+  userId: string,
+  targetRoles?: string[],
+  includeRepoOpportunities: boolean = true
+): Promise<CandidateCareerGapAnalysisResponse> {
+  return fetchFromApi<CandidateCareerGapAnalysisResponse>(
+    `/api/v1/explanation/gap-analysis/candidate/${encodeURIComponent(userId)}/analyze`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        target_roles: targetRoles,
+        include_repo_opportunities: includeRepoOpportunities,
+      }),
+      timeoutMs: 15000,
+    }
+  );
+}
+
+export async function getCareerImprovementSuggestions(
+  userId: string
+): Promise<CareerImprovementSuggestion[]> {
+  return fetchFromApi<CareerImprovementSuggestion[]>(
+    `/api/v1/explanation/gap-analysis/candidate/${encodeURIComponent(userId)}/suggestions`,
+    {
+      method: 'GET',
+      timeoutMs: 10000,
+    }
+  );
+}
+
 
 
 

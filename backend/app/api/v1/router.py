@@ -5,6 +5,7 @@ from app.api.v1.opportunities import router as opportunities_router
 from app.api.v1.orchestration import router as orchestration_router
 from app.api.v1.profile import router as profile_router
 from app.api.v1.ranking import router as ranking_router
+from app.api.v1.explanation import router as explanation_router
 
 api_v1_router = APIRouter()
 
@@ -15,4 +16,5 @@ api_v1_router.include_router(profile_router)
 api_v1_router.include_router(discovery_router)
 api_v1_router.include_router(orchestration_router)
 api_v1_router.include_router(ranking_router)
+api_v1_router.include_router(explanation_router)
 

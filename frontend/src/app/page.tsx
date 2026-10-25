@@ -6,6 +6,7 @@ import { CandidateProfilingDemo } from '@/components/profiling/CandidateProfilin
 import { DiscoveryDemo } from '@/components/discovery/DiscoveryDemo';
 import { AdaptiveDiscoveryDemo } from '@/components/orchestration/AdaptiveDiscoveryDemo';
 import { RecommendationDemo } from '@/components/ranking/RecommendationDemo';
+import { CareerExplanationAndGapAnalysis } from '@/components/explanation/CareerExplanationAndGapAnalysis';
 
 export default function Home() {
   return (
@@ -29,6 +30,14 @@ export default function Home() {
         <div className="flex flex-col items-start gap-4">
           <HealthMonitor />
         </div>
+
+        {/* Milestone 11: Explanations & Candidate Career Gap Analysis */}
+        <section aria-labelledby="explanation-demo-heading" className="space-y-4">
+          <h3 id="explanation-demo-heading" className="text-sm font-semibold uppercase tracking-wider text-zinc-500">
+            Milestone 11: Evidence-Grounded Explanations & Candidate Career Gap Analysis
+          </h3>
+          <CareerExplanationAndGapAnalysis />
+        </section>
 
         {/* Milestone 9: Candidate-Job Ranking & Fit Scoring */}
         <section aria-labelledby="recommendation-demo-heading" className="space-y-4">

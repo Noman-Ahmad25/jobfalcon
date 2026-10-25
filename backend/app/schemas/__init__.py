@@ -82,6 +82,21 @@ from app.schemas.ranking import (
     SkillGap,
     SkillMatchEvidence,
 )
+from app.schemas.explanation import (
+    EvidenceCitation,
+    LLMPolishedExplanation,
+    OpportunityExplanation,
+    RequirementEvidenceStatus,
+    RequirementExplanation,
+)
+from app.schemas.gap_analysis import (
+    ActionType,
+    CandidateCareerGapAnalysisResponse,
+    CareerGapItem,
+    CareerImprovementSuggestion,
+    GapImportance,
+    GapStatus,
+)
 from app.schemas.pipeline import (
     PipelineEvaluationRequest,
     PipelineEvaluationResponse,
@@ -188,5 +203,18 @@ __all__ = [
     "RankedOpportunity",
     "RankingRequest",
     "RankingResponse",
+    # Explanation
+    "RequirementEvidenceStatus",
+    "EvidenceCitation",
+    "RequirementExplanation",
+    "OpportunityExplanation",
+    "LLMPolishedExplanation",
+    # Gap Analysis
+    "GapStatus",
+    "GapImportance",
+    "ActionType",
+    "CareerGapItem",
+    "CareerImprovementSuggestion",
+    "CandidateCareerGapAnalysisResponse",
 ]
 

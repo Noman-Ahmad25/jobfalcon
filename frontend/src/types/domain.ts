@@ -535,6 +535,110 @@ export interface RankingResponse {
   execution_metadata: Record<string, unknown>;
 }
 
+// =============================================================================
+// Milestone 11: Explanations & Career Gap Analysis
+// =============================================================================
+
+export type RequirementEvidenceStatus =
+  | 'SUPPORTED'
+  | 'PARTIALLY_SUPPORTED'
+  | 'NOT_EVIDENCED'
+  | 'REQUIREMENT_UNCLEAR';
+
+export interface EvidenceCitation {
+  evidence_id: string;
+  source_type: EvidenceSourceType;
+  source_uri?: string | null;
+  snippet: string;
+  verifiability_weight: number;
+  observed_at?: string | null;
+}
+
+export interface RequirementExplanation {
+  canonical_skill_id: string;
+  skill_name: string;
+  status: RequirementEvidenceStatus;
+  is_mandatory: boolean;
+  candidate_proficiency?: number | null;
+  expected_proficiency?: number | null;
+  confidence_score?: number | null;
+  citations: EvidenceCitation[];
+  status_rationale: string;
+}
+
+export interface OpportunityExplanation {
+  opportunity_id: string;
+  title: string;
+  company_name: string;
+  overall_fit_score: number;
+  rank?: number | null;
+  why_matches_summary: string;
+  top_driving_dimensions: string[];
+  matched_requirements: RequirementExplanation[];
+  partially_supported_requirements: RequirementExplanation[];
+  skill_gaps: RequirementExplanation[];
+  eligibility_verdict: EligibilityStatus;
+  eligibility_explanation: string;
+  eligibility_caveats: string[];
+  career_relevance: string;
+  growth_opportunity: string;
+  limitations_and_uncertainties: string[];
+  is_llm_polished: boolean;
+  fallback_used: boolean;
+  generated_at: string;
+}
+
+export type GapStatus =
+  | 'NOT_DEMONSTRATED'
+  | 'PROFICIENCY_UNCERTAIN'
+  | 'REQUIREMENT_UNCLEAR';
+
+export type GapImportance = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'NICE_TO_HAVE';
+
+export type ActionType =
+  | 'PROJECT_ENHANCEMENT'
+  | 'PORTFOLIO_BUILD'
+  | 'CONCEPT_STUDY'
+  | 'EVIDENCE_COLLECTION';
+
+export interface CareerGapItem {
+  canonical_skill_id: string;
+  skill_name: string;
+  gap_status: GapStatus;
+  importance: GapImportance;
+  is_mandatory: boolean;
+  candidate_proficiency?: number | null;
+  expected_proficiency?: number | null;
+  confidence_score?: number | null;
+  supporting_evidence: EvidenceCitation[];
+  why_it_matters: string;
+  suggested_action: string;
+  relevant_target_roles: string[];
+  relevant_opportunities: string[];
+}
+
+export interface CareerImprovementSuggestion {
+  suggestion_id: string;
+  action_type: ActionType;
+  title: string;
+  description: string;
+  proportional_stage: string;
+  targeted_gaps: string[];
+  supported_roles: string[];
+  disclaimer: string;
+}
+
+export interface CandidateCareerGapAnalysisResponse {
+  user_id: string;
+  analyzed_at: string;
+  target_roles_analyzed: string[];
+  total_opportunities_analyzed: number;
+  total_gaps_identified: number;
+  prioritized_gaps: CareerGapItem[];
+  suggested_improvements: CareerImprovementSuggestion[];
+}
+
+
 
 
 
