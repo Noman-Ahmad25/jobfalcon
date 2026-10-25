@@ -7,10 +7,17 @@ from typing import Optional, Sequence
 from app.db.connection import DatabaseManager, db_manager
 from app.db.repositories.interfaces import (
     CandidateProfileRepository,
+    CareerPathRepository,
     DuplicateClusterRepository,
     EligibilityAuditRepository,
     OpportunityRepository,
     RecommendationRepository,
+)
+from app.schemas.career_path import (
+    ActionProgressStatus,
+    CareerPathAssessmentResponse,
+    DevelopmentActionItem,
+    PersonalizedDevelopmentPlan,
 )
 from app.schemas.deduplication import DuplicateRecord, OpportunityCluster
 from app.schemas.eligibility import (
@@ -718,4 +725,162 @@ class SQLiteRecommendationRepository(RecommendationRepository):
             evaluation_timestamp=datetime.fromisoformat(row["evaluated_at"]),
             execution_metadata={},
         )
+
+
+class SQLiteCareerPathRepository(CareerPathRepository):
+    """SQLite implementation of CareerPathRepository for assessments, plans, and action tracking."""
+
+    def __init__(self, manager: Optional[DatabaseManager] = None) -> None:
+        self.manager = manager or db_manager
+
+    def save_assessment(self, response: CareerPathAssessmentResponse) -> None:
+        assessment_json = response.model_dump_json()
+        with self.manager.transaction() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO career_path_assessments (
+                    id, user_id, assessment_json, assessed_at
+                ) VALUES (?, ?, ?, ?);
+                """,
+                (
+                    f"cpa_{response.user_id}_{int(response.assessed_at.timestamp())}",
+                    response.user_id,
+                    assessment_json,
+                    response.assessed_at.isoformat(),
+                ),
+            )
+
+    def get_latest_assessment(self, user_id: str) -> Optional[CareerPathAssessmentResponse]:
+        with self.manager.read_connection() as conn:
+            row = conn.execute(
+                """
+                SELECT * FROM career_path_assessments
+                WHERE user_id = ?
+                ORDER BY assessed_at DESC
+                LIMIT 1;
+                """,
+                (user_id,),
+            ).fetchone()
+
+            if not row:
+                return None
+
+            return CareerPathAssessmentResponse.model_validate_json(row["assessment_json"])
+
+    def save_development_plan(self, plan: PersonalizedDevelopmentPlan) -> None:
+        plan_json = plan.model_dump_json()
+        with self.manager.transaction() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO development_plans (
+                    plan_id, user_id, plan_json, generated_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?);
+                """,
+                (
+                    plan.plan_id,
+                    plan.user_id,
+                    plan_json,
+                    plan.generated_at.isoformat(),
+                    plan.updated_at.isoformat(),
+                ),
+            )
+
+            # Also sync progress table for individual actions
+            for action in plan.short_term_actions + plan.long_term_actions:
+                completed_str = action.completed_at.isoformat() if action.completed_at else None
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO development_action_progress (
+                        action_id, user_id, plan_id, status, artifact_url, candidate_notes, completed_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+                    """,
+                    (
+                        action.action_id,
+                        plan.user_id,
+                        plan.plan_id,
+                        action.status.value,
+                        action.verification_artifact_url,
+                        action.candidate_notes,
+                        completed_str,
+                        datetime.now(timezone.utc).isoformat(),
+                    ),
+                )
+
+    def get_latest_development_plan(self, user_id: str) -> Optional[PersonalizedDevelopmentPlan]:
+        with self.manager.read_connection() as conn:
+            row = conn.execute(
+                """
+                SELECT * FROM development_plans
+                WHERE user_id = ?
+                ORDER BY updated_at DESC
+                LIMIT 1;
+                """,
+                (user_id,),
+            ).fetchone()
+
+            if not row:
+                return None
+
+            plan = PersonalizedDevelopmentPlan.model_validate_json(row["plan_json"])
+
+            # Merge live progress states from development_action_progress
+            progress_rows = conn.execute(
+                """
+                SELECT * FROM development_action_progress
+                WHERE user_id = ? AND plan_id = ?;
+                """,
+                (user_id, plan.plan_id),
+            ).fetchall()
+
+            progress_map = {r["action_id"]: r for r in progress_rows}
+
+            for act in plan.short_term_actions + plan.long_term_actions:
+                if act.action_id in progress_map:
+                    pr = progress_map[act.action_id]
+                    act.status = ActionProgressStatus(pr["status"])
+                    act.verification_artifact_url = pr["artifact_url"]
+                    act.candidate_notes = pr["candidate_notes"]
+                    if pr["completed_at"]:
+                        act.completed_at = datetime.fromisoformat(pr["completed_at"])
+
+            return plan
+
+    def update_action_progress(
+        self,
+        user_id: str,
+        action_id: str,
+        status: ActionProgressStatus,
+        artifact_url: Optional[str] = None,
+        notes: Optional[str] = None,
+    ) -> Optional[DevelopmentActionItem]:
+        plan = self.get_latest_development_plan(user_id)
+        if not plan:
+            return None
+
+        # Find the action item in plan
+        target_action: Optional[DevelopmentActionItem] = None
+        for act in plan.short_term_actions + plan.long_term_actions:
+            if act.action_id == action_id:
+                target_action = act
+                break
+
+        if not target_action:
+            return None
+
+        target_action.status = status
+        now_utc = datetime.now(timezone.utc)
+        if status == ActionProgressStatus.COMPLETED:
+            target_action.completed_at = now_utc
+        elif status == ActionProgressStatus.NOT_STARTED:
+            target_action.completed_at = None
+
+        if artifact_url is not None:
+            target_action.verification_artifact_url = artifact_url
+        if notes is not None:
+            target_action.candidate_notes = notes
+
+        plan.updated_at = now_utc
+        self.save_development_plan(plan)
+        return target_action
+
 

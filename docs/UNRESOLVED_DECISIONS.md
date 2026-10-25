@@ -234,5 +234,38 @@ This document records the provisional parameters, empirical calibration requirem
   1. **Taxonomic Expansion for Career Paths**: Map more specialized occupational titles beyond the core 7 O*NET archetypes.
   2. **Dynamic Evidence Freshness Decay in Gap Priority**: Adjust gap urgency dynamically based on how recently evidence was demonstrated (`last_practiced_date`).
 
+---
+
+## 14. Career Path Intelligence & Personalized Development Planning
+
+- **Status**: **Milestone 12 Verified Baseline**
+- **Milestone 12 Baseline Implemented**:
+  1. **Target-Role Analysis & Relationship Categorization**:
+     - Roles are deterministically categorized into `DIRECT_TARGET` (explicitly declared ambitions), `ADJACENT_OPTION` (taxonomically adjacent or $\ge 25\%$ core competency overlap), or `EXPLORATORY_POSSIBILITY` ($< 25\%$ overlap or unmapped paths).
+     - Readiness levels (`PURSUABLE_NOW`, `ATTAINABLE_WITH_DEVELOPMENT`, `EXPLORATORY`) anchor to verified candidate skills, experience months, and hard eligibility constraints.
+     - Unmapped roles return explicit epistemic uncertainty and exploratory classification without false precision or fabricated taxonomy codes.
+  2. **Lightweight Cycle-Safe Career Path Graph**:
+     - Modeled as a Directed Acyclic Graph (DAG) using pure Python data structures without external graph database overhead.
+     - Enforces a strict topological total order `(is_baseline, readiness_rank, relationship_rank, -skill_overlap, role_title)` ensuring cycles are mathematically impossible (`is_cycle_free = True`).
+     - Transitions define explicit transferable skills, concrete development gaps, deterministic feasibility scores ($0.0$ to $1.0$), and estimated effort levels (`LOW`, `MEDIUM`, `HIGH`).
+  3. **Personalized Development Plan & Measurable Actions**:
+     - Generates practical, hands-on demonstrations (portfolio repositories, integration pull requests, execution benchmarks, architecture decision records) over generic course lists.
+     - Differentiates `SHORT_TERM` immediate priorities from `LONG_TERM` strategic capability advancements.
+     - Requires an objective, measurable completion criterion (e.g., passing CI build, $>80\%$ test coverage, benchmark logs) and verifiable evidence to produce for every action.
+     - Enforces a mandatory non-negotiable ethical disclaimer against false hiring or ranking guarantees.
+  4. **Opportunity-Aware Prioritization & Limitation Disclosures**:
+     - Discovered job postings calibrate skill urgency (`EXPLICITLY_REQUIRED`, `EMPLOYER_PREFERRED`, `TAXONOMY_INFERRED`, `UNCERTAIN_IMPORTANCE`).
+     - Honest limitation disclosures clearly state data sufficiency levels (`HIGH`, `MODERATE`, `LIMITED_SAMPLE`, `NO_DISCOVERED_DATA`) and source systems represented.
+  5. **Persistence & Minimal Progress Tracking**:
+     - Relational tables in SQLite WAL mode: `career_path_assessments`, `development_plans`, and `development_action_progress`.
+     - Endpoints allow candidate confirmation of action progress (`NOT_STARTED`, `IN_PROGRESS`, `COMPLETED`, `ABANDONED`) with artifact URLs and reflection notes.
+  6. **AI Safety Boundaries & Deterministic Fallback**:
+     - Hard eligibility, mathematical scoring, evidence grounding, graph edges, and plan structure remain 100% deterministic.
+     - LLM crashes or validation errors fall back instantly to pure deterministic templates with zero degradation.
+- **Open Decisions & Calibration Tasks**:
+  1. **Dynamic Completion Verification Hook**: In future milestones, automatically verify candidate GitHub repository artifacts or commit diffs via an automated provenance evaluator before moving an action to `COMPLETED`.
+  2. **Cross-Employer Requirement Variance**: Calibrate how requirement variances across different industries affect role readiness thresholds.
+
+
 
 

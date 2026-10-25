@@ -638,6 +638,152 @@ export interface CandidateCareerGapAnalysisResponse {
   suggested_improvements: CareerImprovementSuggestion[];
 }
 
+// =============================================================================
+// Milestone 12: Career Path Intelligence & Personalized Development Planning
+// =============================================================================
+
+export type TargetRoleRelationship =
+  | 'DIRECT_TARGET'
+  | 'ADJACENT_OPTION'
+  | 'EXPLORATORY_POSSIBILITY';
+
+export type RoleReadiness =
+  | 'PURSUABLE_NOW'
+  | 'ATTAINABLE_WITH_DEVELOPMENT'
+  | 'EXPLORATORY';
+
+export type ActionHorizon = 'SHORT_TERM' | 'LONG_TERM';
+
+export type ActionProgressStatus =
+  | 'NOT_STARTED'
+  | 'IN_PROGRESS'
+  | 'COMPLETED'
+  | 'ABANDONED';
+
+export type SkillRequirementImportance =
+  | 'EXPLICITLY_REQUIRED'
+  | 'EMPLOYER_PREFERRED'
+  | 'TAXONOMY_INFERRED'
+  | 'UNCERTAIN_IMPORTANCE';
+
+export interface OpportunityCoverageSummary {
+  matching_opportunity_count: number;
+  sample_opportunity_titles: string[];
+  sample_sources: string[];
+  coverage_limitation_note?: string | null;
+}
+
+export interface RoleTargetAssessment {
+  role_title: string;
+  canonical_occupation_code?: string | null;
+  relationship: TargetRoleRelationship;
+  readiness: RoleReadiness;
+  skill_overlap_ratio: number;
+  supporting_skills: string[];
+  supporting_evidence: EvidenceCitation[];
+  critical_gaps: string[];
+  eligibility_uncertainties: string[];
+  opportunity_coverage: OpportunityCoverageSummary;
+  feasibility_rationale: string;
+}
+
+export interface CareerPathNodeView {
+  node_id: string;
+  role_title: string;
+  canonical_occupation_code?: string | null;
+  relationship: TargetRoleRelationship;
+  readiness: RoleReadiness;
+  skill_overlap_ratio: number;
+  core_competencies: string[];
+}
+
+export interface CareerPathTransitionEdge {
+  edge_id: string;
+  source_role: string;
+  target_role: string;
+  transition_type: string;
+  basis_description: string;
+  transferable_skills: string[];
+  development_gaps: string[];
+  feasibility_score: number;
+  estimated_effort_level: 'LOW' | 'MEDIUM' | 'HIGH';
+}
+
+export interface CareerPathGraph {
+  nodes: CareerPathNodeView[];
+  edges: CareerPathTransitionEdge[];
+  baseline_role_title?: string | null;
+  is_cycle_free: boolean;
+}
+
+export interface OpportunitySkillSignal {
+  skill_name: string;
+  signal_type: SkillRequirementImportance;
+  frequency_in_sample: number;
+  supporting_job_titles: string[];
+  supporting_sources: string[];
+}
+
+export interface OpportunityMarketInsight {
+  total_opportunities_analyzed: number;
+  data_sufficiency_level: string;
+  sources_represented: string[];
+  recurring_skills: OpportunitySkillSignal[];
+  limitation_disclosure: string;
+}
+
+export interface DevelopmentActionItem {
+  action_id: string;
+  skill_or_capability: string;
+  motivating_gap_id?: string | null;
+  motivating_gap_description: string;
+  target_roles_supported: string[];
+  supported_opportunities_count: number;
+  action_type: ActionType;
+  horizon: ActionHorizon;
+  concrete_activity: string;
+  measurable_completion_criterion: string;
+  verifiable_evidence_to_produce: string;
+  priority: GapImportance;
+  priority_rationale: string;
+  dependencies: string[];
+  status: ActionProgressStatus;
+  completed_at?: string | null;
+  candidate_notes?: string | null;
+  verification_artifact_url?: string | null;
+}
+
+export interface PersonalizedDevelopmentPlan {
+  plan_id: string;
+  user_id: string;
+  generated_at: string;
+  updated_at: string;
+  plan_summary: string;
+  short_term_actions: DevelopmentActionItem[];
+  long_term_actions: DevelopmentActionItem[];
+  total_actions: number;
+  market_insights: OpportunityMarketInsight;
+  ethical_disclaimer: string;
+}
+
+export interface CareerPathAssessmentResponse {
+  user_id: string;
+  assessed_at: string;
+  role_assessments: RoleTargetAssessment[];
+  career_path_graph: CareerPathGraph;
+  development_plan: PersonalizedDevelopmentPlan;
+  total_target_roles: number;
+  total_adjacent_roles: number;
+  total_exploratory_roles: number;
+}
+
+export interface UpdateActionProgressRequest {
+  status: ActionProgressStatus;
+  verification_artifact_url?: string | null;
+  candidate_notes?: string | null;
+}
+
+
 
 
 

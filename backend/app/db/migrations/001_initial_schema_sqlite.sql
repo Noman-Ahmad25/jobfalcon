@@ -132,3 +132,39 @@ CREATE TABLE IF NOT EXISTS recommendation_evaluations (
 
 CREATE INDEX IF NOT EXISTS ix_recommendation_evaluations_candidate ON recommendation_evaluations(candidate_id, evaluated_at);
 
+-- 9. Career Path Assessments
+CREATE TABLE IF NOT EXISTS career_path_assessments (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    assessment_json TEXT NOT NULL,
+    assessed_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_career_path_assessments_user ON career_path_assessments(user_id, assessed_at);
+
+-- 10. Personalized Development Plans
+CREATE TABLE IF NOT EXISTS development_plans (
+    plan_id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    plan_json TEXT NOT NULL,
+    generated_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_development_plans_user ON development_plans(user_id, updated_at);
+
+-- 11. Development Action Progress
+CREATE TABLE IF NOT EXISTS development_action_progress (
+    action_id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    plan_id TEXT NOT NULL,
+    status TEXT NOT NULL,
+    artifact_url TEXT,
+    candidate_notes TEXT,
+    completed_at TEXT,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_development_action_progress_user ON development_action_progress(user_id, plan_id);
+
+

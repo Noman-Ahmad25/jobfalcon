@@ -3,6 +3,12 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional, Sequence
 
+from app.schemas.career_path import (
+    ActionProgressStatus,
+    CareerPathAssessmentResponse,
+    DevelopmentActionItem,
+    PersonalizedDevelopmentPlan,
+)
 from app.schemas.deduplication import DuplicateRecord, OpportunityCluster
 from app.schemas.eligibility import EligibilityResult
 from app.schemas.opportunity import PolymorphicOpportunity
@@ -146,4 +152,41 @@ class RecommendationRepository(ABC):
     def list_evaluations_for_user(self, user_id: str) -> list[RankingResponse]:
         """Lists historical ranking evaluations for a candidate."""
         raise NotImplementedError
+
+
+class CareerPathRepository(ABC):
+    """Abstract port for career path assessments and personalized development plan persistence."""
+
+    @abstractmethod
+    def save_assessment(self, response: CareerPathAssessmentResponse) -> None:
+        """Persists a complete career path assessment."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_latest_assessment(self, user_id: str) -> Optional[CareerPathAssessmentResponse]:
+        """Retrieves the most recent career path assessment for a candidate."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def save_development_plan(self, plan: PersonalizedDevelopmentPlan) -> None:
+        """Persists or updates a personalized development plan."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_latest_development_plan(self, user_id: str) -> Optional[PersonalizedDevelopmentPlan]:
+        """Retrieves the latest development plan for a candidate."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def update_action_progress(
+        self,
+        user_id: str,
+        action_id: str,
+        status: ActionProgressStatus,
+        artifact_url: Optional[str] = None,
+        notes: Optional[str] = None,
+    ) -> Optional[DevelopmentActionItem]:
+        """Updates the status and artifact provenance for a specific development action."""
+        raise NotImplementedError
+
 

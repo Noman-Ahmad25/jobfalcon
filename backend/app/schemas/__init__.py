@@ -97,6 +97,24 @@ from app.schemas.gap_analysis import (
     GapImportance,
     GapStatus,
 )
+from app.schemas.career_path import (
+    ActionHorizon,
+    ActionProgressStatus,
+    CareerPathAssessmentResponse,
+    CareerPathGraph,
+    CareerPathNodeView,
+    CareerPathTransitionEdge,
+    DevelopmentActionItem,
+    OpportunityCoverageSummary,
+    OpportunityMarketInsight,
+    OpportunitySkillSignal,
+    PersonalizedDevelopmentPlan,
+    RoleReadiness,
+    RoleTargetAssessment,
+    SkillRequirementImportance,
+    TargetRoleRelationship,
+    UpdateActionProgressRequest,
+)
 from app.schemas.pipeline import (
     PipelineEvaluationRequest,
     PipelineEvaluationResponse,
@@ -216,5 +234,22 @@ __all__ = [
     "CareerGapItem",
     "CareerImprovementSuggestion",
     "CandidateCareerGapAnalysisResponse",
+    # Career Path & Development Plan
+    "TargetRoleRelationship",
+    "RoleReadiness",
+    "ActionHorizon",
+    "ActionProgressStatus",
+    "OpportunityCoverageSummary",
+    "RoleTargetAssessment",
+    "CareerPathNodeView",
+    "CareerPathTransitionEdge",
+    "CareerPathGraph",
+    "SkillRequirementImportance",
+    "OpportunitySkillSignal",
+    "OpportunityMarketInsight",
+    "DevelopmentActionItem",
+    "PersonalizedDevelopmentPlan",
+    "CareerPathAssessmentResponse",
+    "UpdateActionProgressRequest",
 ]
 

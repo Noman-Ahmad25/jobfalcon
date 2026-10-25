@@ -16,6 +16,11 @@ import {
   OpportunityExplanation,
   CandidateCareerGapAnalysisResponse,
   CareerImprovementSuggestion,
+  CareerPathAssessmentResponse,
+  RoleTargetAssessment,
+  PersonalizedDevelopmentPlan,
+  DevelopmentActionItem,
+  UpdateActionProgressRequest,
 } from '@/types/domain';
 
 const DEFAULT_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -224,6 +229,111 @@ export async function getCareerImprovementSuggestions(
     }
   );
 }
+
+// =============================================================================
+// Milestone 12: Career Path Intelligence & Personalized Development Planning
+// =============================================================================
+
+export async function getCareerPathAssessment(
+  userId: string,
+  refresh: boolean = false
+): Promise<CareerPathAssessmentResponse> {
+  return fetchFromApi<CareerPathAssessmentResponse>(
+    `/api/v1/career-path/candidate/${encodeURIComponent(userId)}/assessment?refresh=${refresh}`,
+    {
+      method: 'GET',
+      timeoutMs: 15000,
+    }
+  );
+}
+
+export async function getCareerPathRoles(
+  userId: string
+): Promise<RoleTargetAssessment[]> {
+  return fetchFromApi<RoleTargetAssessment[]>(
+    `/api/v1/career-path/candidate/${encodeURIComponent(userId)}/roles`,
+    {
+      method: 'GET',
+      timeoutMs: 10000,
+    }
+  );
+}
+
+export async function getDevelopmentPlan(
+  userId: string
+): Promise<PersonalizedDevelopmentPlan> {
+  return fetchFromApi<PersonalizedDevelopmentPlan>(
+    `/api/v1/career-path/candidate/${encodeURIComponent(userId)}/plan`,
+    {
+      method: 'GET',
+      timeoutMs: 10000,
+    }
+  );
+}
+
+export async function generateDevelopmentPlan(
+  userId: string,
+  targetRoles?: string[],
+  includeRepoOpportunities: boolean = true
+): Promise<PersonalizedDevelopmentPlan> {
+  return fetchFromApi<PersonalizedDevelopmentPlan>(
+    `/api/v1/career-path/candidate/${encodeURIComponent(userId)}/plan/generate`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        target_roles: targetRoles,
+        include_repo_opportunities: includeRepoOpportunities,
+      }),
+      timeoutMs: 15000,
+    }
+  );
+}
+
+export async function getDevelopmentActions(
+  userId: string
+): Promise<DevelopmentActionItem[]> {
+  return fetchFromApi<DevelopmentActionItem[]>(
+    `/api/v1/career-path/candidate/${encodeURIComponent(userId)}/actions`,
+    {
+      method: 'GET',
+      timeoutMs: 10000,
+    }
+  );
+}
+
+export async function updateActionProgress(
+  userId: string,
+  actionId: string,
+  req: UpdateActionProgressRequest
+): Promise<DevelopmentActionItem> {
+  return fetchFromApi<DevelopmentActionItem>(
+    `/api/v1/career-path/candidate/${encodeURIComponent(userId)}/actions/${encodeURIComponent(actionId)}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(req),
+      timeoutMs: 10000,
+    }
+  );
+}
+
+export async function refreshCareerPathAssessment(
+  userId: string,
+  targetRoles?: string[],
+  includeRepoOpportunities: boolean = true
+): Promise<CareerPathAssessmentResponse> {
+  return fetchFromApi<CareerPathAssessmentResponse>(
+    `/api/v1/career-path/candidate/${encodeURIComponent(userId)}/refresh`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        target_roles: targetRoles,
+        include_repo_opportunities: includeRepoOpportunities,
+      }),
+      timeoutMs: 15000,
+    }
+  );
+}
+
 
 
 
