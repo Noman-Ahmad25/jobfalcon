@@ -195,12 +195,16 @@ def test_determine_work_mode_detects_modes() -> None:
 
 def test_connector_health_honest_reporting() -> None:
     async def _run() -> None:
-        # 1. WebSearch in live mode honestly reports MOCKED_FALLBACK because no SearXNG/Google credentials exist
-        web = WebSearchConnector(mock_mode=False)
-        web_health = await web.check_health()
-        assert web_health.status == ConnectorStatus.MOCKED_FALLBACK
-        assert web_health.is_mock_fallback is True
-        assert "No external search gateway credentials configured" in web_health.details.get("note", "")
+        # 1. WebSearch in mock mode reports MOCKED_FALLBACK; in live mode reports honest provider state (UNAVAILABLE or CONNECTED)
+        web_mock = WebSearchConnector(mock_mode=True)
+        web_mock_health = await web_mock.check_health()
+        assert web_mock_health.status == ConnectorStatus.MOCKED_FALLBACK
+        assert web_mock_health.is_mock_fallback is True
+
+        web_live = WebSearchConnector(mock_mode=False)
+        web_live_health = await web_live.check_health()
+        assert web_live_health.status in (ConnectorStatus.UNAVAILABLE, ConnectorStatus.CONNECTED, ConnectorStatus.DEGRADED)
+        assert web_live_health.is_mock_fallback is False
 
         # 2. India Jobs MCP in live mode honestly reports UNAVAILABLE_MISSING_BINARY
         india = IndiaJobsMCPConnector(mock_mode=False)

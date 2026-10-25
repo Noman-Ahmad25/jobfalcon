@@ -219,6 +219,7 @@ export function DiscoveryDemo() {
   const [dedupThreshold, setDedupThreshold] = useState<number>(0.85);
 
   const [loadingConnectors, setLoadingConnectors] = useState<boolean>(false);
+  const [isLiveMode, setIsLiveMode] = useState<boolean>(false);
   const [planningLoading, setPlanningLoading] = useState<boolean>(false);
   const [discoveryLoading, setDiscoveryLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -227,13 +228,14 @@ export function DiscoveryDemo() {
 
   // Load connector health on mount
   useEffect(() => {
-    refreshConnectors();
+    refreshConnectors(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function refreshConnectors() {
+  async function refreshConnectors(live: boolean = isLiveMode) {
     setLoadingConnectors(true);
     try {
-      const data = await getDiscoveryConnectors();
+      const data = await getDiscoveryConnectors(live);
       setConnectors(data);
     } catch (err: unknown) {
       console.error('Failed to load discovery connectors:', err);
@@ -267,6 +269,7 @@ export function DiscoveryDemo() {
         deduplication_threshold: dedupThreshold,
         simulate_failure_connector: failureParam,
         persist_to_repository: true,
+        mock_mode: !isLiveMode,
       });
       setDiscoveryResponse(res);
       if (!queryPlan) {
@@ -304,7 +307,22 @@ export function DiscoveryDemo() {
 
           <div className="flex items-center gap-2">
             <button
-              onClick={refreshConnectors}
+              type="button"
+              onClick={() => {
+                const newMode = !isLiveMode;
+                setIsLiveMode(newMode);
+                refreshConnectors(newMode);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
+                isLiveMode
+                  ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm'
+                  : 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700'
+              }`}
+            >
+              {isLiveMode ? '● Mode: Live External' : '○ Mode: Mock / Offline'}
+            </button>
+            <button
+              onClick={() => refreshConnectors(isLiveMode)}
               disabled={loadingConnectors}
               className="px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 transition"
             >
@@ -380,6 +398,14 @@ export function DiscoveryDemo() {
                 badgeColor = 'bg-sky-50 text-sky-700 border-sky-200';
               } else if (c.status === 'UNAVAILABLE_MISSING_BINARY') {
                 badgeColor = 'bg-amber-50 text-amber-700 border-amber-200';
+              } else if (c.status === 'UNAVAILABLE') {
+                badgeColor = 'bg-zinc-100 text-zinc-700 border-zinc-300';
+              } else if (c.status === 'MISCONFIGURED') {
+                badgeColor = 'bg-purple-50 text-purple-700 border-purple-200';
+              } else if (c.status === 'DEGRADED') {
+                badgeColor = 'bg-amber-50 text-amber-700 border-amber-200';
+              } else if (c.status === 'RATE_LIMITED') {
+                badgeColor = 'bg-orange-50 text-orange-700 border-orange-200';
               } else if (c.status === 'ERROR') {
                 badgeColor = 'bg-rose-50 text-rose-700 border-rose-200';
               }
@@ -398,6 +424,11 @@ export function DiscoveryDemo() {
                   <p className="text-[11px] text-zinc-500">
                     {isMock ? 'Deterministic offline adapter' : 'Live network transport active'}
                   </p>
+                  {c.details && typeof c.details === 'object' && (
+                    <div className="text-[10px] text-zinc-400 pt-1 border-t border-zinc-100 truncate" title={String(c.details.endpoint || c.details.error || '')}>
+                      {c.details.endpoint ? `Endpoint: ${String(c.details.endpoint)}` : (c.details.error ? `Note: ${String(c.details.error)}` : null)}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -683,8 +714,22 @@ export function DiscoveryDemo() {
                             </span>
                             <span>•</span>
                             <span className="font-mono text-indigo-600">
-                              Source: {opp.category_specific_attributes.source_system as string}
+                              Source: {String(opp.category_specific_attributes?.source_system || 'generic')}
                             </span>
+                            {opp.category_specific_attributes?.source_system === 'web_search' && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                                External Web Search
+                              </span>
+                            )}
+                            <span>•</span>
+                            <a
+                              href={opp.source_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-indigo-600 hover:underline inline-flex items-center gap-0.5"
+                            >
+                              Direct Posting ↗
+                            </a>
                           </div>
                         </div>
 

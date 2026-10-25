@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 from fastapi import FastAPI
@@ -6,11 +7,19 @@ from app.api.v1.health import router as health_router
 from app.api.v1.router import api_v1_router
 from app.core.config import get_settings
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Lifespan context manager for startup and shutdown event handling."""
-    # Startup actions
+    # Startup actions: seed default demonstration profiles and benchmark listings
+    try:
+        from app.db.seed import seed_demo_data
+
+        seed_demo_data()
+    except Exception as exc:
+        logger.warning("Demo data seeding failed during startup: %s", exc)
     yield
     # Shutdown actions
 

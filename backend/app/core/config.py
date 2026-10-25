@@ -65,6 +65,32 @@ class Settings(BaseSettings):
         description="Maximum combined character length for candidate input materials",
     )
 
+    # Web Search Configuration (Milestone 13)
+    WEB_SEARCH_PROVIDER: str = Field(
+        default="searxng",
+        description="Search provider: 'searxng', 'custom', or 'mock'",
+    )
+    SEARXNG_BASE_URL: str = Field(
+        default="http://localhost:8080",
+        description="Base URL for SearXNG instance (e.g., http://localhost:8080 or public host)",
+    )
+    WEB_SEARCH_API_KEY: str = Field(
+        default="",
+        description="Optional API key / authentication token for search provider",
+    )
+    WEB_SEARCH_TIMEOUT_SECONDS: float = Field(
+        default=6.0,
+        description="Client timeout for search HTTP requests in seconds",
+    )
+    WEB_SEARCH_MAX_RESULTS: int = Field(
+        default=10,
+        description="Maximum search results requested per query",
+    )
+    WEB_SEARCH_ENRICH_DESTINATIONS: bool = Field(
+        default=False,
+        description="Whether to perform shallow verification/enrichment on destination URLs",
+    )
+
     # CORS Settings
     CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
 

@@ -282,6 +282,9 @@ export type ConnectorStatus =
   | 'CONNECTED'
   | 'MOCKED_FALLBACK'
   | 'UNAVAILABLE_MISSING_BINARY'
+  | 'UNAVAILABLE'
+  | 'MISCONFIGURED'
+  | 'DEGRADED'
   | 'RATE_LIMITED'
   | 'ERROR';
 
@@ -343,6 +346,7 @@ export interface DiscoveryRunRequest {
   deduplication_threshold?: number;
   simulate_failure_connector?: string | null;
   persist_to_repository?: boolean;
+  mock_mode?: boolean;
 }
 
 export interface DiscoveryRunResponse {

@@ -87,6 +87,7 @@ class DiscoveryCoordinator:
         active_connectors = self._resolve_connectors(
             connector_ids=request.connector_ids,
             simulate_failure_connector=request.simulate_failure_connector,
+            mock_mode=request.mock_mode,
         )
 
         # 4. Concurrently invoke connectors across prioritized queries
@@ -177,13 +178,14 @@ class DiscoveryCoordinator:
         self,
         connector_ids: Optional[list[str]],
         simulate_failure_connector: Optional[str],
+        mock_mode: bool = True,
     ) -> list[BaseDiscoveryConnector]:
         """Configures and filters active connectors."""
         if self._connectors is not None:
             base_list = self._connectors
         else:
             base_list = get_default_connectors(
-                mock_mode=True,
+                mock_mode=mock_mode,
                 simulate_failure_connector=simulate_failure_connector,
             )
 

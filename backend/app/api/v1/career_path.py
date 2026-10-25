@@ -23,6 +23,7 @@ from app.schemas.career_path import (
     RoleTargetAssessment,
     UpdateActionProgressRequest,
 )
+from app.schemas.profile import CandidateCareerProfile
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,10 @@ class RefreshAssessmentRequest(BaseModel):
     include_repo_opportunities: bool = Field(
         default=True,
         description="Whether to incorporate active repository opportunities in coverage and market signals",
+    )
+    candidate_profile: Optional[CandidateCareerProfile] = Field(
+        default=None,
+        description="Optional full candidate profile to persist and evaluate if user_id is not yet in repository",
     )
 
 
@@ -285,12 +290,14 @@ def refresh_candidate_assessment(
     service: CareerPathIntelligenceService = Depends(get_career_path_service),
 ) -> CareerPathAssessmentResponse:
     """Forces recalculation and persistence of career path assessments and development plan."""
-    candidate = profile_repo.get(user_id)
+    candidate = req.candidate_profile or profile_repo.get(user_id)
     if not candidate:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Candidate profile '{user_id}' not found.",
         )
+    if req.candidate_profile:
+        profile_repo.save(req.candidate_profile)
 
     opportunities = opp_repo.list_all(active_only=True) if req.include_repo_opportunities else []
     assessment = service.assess_candidate_career_paths(

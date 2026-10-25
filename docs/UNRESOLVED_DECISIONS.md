@@ -91,14 +91,13 @@ This document records the provisional parameters, empirical calibration requirem
 
 ## 7. External Opportunity-Source Integrations & Multi-Source Discovery
 
-- **Status**: **Milestone 10 Live Discovery & Honest Connectivity Verified Baseline**
+- **Status**: **Milestone 10 & Milestone 13 Live Discovery & Honest Connectivity Verified Baseline**
 - **Milestone 10 Baseline Implemented & Verified**:
   1. **Verified Live Connectors**:
      - `CompanyCareerPageConnector` (`ATS_DIRECT_API`): Verified live querying of public Greenhouse endpoints (`boards-api.greenhouse.io/v1/boards/{board}/jobs?content=true` across Vercel, Cloudflare, GitLab, Figma) and Ashby (`api.ashbyhq.com/posting-api/job-board/linear`). Normalizes real-world job records, strips HTML tags, extracts skills using canonical taxonomy, parses experience requirements, and retains real application URLs (`absolute_url`, `jobUrl`).
      - `JobSpyMCPConnector` (`MCP_STDIO`): Verified live scraping via `python-jobspy` on Indeed, LinkedIn, and Glassdoor. Normalizes pandas DataFrames into `PolymorphicOpportunity` schemas with direct application URLs and salary intervals.
   2. **Honest Capability & Missing Prerequisite Reporting**:
      - `IndiaJobsMCPConnector`: Verified that `@borgius/india-jobs-mcp` returns 404 on npm registry and no binary is installed on PATH. In live mode, honestly reports `ConnectorStatus.UNAVAILABLE_MISSING_BINARY` without claiming false connectivity.
-     - `WebSearchConnector`: Operates in deterministic simulated fallback (`ConnectorStatus.MOCKED_FALLBACK`) because no SearXNG gateway or Google Jobs credentials are configured in local environment.
   3. **End-to-End Career Intelligence Pipeline**:
      - Integrates Candidate Evidence Profile $\to$ O*NET Role Mapping $\to$ Multi-Source Discovery $\to$ MinHash LSH Deduplication $\to$ Deterministic Eligibility $\to$ 6-Dimensional Fit Ranking $\to$ Idempotent Persistence.
      - Real listings with unstated deadlines evaluate safely as `ELIGIBLE_WITH_UNCERTAINTY` with `UNCERT_NO_DEADLINE_SPECIFIED` caveat, preventing false rejection of real opportunities.
@@ -108,10 +107,27 @@ This document records the provisional parameters, empirical calibration requirem
      - Fault Isolation: Exceptions, rate limits, or crashes in any individual connector are recorded as `ConnectorStatus.ERROR` while all listings from healthy connectors are preserved.
      - Early cross-source MinHash LSH deduplication (Jaccard $\ge 0.85$) clusters multi-board syndicated postings into `OpportunityCluster` without losing source provenance.
      - Feeds canonical opportunities into the deterministic eligibility engine with full audit breakdown.
+- **Milestone 13 Real Web Search Integration Implemented & Verified**:
+  1. **Multi-Provider Web Search Architecture (`app.modules.discovery.connectors.web_search`)**:
+     - Replaced simulated mock search with real provider abstractions: `SearXNGSearchProvider` (self-hosted meta-search via JSON API), `DuckDuckGoSearchProvider` (zero-API-key public web search with automatic `uddg` unwrapping and HTML parsing), `CustomJSONSearchProvider` (custom enterprise search gateways), and `MockSearchProvider` (deterministic fixture mode).
+     - Factory `get_search_provider` dynamically resolves provider based on `WEB_SEARCH_PROVIDER` configuration setting.
+  2. **Job Search Result Classifier & Noise Filtration (`classifier.py`)**:
+     - Deterministically detects and discards noise (programming tutorials, course syllabi, salary surveys, interview guides, company news blogs).
+     - Prioritizes direct employer ATS platforms (Greenhouse, Lever, Ashby, Workday, SmartRecruiters, Jobvite, Taleo).
+     - Extracts employer brand and cleans titles (`Senior Python Engineer at Company` $\to$ `Company`).
+  3. **Security & Input Sanitization Invariant**:
+     - External search snippets and titles are treated as **untrusted data** and run through NFKC normalization, HTML tag stripping, and regex neutralizing prompt injection directives.
+     - Search listings are explicitly tagged: `[Search Index Result - Unverified Requisition]`.
+     - Preserves explicit epistemic uncertainty: sets `trust_score = 0.68–0.82` and `completeness_score = 0.75`.
+     - Direct requisition URLs are strictly retained for candidate verification.
+  4. **Truthful Transport & Connector Health Reporting**:
+     - Connector honestly reports `CONNECTED` (real HTTP search succeeded), `UNAVAILABLE` (SearXNG offline or unreachable), `MISCONFIGURED` (invalid base URL), `DEGRADED` (provider returns 0 results), `MOCKED_FALLBACK` (explicit test/offline mode), or `ERROR`.
+     - Zero fake APIs, zero hallucinated Google Jobs credentials.
 - **Open Decisions & Calibration Tasks**:
   1. **Permitted Live Feeds & Rate Limits**: Validate production integration boundaries and rate-limit backoff profiles for direct employer ATS feeds versus syndicated job board MCP tools.
-  2. **Terms of Service Compliance**: Ensure compliance with platform rate limits, robots.txt, and terms of service; implement cached ingestion via background workers (`arq` + Redis) rather than on-demand unauthenticated scraping during user requests.
-  3. **Ad-Hoc Candidate Ingestion**: Support candidate-provided job posting URLs with automated adversarial sanitization and MinHash deduplication.
+  2. **Destination Page Verification**: Evaluate ethical, rate-limited HEAD / lightweight GET requests to verify HTTP 200 on destination posting pages without violating site access policies or triggering CAPTCHAs.
+  3. **Terms of Service Compliance**: Ensure compliance with platform rate limits, robots.txt, and terms of service; implement cached ingestion via background workers (`arq` + Redis) rather than on-demand unauthenticated scraping during user requests.
+  4. **Ad-Hoc Candidate Ingestion**: Support candidate-provided job posting URLs with automated adversarial sanitization and MinHash deduplication.
 
 ---
 

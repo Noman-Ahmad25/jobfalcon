@@ -70,7 +70,37 @@ The backend API will be available at `http://localhost:8000`. Test the health ch
 curl http://localhost:8000/healthz
 ```
 
-### 2. Frontend Setup
+### 2. Real Web Search Configuration (Milestone 13)
+
+JobFalcon features genuine, multi-provider web search integration for external opportunity discovery without mandating paid third-party API subscriptions:
+
+```bash
+# Option A: Self-Hosted SearXNG (Default, Privacy-Preserving Meta-Search)
+docker run -d --name searxng -p 8080:8080 -e "SEARXNG_BASE_URL=http://localhost:8080" searxng/searxng
+
+# Configure in backend/.env:
+WEB_SEARCH_PROVIDER=searxng
+SEARXNG_BASE_URL=http://localhost:8080
+WEB_SEARCH_TIMEOUT_SECONDS=6.0
+WEB_SEARCH_MAX_RESULTS=10
+
+# Option B: Zero-Config Public Web Search (Zero API Key, Zero Container Setup)
+# Uses DuckDuckGo Lite endpoint with automatic URL decoding and anti-noise classification
+WEB_SEARCH_PROVIDER=duckduckgo
+
+# Option C: Custom REST JSON Search Gateway
+WEB_SEARCH_PROVIDER=custom_json
+CUSTOM_SEARCH_ENDPOINT_URL=https://search.mycompany.internal/api/search
+WEB_SEARCH_API_KEY=optional_secret_token
+```
+
+**Security & Provenance Invariants**:
+- All search result snippets are treated as **untrusted data**, sanitized against script injection and prompt injection attempts, and prepended with `[Search Index Result - Unverified Requisition]`.
+- Direct original requisition URLs are strictly preserved.
+- Unverified web search listings receive explicit confidence discounting (`trust_score=0.68–0.82`, `completeness_score=0.75`), and cannot alter deterministic eligibility or mathematical 6D ranking scores.
+- When providers are unreachable or misconfigured, connectors honestly report `UNAVAILABLE` or `MISCONFIGURED` without hallucinating fake listings or claiming false `CONNECTED` states.
+
+### 3. Frontend Setup
 
 ```bash
 # In a separate terminal, navigate to frontend directory

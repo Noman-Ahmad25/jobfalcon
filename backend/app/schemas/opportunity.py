@@ -189,3 +189,8 @@ class PolymorphicOpportunity(BaseModel):
     @classmethod
     def _enforce_text_sanitization(cls, v: Any) -> str:
         return sanitize_untrusted_text(str(v))
+
+    @property
+    def source_system(self) -> str:
+        """Returns the origin source system recorded in category_specific_attributes."""
+        return str(self.category_specific_attributes.get("source_system", "generic"))

@@ -124,10 +124,11 @@ export async function getCandidateProfile(
   });
 }
 
-export async function getDiscoveryConnectors(): Promise<ConnectorHealthReport[]> {
-  return fetchFromApi<ConnectorHealthReport[]>('/api/v1/discovery/connectors', {
+export async function getDiscoveryConnectors(live: boolean = false): Promise<ConnectorHealthReport[]> {
+  const query = live ? '?live=true' : '';
+  return fetchFromApi<ConnectorHealthReport[]>(`/api/v1/discovery/connectors${query}`, {
     method: 'GET',
-    timeoutMs: 5000,
+    timeoutMs: live ? 12000 : 5000,
   });
 }
 

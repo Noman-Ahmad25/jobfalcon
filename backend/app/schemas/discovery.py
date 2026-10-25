@@ -19,6 +19,9 @@ class ConnectorStatus(str, Enum):
     CONNECTED = "CONNECTED"
     MOCKED_FALLBACK = "MOCKED_FALLBACK"
     UNAVAILABLE_MISSING_BINARY = "UNAVAILABLE_MISSING_BINARY"
+    UNAVAILABLE = "UNAVAILABLE"
+    MISCONFIGURED = "MISCONFIGURED"
+    DEGRADED = "DEGRADED"
     RATE_LIMITED = "RATE_LIMITED"
     ERROR = "ERROR"
 
@@ -267,6 +270,10 @@ class DiscoveryRunRequest(BaseModel):
     persist_to_repository: bool = Field(
         default=True,
         description="Whether to persist discovered listings and clusters into the database.",
+    )
+    mock_mode: bool = Field(
+        default=True,
+        description="Whether to execute connectors in deterministic mock mode or live network mode.",
     )
 
 

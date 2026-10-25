@@ -176,7 +176,7 @@ class SQLiteCandidateProfileRepository(CandidateProfileRepository):
                 skill_id = f"{profile.user_id}:{skill.canonical_skill_id}"
                 conn.execute(
                     """
-                    INSERT INTO candidate_skills (
+                    INSERT OR REPLACE INTO candidate_skills (
                         id, user_id, canonical_skill_id, skill_name,
                         proficiency_score, confidence_score, last_practiced_date, created_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
@@ -198,7 +198,7 @@ class SQLiteCandidateProfileRepository(CandidateProfileRepository):
                 for ev in skill.evidence_records:
                     conn.execute(
                         """
-                        INSERT INTO candidate_evidence (
+                        INSERT OR REPLACE INTO candidate_evidence (
                             evidence_id, skill_id, source_type, source_uri,
                             extracted_snippet, observed_at, verifiability_weight
                         ) VALUES (?, ?, ?, ?, ?, ?, ?);

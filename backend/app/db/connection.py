@@ -17,8 +17,9 @@ def resolve_sqlite_path(database_url: str) -> str:
         path_str = database_url[len("sqlite:///") :]
         # Handle relative or absolute paths
         if path_str.startswith("./"):
-            # Resolve relative to workspace root / backend
-            return os.path.abspath(path_str)
+            # Resolve deterministically relative to backend root directory
+            backend_dir = Path(__file__).resolve().parents[2]
+            return str((backend_dir / path_str[2:]).resolve())
         return path_str
     return database_url
 

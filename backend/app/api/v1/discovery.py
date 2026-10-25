@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from app.db.repositories.interfaces import CandidateProfileRepository
@@ -52,18 +52,20 @@ def get_discovery_coordinator() -> DiscoveryCoordinator:
     status_code=status.HTTP_200_OK,
     summary="List Discovery Connectors and Operational Health",
 )
-async def list_connectors() -> list[ConnectorHealthReport]:
+async def list_connectors(
+    live: bool = Query(default=False, description="When true, performs genuine live network connectivity probes"),
+) -> list[ConnectorHealthReport]:
     """Inspects the operational health and connectivity of configured discovery connectors.
 
     Reports:
-    - Web Search Aggregator
+    - Web Search Aggregator (SearXNG / DuckDuckGo / Custom REST)
     - India Jobs MCP (@borgius/india-jobs-mcp)
     - JobSpy MCP (jobspy-mcp-server)
     - Direct Company ATS Feeds (Greenhouse, Lever, Ashby)
 
-    Status indicates CONNECTED, MOCKED_FALLBACK, or UNAVAILABLE_MISSING_BINARY without falsified claims.
+    Status indicates CONNECTED, UNAVAILABLE, MISCONFIGURED, DEGRADED, or MOCKED_FALLBACK without falsified claims.
     """
-    connectors = get_default_connectors(mock_mode=True)
+    connectors = get_default_connectors(mock_mode=not live)
     reports = []
     for connector in connectors:
         try:
