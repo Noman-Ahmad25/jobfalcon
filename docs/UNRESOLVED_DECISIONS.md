@@ -252,35 +252,87 @@ This document records the provisional parameters, empirical calibration requirem
 
 ---
 
-## 14. Career Path Intelligence & Personalized Development Planning
+## 15. Genuine Real Web Search Integration
 
-- **Status**: **Milestone 12 Verified Baseline**
-- **Milestone 12 Baseline Implemented**:
-  1. **Target-Role Analysis & Relationship Categorization**:
-     - Roles are deterministically categorized into `DIRECT_TARGET` (explicitly declared ambitions), `ADJACENT_OPTION` (taxonomically adjacent or $\ge 25\%$ core competency overlap), or `EXPLORATORY_POSSIBILITY` ($< 25\%$ overlap or unmapped paths).
-     - Readiness levels (`PURSUABLE_NOW`, `ATTAINABLE_WITH_DEVELOPMENT`, `EXPLORATORY`) anchor to verified candidate skills, experience months, and hard eligibility constraints.
-     - Unmapped roles return explicit epistemic uncertainty and exploratory classification without false precision or fabricated taxonomy codes.
-  2. **Lightweight Cycle-Safe Career Path Graph**:
-     - Modeled as a Directed Acyclic Graph (DAG) using pure Python data structures without external graph database overhead.
-     - Enforces a strict topological total order `(is_baseline, readiness_rank, relationship_rank, -skill_overlap, role_title)` ensuring cycles are mathematically impossible (`is_cycle_free = True`).
-     - Transitions define explicit transferable skills, concrete development gaps, deterministic feasibility scores ($0.0$ to $1.0$), and estimated effort levels (`LOW`, `MEDIUM`, `HIGH`).
-  3. **Personalized Development Plan & Measurable Actions**:
-     - Generates practical, hands-on demonstrations (portfolio repositories, integration pull requests, execution benchmarks, architecture decision records) over generic course lists.
-     - Differentiates `SHORT_TERM` immediate priorities from `LONG_TERM` strategic capability advancements.
-     - Requires an objective, measurable completion criterion (e.g., passing CI build, $>80\%$ test coverage, benchmark logs) and verifiable evidence to produce for every action.
-     - Enforces a mandatory non-negotiable ethical disclaimer against false hiring or ranking guarantees.
-  4. **Opportunity-Aware Prioritization & Limitation Disclosures**:
-     - Discovered job postings calibrate skill urgency (`EXPLICITLY_REQUIRED`, `EMPLOYER_PREFERRED`, `TAXONOMY_INFERRED`, `UNCERTAIN_IMPORTANCE`).
-     - Honest limitation disclosures clearly state data sufficiency levels (`HIGH`, `MODERATE`, `LIMITED_SAMPLE`, `NO_DISCOVERED_DATA`) and source systems represented.
-  5. **Persistence & Minimal Progress Tracking**:
-     - Relational tables in SQLite WAL mode: `career_path_assessments`, `development_plans`, and `development_action_progress`.
-     - Endpoints allow candidate confirmation of action progress (`NOT_STARTED`, `IN_PROGRESS`, `COMPLETED`, `ABANDONED`) with artifact URLs and reflection notes.
-  6. **AI Safety Boundaries & Deterministic Fallback**:
-     - Hard eligibility, mathematical scoring, evidence grounding, graph edges, and plan structure remain 100% deterministic.
-     - LLM crashes or validation errors fall back instantly to pure deterministic templates with zero degradation.
+- **Status**: **Milestone 13 Verified Baseline**
+- **Milestone 13 Baseline Implemented**:
+  1. **Configurable Multi-Provider Search Adapters**:
+     - `SearXNGSearchProvider`: Privacy-preserving self-hosted meta-search provider querying external job sources without mandatory paid third-party APIs.
+     - `DuckDuckGoSearchProvider`: Zero-configuration fallback utilizing standard HTML parsing and robust URL extraction.
+     - `CustomJsonSearchProvider`: Enterprise REST search gateway adapter.
+  2. **Heuristic Noise Filtering & Source Provenance**:
+     - Classification pipeline distinguishes genuine job requisitions from blog posts, aggregators, search indexes, and salary surveys.
+     - Retains canonical destination URLs (`source_url`) and tags listings with `source_system="web_search"`.
+  3. **Injection Sanitization & Uncertainty Tagging**:
+     - Strips script tags, HTML markup, and malicious prompt injection instructions via Unicode NFKC normalization.
+     - Prepends listings with `[Search Index Result - Unverified Requisition]` and sets explicit discount scores (`trust_score=0.68–0.82`, `completeness_score=0.75`).
+  4. **Deterministic Invariant Preservation**:
+     - Web-discovered opportunities flow directly through MinHash LSH deduplication, deterministic eligibility gating, and mathematical 6D ranking without modifying weights or allowing LLM overrides.
 - **Open Decisions & Calibration Tasks**:
-  1. **Dynamic Completion Verification Hook**: In future milestones, automatically verify candidate GitHub repository artifacts or commit diffs via an automated provenance evaluator before moving an action to `COMPLETED`.
-  2. **Cross-Employer Requirement Variance**: Calibrate how requirement variances across different industries affect role readiness thresholds.
+  1. **Dynamic Content Enrichment Rate Limiting**: Balance deep scrape enrichment of unverified search results against destination site rate limits and robot exclusion policies.
+  2. **Domain-Specific Trust Weights**: Refine `trust_score` based on whether the destination domain is a recognized employer career site, trusted ATS platform, or third-party aggregator.
+
+---
+
+## 16. Model Context Protocol (MCP) Discovery Integration
+
+- **Status**: **Milestone 14 Verified Baseline**
+- **Milestone 14 Baseline Implemented**:
+  1. **Official Model Context Protocol (JSON-RPC over STDIO)**:
+     - Integration uses official `mcp` Python SDK (v2.3.0) and official `mcp-jobspy` (v1.4.1) MCP server executable.
+     - Communication occurs strictly via standard JSON-RPC 2.0 protocol over stdio streams (`ClientSession`, `stdio_client`, `initialize`, `list_tools`, `call_tool`).
+     - Avoided fragile direct Python library calls or non-protocol subprocess wrappers.
+  2. **JobSpy MCP Provider Selection & Tool Pipeline**:
+     - Selected JobSpy MCP as primary viable MCP source.
+     - Implemented single-session execution of `search_jobs` and `get_job_details`, preserving in-memory search context and extracting direct employer ATS apply URLs (`job_url_direct`).
+     - Dropped `@borgius/india-jobs-mcp`: Investigation confirmed package returns HTTP 404 Not Found on npm registry with no published binary. Honest status `UNAVAILABLE_MISSING_BINARY` reported in live mode.
+  3. **Honest Diagnostic Health & Capability Probes**:
+     - Probes binary availability and executes protocol handshake (`initialize`) and tool discovery (`list_tools`).
+     - Reports `CONNECTED` only upon successful protocol communication and discovery of advertised tools.
+     - Reports `UNAVAILABLE_MISSING_BINARY` with diagnostic details and installation commands when binary is missing.
+     - Reports `MOCKED_FALLBACK` when operating in offline test mode.
+  4. **Security, Sanitization & Provenance**:
+     - Sanitizes untrusted titles and descriptions via Unicode NFKC normalization and control character stripping.
+     - Labels unverified listings with `[MCP Tool Result: jobspy/search_jobs - Unverified Requisition]`.
+     - Assigns calibrated confidence (`trust_score=0.78–0.85`, `completeness_score=0.75–0.85`).
+     - Computes 128-permutation MinHash LSH signature for cross-source deduplication against ATS and Web Search listings.
+  5. **Deterministic Pipeline Invariants**:
+     - MCP opportunities flow directly into deterministic Python eligibility rules and 6D fit scoring without LLM intervention or weight shifts.
+     - Coordinator ensures partial failure isolation: MCP timeouts or pipe crashes never disrupt remaining connectors.
+- **Open Decisions & Calibration Tasks**:
+  1. **Persistent Stdio Server Daemonization**: Investigate maintaining a persistent background daemon for MCP server instances across repeated discovery runs while bounding idle memory consumption.
+  2. **Additional MCP Sources**: Evaluate emerging MCP job discovery servers as the MCP ecosystem matures, maintaining strict protocol compliance and zero-hallucination health reporting.
+
+---
+
+## 17. LangGraph Agent Orchestration Architecture Reconciliation
+
+- **Status**: **Reconciled & Verified Baseline**
+- **Architecture Reconciliation Implemented**:
+  1. **Primary LangGraph Framework Integration**:
+     - Added `langgraph>=0.2.0` as an explicit, authoritative dependency in `pyproject.toml`.
+     - Replaced custom procedural while-loop with compiled `StateGraph(AdaptiveDiscoveryGraphState)`.
+     - Single source of truth for agent workflow state, loop bounds, and routing decisions.
+  2. **Hierarchical Specialized Nodes & Conditional Routing**:
+     - `supervisor`: Profile resolution, connector health check, role mapping, and strategy formulation.
+     - `discovery_worker`: Concurrent multi-source searches with action hashing (`compute_query_hash`) and partial failure isolation.
+     - `evaluation_worker`: Deterministic cross-source MinHash LSH deduplication and pure Python eligibility gating.
+     - `coverage_decision`: Goal coverage evaluation, loop budgeting (`max_iterations`, `max_tool_calls`), and adaptive shifts.
+     - `ranking_worker`: Deterministic 6-dimensional candidate-job fit scoring.
+     - `finalizing_worker`: Idempotent repository persistence and execution telemetry compilation.
+  3. **Strict Separation of Concerns & Deterministic Primacy**:
+     - LangGraph manages graph state, conditional branching, and loop bounds.
+     - Eligibility constraints, deduplication thresholds, and 6D ranking formulas execute exclusively in pure Python deterministic code paths with zero LLM bypass.
+  4. **State Channel Invariants & Pure Binary Reducers**:
+     - `accumulated_raw` channel uses pure `deduplicate_opportunities_reducer` to merge parallel discovery streams safely.
+     - `timeline_events`, `adaptation_history`, and `executed_query_hashes` use `operator.add` without in-place mutations.
+  5. **Safe Observable Execution Traces**:
+     - Structured `WorkflowTimelineEvent` telemetry tracks stages, tool invocations, and adaptation events for frontend visibility.
+     - Zero exposure of internal model scratchpads or private chain-of-thought.
+- **Open Decisions & Calibration Tasks**:
+  1. **AsyncPostgresSaver Checkpointing**: Connect durable checkpointing (`checkpointer=AsyncPostgresSaver(...)`) for multi-turn human-in-the-loop pauses when migrating to PostgreSQL.
+  2. **Dynamic Worker Fan-Out via Send API**: Leverage LangGraph's `Send` API for granular per-role parallel worker dispatch when expanding to broad multi-role cohorts.
+
 
 
 

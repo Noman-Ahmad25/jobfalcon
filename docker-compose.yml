@@ -1,0 +1,186 @@
+# ==============================================================================
+# JobFalcon — Multi-Container Orchestration Specification
+# ==============================================================================
+# Quickstart (Default zero-dependency mode with SQLite & SearXNG):
+#   docker compose up --build
+#
+# Full infrastructure mode (PostgreSQL pgvector, Redis Stack, MinIO):
+#   docker compose --profile full up --build
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # FastAPI Application & AI Orchestration Backend
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: jobfalcon-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - HOST=0.0.0.0
+      - PORT=8000
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - DATABASE_URL=sqlite:////app/data/jobfalcon_dev.db
+      - LLM_PROVIDER=mock
+      - LLM_MODEL=qwen2.5:14b-instruct
+      - WEB_SEARCH_PROVIDER=searxng
+      - SEARXNG_BASE_URL=http://searxng:8080
+      - MCP_JOBSPY_COMMAND=mcp-jobspy
+      - MCP_JOBSPY_TIMEOUT_SECONDS=12.0
+    volumes:
+      - jobfalcon_backend_data:/app/data
+    depends_on:
+      searxng:
+        condition: service_started
+    networks:
+      - jobfalcon-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # ----------------------------------------------------------------------------
+  # Next.js Frontend Career Workspace UI
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:8000
+    container_name: jobfalcon-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - jobfalcon-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ----------------------------------------------------------------------------
+  # SearXNG Metasearch Engine (Real Privacy Web Search for Job Opportunities)
+  # ----------------------------------------------------------------------------
+  searxng:
+    image: searxng/searxng:latest
+    container_name: jobfalcon-searxng
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+      - BIND_ADDRESS=0.0.0.0:8080
+    volumes:
+      - searxng_data:/etc/searxng
+    networks:
+      - jobfalcon-net
+
+  # ----------------------------------------------------------------------------
+  # OPTIONAL PROFILE: PostgreSQL with pgvector (Full Production Store)
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: jobfalcon-postgres
+    restart: unless-stopped
+    profiles:
+      - full
+    environment:
+      POSTGRES_DB: jobfalcon
+      POSTGRES_USER: jobfalcon_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword123}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - jobfalcon-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobfalcon_user -d jobfalcon"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ----------------------------------------------------------------------------
+  # OPTIONAL PROFILE: Redis Stack (RedisVL Semantic Caching & Rate Limiting)
+  # ----------------------------------------------------------------------------
+  redis:
+    image: redis/redis-stack-server:latest
+    container_name: jobfalcon-redis
+    restart: unless-stopped
+    profiles:
+      - full
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - jobfalcon-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ----------------------------------------------------------------------------
+  # OPTIONAL PROFILE: MinIO S3-Compatible Object Storage (Resumes & Artifacts)
+  # ----------------------------------------------------------------------------
+  minio:
+    image: minio/minio:latest
+    container_name: jobfalcon-minio
+    restart: unless-stopped
+    profiles:
+      - full
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - jobfalcon-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+# ==============================================================================
+# Networks & Persistent Storage Volumes
+# ==============================================================================
+networks:
+  jobfalcon-net:
+    name: jobfalcon-network
+    driver: bridge
+
+volumes:
+  jobfalcon_backend_data:
+    name: jobfalcon_backend_data
+  searxng_data:
+    name: jobfalcon_searxng_data
+  postgres_data:
+    name: jobfalcon_postgres_data
+  redis_data:
+    name: jobfalcon_redis_data
+  minio_data:
+    name: jobfalcon_minio_data

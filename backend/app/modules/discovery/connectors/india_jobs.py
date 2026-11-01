@@ -21,17 +21,19 @@ from app.schemas.opportunity import OpportunitySkillRequirement, PolymorphicOppo
 
 
 class IndiaJobsMCPConnector(BaseDiscoveryConnector):
-    """Discovery connector interfacing with @borgius/india-jobs-mcp.
+    """Discovery connector previously scoped for @borgius/india-jobs-mcp.
 
-    Specialized for Indian tech employment platforms:
-    - Naukri, Foundit (Monster India), Hirist, Cutshort, and Instahyre.
-    - Captures INR compensation/stipends, Indian metro hubs (Bangalore, Hyderabad, Pune, Gurgaon),
-      and ISO 'IN' work authorizations.
+    STATUS: DEPRECATED / DROPPED IN MILESTONE 14.
+    Investigation during Milestone 14 confirmed that the published npm package
+    '@borgius/india-jobs-mcp' returns HTTP 404 Not Found on the npm registry and no
+    functional binary exists. Effort on this package was halted per Milestone 14
+    governance.
 
     Health & Honest Availability Guarantee:
-    - Detects whether the local '@borgius/india-jobs-mcp' stdio binary or npx command is available.
-    - If uninstalled or operating in offline sandbox, explicitly reports MOCKED_FALLBACK status.
-    - Never claims a fake live network connection if the underlying package is not installed.
+    - In live mode (mock_mode=False), honestly reports UNAVAILABLE_MISSING_BINARY
+      because the npm package does not exist.
+    - In mock mode (mock_mode=True), provides deterministic fallback fixtures for testing.
+    - Never claims a fake live network connection.
     """
 
     def __init__(

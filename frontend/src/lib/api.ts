@@ -26,6 +26,13 @@ import {
 const DEFAULT_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const DEFAULT_TIMEOUT_MS = 5000;
 
+// Application boundary: pluggable auth and tenant headers for future BFF / Auth integration
+let globalAuthHeaders: Record<string, string> = {};
+
+export function setApiAuthContext(headers: Record<string, string>): void {
+  globalAuthHeaders = { ...headers };
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -54,6 +61,7 @@ export async function fetchFromApi<T>(
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
+        ...globalAuthHeaders,
         ...fetchOptions.headers,
       },
     });

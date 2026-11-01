@@ -1,140 +1,156 @@
-import React from 'react';
-import { Header } from '@/components/layout/Header';
-import { HealthMonitor } from '@/components/health/HealthMonitor';
-import { DeterministicPipelineDemo } from '@/components/pipeline/DeterministicPipelineDemo';
-import { CandidateProfilingDemo } from '@/components/profiling/CandidateProfilingDemo';
-import { DiscoveryDemo } from '@/components/discovery/DiscoveryDemo';
-import { AdaptiveDiscoveryDemo } from '@/components/orchestration/AdaptiveDiscoveryDemo';
-import { RecommendationDemo } from '@/components/ranking/RecommendationDemo';
-import { CareerExplanationAndGapAnalysis } from '@/components/explanation/CareerExplanationAndGapAnalysis';
-import { CareerPathIntelligenceDemo } from '@/components/career_path/CareerPathIntelligenceDemo';
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { Header, WorkspaceTab } from '@/components/layout/Header';
+import { CANDIDATES, DEFAULT_CANDIDATE_ID } from '@/lib/candidates';
+import { CandidateCareerProfile } from '@/types/domain';
+import { getBackendHealth } from '@/lib/api';
+import { DiscoveryWorkspace } from '@/components/workspaces/DiscoveryWorkspace';
+import { ProfileWorkspace } from '@/components/workspaces/ProfileWorkspace';
+import { DevelopmentWorkspace } from '@/components/workspaces/DevelopmentWorkspace';
+import { CareerPathWorkspace } from '@/components/workspaces/CareerPathWorkspace';
+import { Users } from 'lucide-react';
 
 export default function Home() {
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>('discover');
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string>(DEFAULT_CANDIDATE_ID);
+  const [activeCandidate, setActiveCandidate] = useState(CANDIDATES[DEFAULT_CANDIDATE_ID]);
+  const [candidateProfile, setCandidateProfile] = useState<CandidateCareerProfile>(
+    CANDIDATES[DEFAULT_CANDIDATE_ID].profile
+  );
+  const [backendOnline, setBackendOnline] = useState<boolean>(true);
+
+  // Check backend health on initial mount
+  useEffect(() => {
+    let isMounted = true;
+    async function checkHealth() {
+      try {
+        const res = await getBackendHealth();
+        if (isMounted) setBackendOnline(res.status === 'ok' || res.status === 'degraded');
+      } catch {
+        if (isMounted) setBackendOnline(false);
+      }
+    }
+    checkHealth();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Update candidate profile when candidate selector changes
+  const handleSelectCandidate = (candidateId: string) => {
+    if (CANDIDATES[candidateId]) {
+      setSelectedCandidateId(candidateId);
+      setActiveCandidate(CANDIDATES[candidateId]);
+      setCandidateProfile(CANDIDATES[candidateId].profile);
+    }
+  };
+
+  // Cross-workspace navigation handler
+  const handleNavigateTab = (tab: WorkspaceTab) => {
+    setActiveTab(tab);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
-    <div className="min-h-screen bg-zinc-50 flex flex-col font-sans text-zinc-900">
-      <Header />
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col font-sans text-zinc-900 dark:text-zinc-100 antialiased selection:bg-teal-500 selection:text-white">
+      {/* Top Application Header */}
+      <Header
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        candidateName={activeCandidate.name}
+        candidateRole={activeCandidate.headline}
+        backendOnline={backendOnline}
+      />
 
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
-        {/* Workspace Introduction */}
-        <div className="space-y-3">
-          <h2 className="text-2xl font-bold tracking-tight text-zinc-900">
-            Career Opportunity Recommendation System
-          </h2>
-          <p className="text-sm text-zinc-600 max-w-3xl leading-relaxed">
-            Welcome to the vertical foundation of JobFalcon. This environment coordinates
-            a modular FastAPI backend with a Next.js App Router frontend, strictly establishing
-            the separation between deterministic application rules and future agentic AI orchestration.
-          </p>
-        </div>
-
-        {/* Live Backend Communication & Health Check */}
-        <div className="flex flex-col items-start gap-4">
-          <HealthMonitor />
-        </div>
-
-        {/* Milestone 12: Career Path Intelligence & Personalized Development Planning */}
-        <section aria-labelledby="career-path-demo-heading" className="space-y-4">
-          <h3 id="career-path-demo-heading" className="text-sm font-semibold uppercase tracking-wider text-zinc-500">
-            Milestone 12: Career Path Intelligence & Personalized Development Planning
-          </h3>
-          <CareerPathIntelligenceDemo />
-        </section>
-
-        {/* Milestone 11: Explanations & Candidate Career Gap Analysis */}
-        <section aria-labelledby="explanation-demo-heading" className="space-y-4">
-          <h3 id="explanation-demo-heading" className="text-sm font-semibold uppercase tracking-wider text-zinc-500">
-            Milestone 11: Evidence-Grounded Explanations & Candidate Career Gap Analysis
-          </h3>
-          <CareerExplanationAndGapAnalysis />
-        </section>
-
-        {/* Milestone 9: Candidate-Job Ranking & Fit Scoring */}
-        <section aria-labelledby="recommendation-demo-heading" className="space-y-4">
-          <h3 id="recommendation-demo-heading" className="text-sm font-semibold uppercase tracking-wider text-zinc-500">
-            Milestone 9: Evidence-Grounded Candidate–Job Ranking & Fit Scoring
-          </h3>
-          <RecommendationDemo />
-        </section>
-
-        {/* Milestone 8: Agent Orchestration & Adaptive Discovery */}
-        <section aria-labelledby="orchestration-demo-heading" className="space-y-4">
-          <h3 id="orchestration-demo-heading" className="text-sm font-semibold uppercase tracking-wider text-zinc-500">
-            Autonomous Agent Orchestration & Adaptive Discovery Loop
-          </h3>
-          <AdaptiveDiscoveryDemo />
-        </section>
-
-        {/* Milestone 6: Candidate Skill Profiling & Evidence Extraction */}
-        <section aria-labelledby="profiling-demo-heading" className="space-y-4">
-          <h3 id="profiling-demo-heading" className="text-sm font-semibold uppercase tracking-wider text-zinc-500">
-            AI-Powered Candidate Skill Profiling & Evidence Grounding
-          </h3>
-          <CandidateProfilingDemo />
-        </section>
-
-        {/* Milestone 7: Skill-to-Role Mapping & Multi-Source Discovery */}
-        <section aria-labelledby="discovery-demo-heading" className="space-y-4">
-          <h3 id="discovery-demo-heading" className="text-sm font-semibold uppercase tracking-wider text-zinc-500">
-            Multi-Source Discovery Foundation & Skill-to-Role Mapping
-          </h3>
-          <DiscoveryDemo />
-        </section>
-
-        {/* Milestone 4: Deterministic Core Integration Demo */}
-        <section aria-labelledby="pipeline-demo-heading" className="space-y-4">
-          <h3 id="pipeline-demo-heading" className="text-sm font-semibold uppercase tracking-wider text-zinc-500">
-            Deterministic Pipeline Execution
-          </h3>
-          <DeterministicPipelineDemo />
-        </section>
-
-
-        {/* Core Architecture Invariant Cards */}
-        <section aria-labelledby="architecture-principles-heading" className="space-y-4">
-          <h3 id="architecture-principles-heading" className="text-sm font-semibold uppercase tracking-wider text-zinc-500">
-            System Invariants & Boundaries
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <div className="bg-white p-5 rounded-xl border border-zinc-200 shadow-sm space-y-2">
-              <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-700 font-semibold text-xs">
-                01
-              </div>
-              <h4 className="text-sm font-semibold text-zinc-900">Deterministic Primacy</h4>
-              <p className="text-xs text-zinc-600 leading-normal">
-                Hard eligibility gates, graduation window verification, and multi-dimensional scoring math
-                execute exclusively in deterministic code with zero LLM bypass.
-              </p>
-            </div>
-
-            <div className="bg-white p-5 rounded-xl border border-zinc-200 shadow-sm space-y-2">
-              <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-700 font-semibold text-xs">
-                02
-              </div>
-              <h4 className="text-sm font-semibold text-zinc-900">Modular Monolith</h4>
-              <p className="text-xs text-zinc-600 leading-normal">
-                Standard application services (auth, profiles, saved opportunities) are cleanly decoupled
-                from AI orchestration workflows without introducing premature microservices.
-              </p>
-            </div>
-
-            <div className="bg-white p-5 rounded-xl border border-zinc-200 shadow-sm space-y-2">
-              <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-700 font-semibold text-xs">
-                03
-              </div>
-              <h4 className="text-sm font-semibold text-zinc-900">Evidence Provenance</h4>
-              <p className="text-xs text-zinc-600 leading-normal">
-                Every skill assessment, recommendation explanation, and career match is anchored to
-                discrete, verifiable evidence records with epistemic confidence calibration.
-              </p>
+      {/* Main Workstation Container */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {/* Candidate Switcher Bar */}
+        <div className="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="p-1.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
+              <Users className="w-4 h-4" />
+            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-zinc-500 font-mono">Active Candidate:</span>
+              <select
+                value={selectedCandidateId}
+                onChange={(e) => handleSelectCandidate(e.target.value)}
+                className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2.5 py-1 focus:ring-2 focus:ring-teal-500 focus:outline-hidden cursor-pointer"
+              >
+                {Object.values(CANDIDATES).map((cand) => (
+                  <option key={cand.id} value={cand.id}>
+                    {cand.name} ({cand.role})
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
-        </section>
+
+          <div className="flex items-center gap-2 text-xs font-mono text-zinc-500 flex-wrap">
+            <span>
+              Target: <strong className="text-zinc-800 dark:text-zinc-200">{candidateProfile.target_career_paths[0]?.title}</strong>
+            </span>
+            <span>•</span>
+            <span>{candidateProfile.assessed_skills.length} skills on file</span>
+            <span>•</span>
+            <span>Degree: {candidateProfile.eligibility_constraints.highest_degree_level}</span>
+          </div>
+        </div>
+
+        {/* Active Workspace View */}
+        {activeTab === 'discover' && (
+          <DiscoveryWorkspace
+            candidateProfile={candidateProfile}
+            candidateName={activeCandidate.name}
+            onNavigateTab={handleNavigateTab}
+          />
+        )}
+
+        {activeTab === 'profile' && (
+          <ProfileWorkspace
+            candidateProfile={candidateProfile}
+            candidateName={activeCandidate.name}
+            onNavigateTab={handleNavigateTab}
+            onProfileUpdated={(updated) => setCandidateProfile(updated)}
+          />
+        )}
+
+        {activeTab === 'development' && (
+          <DevelopmentWorkspace
+            candidateProfile={candidateProfile}
+            candidateName={activeCandidate.name}
+            onNavigateTab={handleNavigateTab}
+          />
+        )}
+
+        {activeTab === 'career-path' && (
+          <CareerPathWorkspace
+            candidateProfile={candidateProfile}
+            candidateName={activeCandidate.name}
+            onNavigateTab={handleNavigateTab}
+          />
+        )}
       </main>
 
-      <footer className="border-t border-zinc-200 bg-white py-6 text-center text-xs text-zinc-500">
-        <div className="max-w-6xl mx-auto px-4">
-          JobFalcon Architecture v1.0 • Initial Working Vertical Foundation
+      {/* Engineering Invariants Footer */}
+      <footer className="border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 py-6 mt-12 text-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3 text-zinc-500">
+            <span className="font-semibold text-zinc-800 dark:text-zinc-200">JobFalcon V1</span>
+            <span>•</span>
+            <span>Deterministic Career Intelligence</span>
+            <span>•</span>
+            <span className="font-mono text-[11px]">LangGraph StateGraph Engine</span>
+          </div>
+
+          <div className="flex items-center gap-4 text-zinc-500 font-mono text-[11px]">
+            <span>100% Deterministic Gating</span>
+            <span>•</span>
+            <span>Zero LLM Score Hallucination</span>
+            <span>•</span>
+            <span>Evidence Grounded</span>
+          </div>
         </div>
       </footer>
     </div>

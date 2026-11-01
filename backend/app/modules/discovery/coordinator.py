@@ -210,15 +210,16 @@ class DiscoveryCoordinator:
 
         async def _invoke_connector(connector: BaseDiscoveryConnector) -> DiscoveryConnectorResult:
             t_start = time.perf_counter()
+            conn_timeout = float(getattr(connector, "timeout_seconds", 8.0))
             try:
-                # 5.0 second bounded timeout per connector
+                # Bounded timeout per connector (defaults to 8.0s or connector-specific timeout)
                 return await asyncio.wait_for(
                     connector.search(primary_query, limit=max_results_per_connector),
-                    timeout=5.0,
+                    timeout=conn_timeout,
                 )
             except asyncio.TimeoutError:
                 lat = round((time.perf_counter() - t_start) * 1000, 2)
-                logger.warning("Connector %s timed out after 5.0s", connector.connector_id)
+                logger.warning("Connector %s timed out after %.1fs", connector.connector_id, conn_timeout)
                 return DiscoveryConnectorResult(
                     connector_id=connector.connector_id,
                     source_name=connector.source_name,
@@ -227,7 +228,7 @@ class DiscoveryCoordinator:
                     opportunities=[],
                     raw_count=0,
                     latency_ms=lat,
-                    error_message="Connector request timed out after 5000ms.",
+                    error_message=f"Connector request timed out after {int(conn_timeout * 1000)}ms.",
                 )
             except Exception as exc:
                 lat = round((time.perf_counter() - t_start) * 1000, 2)

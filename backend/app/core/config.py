@@ -91,6 +91,28 @@ class Settings(BaseSettings):
         description="Whether to perform shallow verification/enrichment on destination URLs",
     )
 
+    # Model Context Protocol (MCP) Configuration (Milestone 14)
+    MCP_JOBSPY_COMMAND: str = Field(
+        default="mcp-jobspy",
+        description="Executable command or binary path for the JobSpy MCP server (e.g. 'mcp-jobspy')",
+    )
+    MCP_JOBSPY_TIMEOUT_SECONDS: float = Field(
+        default=12.0,
+        description="Client timeout for MCP stdio tool calls in seconds",
+    )
+    MCP_JOBSPY_RESULTS_WANTED: int = Field(
+        default=5,
+        description="Number of opportunity results requested per job board during MCP tool execution",
+    )
+    MCP_JOBSPY_FETCH_DETAILS: bool = Field(
+        default=True,
+        description="Whether to invoke MCP get_job_details tool to enrich full descriptions and direct URLs",
+    )
+    MCP_JOBSPY_COUNTRY: str = Field(
+        default="usa",
+        description="Default target country for JobSpy MCP scrapers (e.g., 'usa', 'uk', 'canada')",
+    )
+
     # CORS Settings
     CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
 
