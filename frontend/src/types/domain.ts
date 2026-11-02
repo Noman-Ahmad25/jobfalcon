@@ -905,6 +905,60 @@ export interface StructuredProfileCreateRequest {
   }>;
 }
 
+// =============================================================================
+// Market Search & Market Intelligence
+// =============================================================================
+
+export interface OpportunitySearchRequest {
+  query?: string | null;
+  location?: string | null;
+  work_mode?: WorkMode | null;
+  category?: OpportunityCategory | null;
+  target_role?: string | null;
+  min_experience_max_months?: number | null;
+  skills?: string[];
+  page?: number;
+  page_size?: number;
+}
+
+export interface OpportunitySearchResponse {
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  opportunities: PolymorphicOpportunity[];
+  applied_filters: Record<string, unknown>;
+}
+
+export interface MarketSkillDemand {
+  skill_name: string;
+  count: number;
+  percentage: number;
+  is_mandatory_count: number;
+  is_preferred_count: number;
+}
+
+export interface MarketSkillCombination {
+  skills: string[];
+  co_occurrence_count: number;
+}
+
+export interface MarketIntelligenceResponse {
+  total_opportunities_analyzed: number;
+  unique_employers_count: number;
+  analysis_scope_summary: string;
+  top_skills: MarketSkillDemand[];
+  top_skill_combinations: MarketSkillCombination[];
+  experience_distribution: Record<string, number>;
+  work_mode_distribution: Record<string, number>;
+  top_role_families: Array<{
+    title: string;
+    count: number;
+    percentage: number;
+  }>;
+  data_integrity_notice: string;
+}
+
 
 
 

@@ -58,28 +58,74 @@ def strip_html_tags(html_text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+PREFERRED_QUALIFICATION_CUES: tuple[str, ...] = (
+    "preferred",
+    "nice to have",
+    "nice-to-have",
+    "is a plus",
+    "a plus",
+    "bonus",
+    "good to have",
+    "optional",
+    "desired",
+    "advantageous",
+)
+
+
 def extract_skills_from_text(
     text: str,
     max_skills: int = 8,
 ) -> list[OpportunitySkillRequirement]:
-    """Deterministically extracts canonical skill requirements from normalized job text."""
+    """Deterministically extracts canonical skill requirements from normalized job text.
+
+    Distinguishes mandatory requirements from preferred/nice-to-have qualifications
+    based on section headings and local sentence/clause context cues.
+    """
     if not text:
         return []
 
     lowered = text.lower()
     extracted: list[OpportunitySkillRequirement] = []
 
+    # Check for dedicated preferred qualifications section
+    preferred_section_start = -1
+    for heading in ("preferred qualifications", "preferred skills", "nice to have", "nice-to-have", "desired skills", "bonus points"):
+        idx = lowered.find(heading)
+        if idx != -1:
+            preferred_section_start = idx
+            break
+
     for canonical_name, variants in SKILL_TAXONOMY_DICTIONARY.items():
         for variant in variants:
-            # Word boundary matching
             pattern = r"(?:\b|_)" + re.escape(variant) + r"(?:\b|_)"
-            if re.search(pattern, lowered):
+            match = re.search(pattern, lowered)
+            if match:
+                is_preferred = False
+                pos = match.start()
+
+                # 1. Check if located inside an explicit preferred section
+                if preferred_section_start != -1 and pos > preferred_section_start:
+                    is_preferred = True
+                else:
+                    # 2. Check local sentence/clause (delimited by periods or linebreaks)
+                    clause_start = max(lowered.rfind(".", 0, pos), lowered.rfind("\n", 0, pos), 0)
+                    clause_end = len(lowered)
+                    next_period = lowered.find(".", match.end())
+                    next_nl = lowered.find("\n", match.end())
+                    if next_period != -1 and (next_nl == -1 or next_period < next_nl):
+                        clause_end = next_period
+                    elif next_nl != -1:
+                        clause_end = next_nl
+
+                    clause = lowered[clause_start:clause_end]
+                    is_preferred = any(cue in clause for cue in PREFERRED_QUALIFICATION_CUES)
+
                 clean_id = f"skill_{canonical_name.lower().replace('.', '').replace(' ', '_').replace('+', 'p')}"
                 extracted.append(
                     OpportunitySkillRequirement(
                         canonical_skill_id=clean_id,
                         skill_name=canonical_name,
-                        is_mandatory=True,
+                        is_mandatory=not is_preferred,
                         minimum_proficiency_expected=5.0,
                     )
                 )
@@ -88,6 +134,22 @@ def extract_skills_from_text(
             break
 
     return extracted
+
+
+def format_experience_requirement(months: int) -> str:
+    """Returns human-readable experience string obeying 'Unknown is not zero'.
+
+    If months < 0, explicitly returns 'Not stated' rather than converting to 0.
+    """
+    if months < 0:
+        return "Not stated"
+    if months == 0:
+        return "Entry level (no prior experience required)"
+    years = months // 12
+    rem = months % 12
+    if rem == 0:
+        return f"{years}+ year{'s' if years != 1 else ''}"
+    return f"{months} months"
 
 
 def extract_experience_months_with_confidence(

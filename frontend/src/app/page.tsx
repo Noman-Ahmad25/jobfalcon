@@ -6,10 +6,13 @@ import { CANDIDATES } from '@/lib/candidates';
 import { CandidateCareerProfile, CandidateProfileSummary } from '@/types/domain';
 import { getBackendHealth, listProfiles, getCandidateProfile } from '@/lib/api';
 import { DiscoveryWorkspace } from '@/components/workspaces/DiscoveryWorkspace';
+import { MarketSearchWorkspace } from '@/components/workspaces/MarketSearchWorkspace';
+import { MarketIntelligenceWorkspace } from '@/components/workspaces/MarketIntelligenceWorkspace';
 import { ProfileWorkspace } from '@/components/workspaces/ProfileWorkspace';
 import { DevelopmentWorkspace } from '@/components/workspaces/DevelopmentWorkspace';
 import { CareerPathWorkspace } from '@/components/workspaces/CareerPathWorkspace';
 import { OnboardingScreen } from '@/components/onboarding/OnboardingScreen';
+import { getStoredTheme, applyTheme, ThemeMode } from '@/lib/theme';
 import { Users, UserPlus, Loader2 } from 'lucide-react';
 
 const KNOWN_DEMO_IDS = new Set([
@@ -31,6 +34,19 @@ export default function Home() {
   const [backendOnline, setBackendOnline] = useState<boolean>(true);
   const [isLoadingProfile, setIsLoadingProfile] = useState<boolean>(true);
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
+  const [isDevMode, setIsDevMode] = useState<boolean>(false);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const saved = getStoredTheme();
+    applyTheme(saved);
+    return document.documentElement.classList.contains('dark');
+  });
+
+  const handleToggleTheme = () => {
+    const nextMode: ThemeMode = isDarkMode ? 'light' : 'dark';
+    applyTheme(nextMode);
+    setIsDarkMode(!isDarkMode);
+  };
 
   // Load a candidate profile from backend repository
   const loadProfile = useCallback(async (userId: string) => {
@@ -167,6 +183,10 @@ export default function Home() {
         candidateName={candidateName}
         candidateRole={candidateHeadline}
         backendOnline={backendOnline}
+        isDevMode={isDevMode}
+        onToggleDevMode={() => setIsDevMode(!isDevMode)}
+        isDarkMode={isDarkMode}
+        onToggleTheme={handleToggleTheme}
       />
 
       {/* Main Workstation Container */}
@@ -275,6 +295,21 @@ export default function Home() {
                 candidateProfile={candidateProfile}
                 candidateName={candidateName}
                 onNavigateTab={handleNavigateTab}
+                isDevMode={isDevMode}
+              />
+            )}
+
+            {activeTab === 'search' && (
+              <MarketSearchWorkspace
+                candidateProfile={candidateProfile}
+                candidateName={candidateName}
+              />
+            )}
+
+            {activeTab === 'market' && (
+              <MarketIntelligenceWorkspace
+                candidateProfile={candidateProfile}
+                candidateName={candidateName}
               />
             )}
 
@@ -309,23 +344,23 @@ export default function Home() {
         )}
       </main>
 
-      {/* Engineering Invariants Footer */}
-      <footer className="border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 py-6 mt-12 text-xs">
+      {/* Precision Career Intelligence Footer */}
+      <footer className="border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 py-6 mt-12 text-xs transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3 text-zinc-500">
             <span className="font-semibold text-zinc-800 dark:text-zinc-200">JobFalcon V1</span>
             <span>•</span>
-            <span>Deterministic Career Intelligence</span>
+            <span>Evidence-First Career Intelligence</span>
             <span>•</span>
-            <span className="font-mono text-[11px]">LangGraph StateGraph Engine</span>
+            <span>Local Workstation</span>
           </div>
 
           <div className="flex items-center gap-4 text-zinc-500 font-mono text-[11px]">
             <span>100% Deterministic Gating</span>
             <span>•</span>
-            <span>Zero LLM Score Hallucination</span>
+            <span>Zero Hallucinated Metrics</span>
             <span>•</span>
-            <span>Evidence Grounded</span>
+            <span>Verifiable Evidence Records</span>
           </div>
         </div>
       </footer>

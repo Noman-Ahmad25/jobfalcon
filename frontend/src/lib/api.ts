@@ -24,6 +24,10 @@ import {
   DevelopmentActionItem,
   UpdateActionProgressRequest,
   StructuredProfileCreateRequest,
+  OpportunitySearchRequest,
+  OpportunitySearchResponse,
+  MarketIntelligenceResponse,
+  PolymorphicOpportunity,
 } from '@/types/domain';
 
 const DEFAULT_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -431,5 +435,48 @@ export async function deleteCandidateProfile(userId: string): Promise<void> {
     timeoutMs: 5000,
   });
 }
+
+/** Intentional market search for opportunities using chosen criteria. */
+export async function searchOpportunities(
+  request: OpportunitySearchRequest
+): Promise<OpportunitySearchResponse> {
+  return fetchFromApi<OpportunitySearchResponse>('/api/v1/opportunities/search', {
+    method: 'POST',
+    body: JSON.stringify(request),
+    timeoutMs: 8000,
+  });
+}
+
+/** Grounded empirical market demand intelligence. */
+export async function getMarketIntelligence(params?: {
+  target_role?: string;
+  category?: string;
+}): Promise<MarketIntelligenceResponse> {
+  const query = new URLSearchParams();
+  if (params?.target_role) query.set('target_role', params.target_role);
+  if (params?.category) query.set('category', params.category);
+  const qStr = query.toString();
+  return fetchFromApi<MarketIntelligenceResponse>(
+    `/api/v1/opportunities/market-intelligence${qStr ? `?${qStr}` : ''}`,
+    {
+      method: 'GET',
+      timeoutMs: 8000,
+    }
+  );
+}
+
+/** Retrieve detailed polymorphic opportunity by identifier. */
+export async function getOpportunityById(
+  opportunityId: string
+): Promise<PolymorphicOpportunity> {
+  return fetchFromApi<PolymorphicOpportunity>(
+    `/api/v1/opportunities/${encodeURIComponent(opportunityId)}`,
+    {
+      method: 'GET',
+      timeoutMs: 6000,
+    }
+  );
+}
+
 
 

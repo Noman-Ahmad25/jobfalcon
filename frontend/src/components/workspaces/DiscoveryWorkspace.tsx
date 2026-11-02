@@ -19,6 +19,8 @@ import {
   Radio,
   Clock,
   Check,
+  Eye,
+  Terminal,
 } from 'lucide-react';
 import {
   AdaptiveDiscoveryRequest,
@@ -43,13 +45,28 @@ import { NumberTicker } from '@/components/ui/NumberTicker';
 import { ScoreBar } from '@/components/ui/ScoreBar';
 import { SlideDrawer } from '@/components/ui/SlideDrawer';
 import { EvidenceCard } from '@/components/ui/EvidenceCard';
+import { OpportunityDetailModal } from '@/components/ui/OpportunityDetailModal';
 import { WorkspaceTab } from '@/components/layout/Header';
 
 interface DiscoveryWorkspaceProps {
   candidateProfile: CandidateCareerProfile;
   candidateName: string;
   onNavigateTab: (tab: WorkspaceTab, context?: { targetRole?: string; skillId?: string }) => void;
+  isDevMode?: boolean;
 }
+
+const HUMAN_PROGRESS_STAGES: Record<WorkflowStage, { step: number; text: string }> = {
+  INITIALIZING: { step: 1, text: 'Finding opportunities matching your career direction' },
+  STRATEGY_FORMULATION: { step: 1, text: 'Preparing targeted search strategy across verified sources' },
+  SEARCHING: { step: 2, text: 'Searching relevant opportunity sources (Real Web & ATS feeds)' },
+  EVALUATING: { step: 3, text: 'Analyzing requirements and verifying candidate eligibility' },
+  GAP_ANALYSIS: { step: 4, text: 'Assessing coverage and identified market deficits' },
+  ADAPTING: { step: 4, text: 'Adapting search queries to maximize verified opportunity quality' },
+  RANKING: { step: 5, text: 'Comparing opportunities with your profile & computing fit' },
+  FINALIZING: { step: 5, text: 'Finalizing recommendations and evidence explanations' },
+  COMPLETED: { step: 5, text: 'Personalized opportunity discovery complete' },
+  FAILED: { step: 0, text: 'Discovery workflow encountered an issue' },
+};
 
 const WORKFLOW_STEPS: { stage: WorkflowStage; label: string; description: string }[] = [
   { stage: 'INITIALIZING', label: 'Init', description: 'Resolve Candidate' },
@@ -64,7 +81,13 @@ export function DiscoveryWorkspace({
   candidateProfile,
   candidateName,
   onNavigateTab,
+  isDevMode = false,
 }: DiscoveryWorkspaceProps) {
+  // Technical Dev Observability State
+  const [showDevTelemetry, setShowDevTelemetry] = useState<boolean>(isDevMode);
+  const [examinedOpportunity, setExaminedOpportunity] = useState<RankedOpportunity | null>(null);
+  const isTelemetryVisible = showDevTelemetry || isDevMode;
+
   // Discovery Configuration State
   const [targetGoal, setTargetGoal] = useState<number>(3);
   const maxIterations = 2;
@@ -352,17 +375,16 @@ export function DiscoveryWorkspace({
                 <Compass className="w-4 h-4" />
               </span>
               <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-                Opportunity Discovery & Match Radar
+                Personalized Opportunity Discovery
               </h2>
               {activeRun && (
                 <Badge variant={isExecuting ? 'teal' : 'verified'} size="sm" mono>
-                  {isExecuting ? 'EXECUTING' : 'DURABLE RUN SAVED'}
+                  {isExecuting ? 'FINDING MATCHES' : 'MATCHES SAVED'}
                 </Badge>
               )}
             </div>
             <p className="text-xs text-zinc-600 dark:text-zinc-400 max-w-2xl leading-relaxed">
-              Coordinates multi-source discovery (SearXNG Real Web, JobSpy MCP, Direct ATS), MinHash deduplication,
-              deterministic eligibility filtering, and 6-dimensional fit scoring for {candidateName}.
+              Finds, verifies, and ranks authentic career opportunities tailored specifically to your background and target trajectory ({candidateProfile.target_career_paths[0]?.title || 'Target Role'}).
             </p>
           </div>
 
@@ -501,8 +523,66 @@ export function DiscoveryWorkspace({
         </div>
       )}
 
-      {/* 2. Observable Workflow Stepper & Telemetry Monitor */}
+      {/* 2. User-Centric Live Progress Card (Normal Mode) */}
+      {isExecuting && (
+        <div className="p-5 rounded-2xl bg-teal-50/60 dark:bg-teal-950/20 border border-teal-200/80 dark:border-teal-800/60 shadow-xs space-y-3 animate-in fade-in duration-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="p-2 rounded-xl bg-teal-600 text-white animate-spin">
+                <RotateCw className="w-4 h-4" />
+              </span>
+              <div>
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                  {HUMAN_PROGRESS_STAGES[currentStage]?.text || 'Discovering career opportunities...'}
+                </h3>
+                <p className="text-xs text-zinc-500">
+                  Step {HUMAN_PROGRESS_STAGES[currentStage]?.step || 1} of 5 • Progressive evaluation across authentic sources.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 text-xs font-mono text-zinc-600 dark:text-zinc-400 bg-white dark:bg-zinc-800 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700">
+              <span>Leads: <strong>{liveRawCount}</strong></span>
+              <span>•</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                {liveEligibleCount} Verified Matches
+              </span>
+            </div>
+          </div>
+
+          <div className="w-full bg-zinc-200/70 dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden">
+            <div
+              className="bg-teal-600 h-full transition-all duration-300"
+              style={{
+                width: `${Math.max(15, (HUMAN_PROGRESS_STAGES[currentStage]?.step || 1) * 20)}%`,
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 2.1 Developer Observability Toggle Strip */}
       {(isExecuting || activeRun || discoveryResponse) && (
+        <div className="flex items-center justify-between pt-1">
+          <button
+            onClick={() => setShowDevTelemetry(!showDevTelemetry)}
+            className="inline-flex items-center gap-1.5 text-xs font-mono text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
+          >
+            <Terminal className="w-3.5 h-3.5 text-zinc-400" />
+            <span>
+              {showDevTelemetry ? 'Hide Technical Telemetry' : 'View Technical Observability & Pipeline Trace'}
+            </span>
+          </button>
+          {showDevTelemetry && (
+            <span className="text-[10px] font-mono text-zinc-400 hidden sm:inline">
+              LangGraph StateGraph • MinHash LSH • Tool Budget Accounting
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* 2.2 Observable Workflow Stepper & Telemetry Monitor (Developer Mode) */}
+      {(isExecuting || activeRun || discoveryResponse) && isTelemetryVisible && (
         <div className="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs overflow-hidden space-y-4">
           {/* Stepper Header Strip */}
           <div className="px-6 py-4 bg-zinc-50/70 dark:bg-zinc-800/40 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between flex-wrap gap-3">
@@ -924,14 +1004,23 @@ export function DiscoveryWorkspace({
 
                     <div className="flex items-center gap-2 shrink-0">
                       <button
+                        onClick={() => setExaminedOpportunity(rec)}
+                        className="px-3.5 py-1.5 rounded-lg bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-xs font-semibold text-teal-800 dark:text-teal-300 transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+                        <span>Examine Role & Fit</span>
+                      </button>
+
+                      <button
                         onClick={() => {
                           setAuditedOpportunity(rec);
                           setAuditDrawerTab('fit');
                         }}
-                        className="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition-colors flex items-center gap-1.5"
+                        className="px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium text-zinc-600 dark:text-zinc-400 transition-colors flex items-center gap-1"
+                        title="Inspect raw audit and deterministic evidence records"
                       >
-                        <FileText className="w-3.5 h-3.5 text-zinc-500" />
-                        <span>Inspect Evidence & Audit</span>
+                        <FileText className="w-3 h-3 text-zinc-400" />
+                        <span className="hidden sm:inline">Audit</span>
                       </button>
 
                       {opp.source_url && (
@@ -939,7 +1028,7 @@ export function DiscoveryWorkspace({
                           href={opp.source_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold transition-colors flex items-center gap-1 shadow-xs"
+                          className="px-3.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-semibold transition-colors flex items-center gap-1 shadow-xs"
                         >
                           <span>Apply</span>
                           <ExternalLink className="w-3 h-3" />
@@ -1198,6 +1287,15 @@ export function DiscoveryWorkspace({
             )}
           </div>
         </SlideDrawer>
+      )}
+
+      {/* 5. Focused Opportunity Detail Modal */}
+      {examinedOpportunity && (
+        <OpportunityDetailModal
+          opportunity={examinedOpportunity}
+          candidateProfile={candidateProfile}
+          onClose={() => setExaminedOpportunity(null)}
+        />
       )}
     </div>
   );

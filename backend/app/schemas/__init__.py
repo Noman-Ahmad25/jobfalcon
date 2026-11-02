@@ -125,6 +125,13 @@ from app.schemas.pipeline import (
     PipelineEvaluationRequest,
     PipelineEvaluationResponse,
 )
+from app.schemas.market import (
+    MarketIntelligenceResponse,
+    MarketSkillCombination,
+    MarketSkillDemand,
+    OpportunitySearchRequest,
+    OpportunitySearchResponse,
+)
 from app.schemas.profiling import (
     CandidateProfilingRequest,
     CandidateProfilingResponse,
@@ -187,6 +194,12 @@ __all__ = [
     # Pipeline
     "PipelineEvaluationRequest",
     "PipelineEvaluationResponse",
+    # Market Search & Intelligence
+    "OpportunitySearchRequest",
+    "OpportunitySearchResponse",
+    "MarketSkillDemand",
+    "MarketSkillCombination",
+    "MarketIntelligenceResponse",
     # Profiling
     "CandidateProfilingRequest",
     "CandidateProfilingResponse",
