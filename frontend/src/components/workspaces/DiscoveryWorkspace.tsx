@@ -855,6 +855,20 @@ export function DiscoveryWorkspace({
                           Mode: {opp.eligibility_rules?.work_mode || 'REMOTE'}
                         </span>
                         <span>•</span>
+                        <span className="font-mono text-[11px] text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60 px-1.5 py-0.5 rounded border border-teal-200 dark:border-teal-800">
+                          {(() => {
+                            const minMonths = opp.eligibility_rules?.min_experience_months ?? 0;
+                            const candMonths = candidateProfile?.eligibility_constraints?.total_full_time_experience_months ?? 0;
+                            if (minMonths <= 0) return 'Entry Level';
+                            const reqYrs = (minMonths / 12).toFixed(minMonths % 12 === 0 ? 0 : 1);
+                            const candYrs = (candMonths / 12).toFixed(1);
+                            if (candMonths >= minMonths) {
+                              return `Req: ${reqYrs}+ yrs • ✓ Qualified (${candYrs} yrs)`;
+                            }
+                            return `Req: ${reqYrs}+ yrs • You have ${candYrs} yrs`;
+                          })()}
+                        </span>
+                        <span>•</span>
                         <span className="text-[11px] font-mono text-zinc-400">
                           Source: {String(opp.category_specific_attributes?.source_system || 'ats_direct')}
                         </span>

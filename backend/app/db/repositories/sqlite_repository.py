@@ -35,7 +35,10 @@ from app.schemas.opportunity import (
 from app.schemas.profile import (
     AssessedSkill,
     CandidateCareerProfile,
+    CandidateEducation,
     CandidateEligibilityProfile,
+    CandidateProject,
+    CandidateWorkExperience,
     CareerPathNode,
 )
 from app.schemas.discovery import ConnectorHealthReport
@@ -126,11 +129,52 @@ class SQLiteCandidateProfileRepository(CandidateProfileRepository):
                 else None
             )
 
+            # Parse rich career history records
+            work_experiences: list[CandidateWorkExperience] = []
+            if "work_experiences_json" in profile_row.keys() and profile_row["work_experiences_json"]:
+                try:
+                    work_experiences = [
+                        CandidateWorkExperience.model_validate(w)
+                        for w in json.loads(profile_row["work_experiences_json"])
+                    ]
+                except Exception:
+                    pass
+
+            education_records: list[CandidateEducation] = []
+            if "education_json" in profile_row.keys() and profile_row["education_json"]:
+                try:
+                    education_records = [
+                        CandidateEducation.model_validate(e)
+                        for e in json.loads(profile_row["education_json"])
+                    ]
+                except Exception:
+                    pass
+
+            projects_records: list[CandidateProject] = []
+            if "projects_json" in profile_row.keys() and profile_row["projects_json"]:
+                try:
+                    projects_records = [
+                        CandidateProject.model_validate(p)
+                        for p in json.loads(profile_row["projects_json"])
+                    ]
+                except Exception:
+                    pass
+
+            headline_val = profile_row["headline"] if "headline" in profile_row.keys() else None
+            location_val = profile_row["location"] if "location" in profile_row.keys() else None
+            bio_val = profile_row["bio"] if "bio" in profile_row.keys() else None
+
             return CandidateCareerProfile(
                 user_id=profile_row["user_id"],
                 display_name=profile_row["display_name"] if "display_name" in profile_row.keys() else None,
+                headline=headline_val,
+                location=location_val,
+                bio=bio_val,
                 profile_version=profile_row["profile_version"],
                 assessed_skills=assessed_skills,
+                work_experiences=work_experiences,
+                education=education_records,
+                projects=projects_records,
                 current_career_path=current_path,
                 target_career_paths=target_paths,
                 adjacent_career_paths=adjacent_paths,
@@ -148,35 +192,50 @@ class SQLiteCandidateProfileRepository(CandidateProfileRepository):
             if profile.current_career_path
             else None
         )
+        work_exp_json = json.dumps([w.model_dump() for w in profile.work_experiences])
+        edu_json = json.dumps([e.model_dump() for e in profile.education])
+        proj_json = json.dumps([p.model_dump() for p in profile.projects])
 
         with self.manager.transaction() as conn:
             # 1. Upsert profile row
             conn.execute(
                 """
                 INSERT INTO candidate_profiles (
-                    user_id, display_name, profile_version, overall_confidence, constraints_json,
+                    user_id, display_name, headline, location, bio, profile_version, overall_confidence, constraints_json,
                     target_career_paths_json, adjacent_career_paths_json,
-                    current_career_path_json, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    current_career_path_json, work_experiences_json, education_json, projects_json, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(user_id) DO UPDATE SET
                     display_name = excluded.display_name,
+                    headline = excluded.headline,
+                    location = excluded.location,
+                    bio = excluded.bio,
                     profile_version = excluded.profile_version,
                     overall_confidence = excluded.overall_confidence,
                     constraints_json = excluded.constraints_json,
                     target_career_paths_json = excluded.target_career_paths_json,
                     adjacent_career_paths_json = excluded.adjacent_career_paths_json,
                     current_career_path_json = excluded.current_career_path_json,
+                    work_experiences_json = excluded.work_experiences_json,
+                    education_json = excluded.education_json,
+                    projects_json = excluded.projects_json,
                     updated_at = excluded.updated_at;
                 """,
                 (
                     profile.user_id,
                     profile.display_name,
+                    profile.headline,
+                    profile.location,
+                    profile.bio,
                     profile.profile_version,
                     profile.overall_profile_confidence,
                     constraints_json,
                     target_json,
                     adjacent_json,
                     current_json,
+                    work_exp_json,
+                    edu_json,
+                    proj_json,
                     now_iso,
                     now_iso,
                 ),

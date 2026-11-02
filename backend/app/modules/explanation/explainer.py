@@ -350,6 +350,23 @@ class OpportunityExplanationEngine:
     ) -> list[str]:
         limitations: list[str] = []
 
+        # 1. Experience & Seniority Gap (Highest priority factor)
+        cand_exp = candidate.eligibility_constraints.total_full_time_experience_months
+        min_exp = getattr(opportunity.eligibility_rules, "min_experience_months", 0)
+        if min_exp > 0 and cand_exp < min_exp:
+            exp_req = f"{min_exp // 12}+ years" if min_exp >= 12 else f"{min_exp} mos"
+            cand_has = f"{cand_exp // 12} yr {cand_exp % 12} mo" if cand_exp >= 12 else f"{cand_exp} mos"
+            limitations.append(
+                f"Experience: Role specifies {exp_req} of experience (profile documents {cand_has})."
+            )
+
+        title_lower = opportunity.title.lower()
+        if any(w in title_lower for w in ("senior", "lead", "staff", "principal", "manager")) and cand_exp < 24:
+            limitations.append(
+                f"Seniority gap: Title '{opportunity.title}' indicates senior ownership level."
+            )
+
+        # 2. Eligibility & Caveats
         if caveats:
             for cav in caveats:
                 limitations.append(f"Eligibility note: {cav}")
@@ -360,19 +377,29 @@ class OpportunityExplanationEngine:
         if not getattr(opportunity, "is_verified_posting", True):
             limitations.append("Source is an unverified search index result; verify direct requisition status.")
 
+        # 3. Core Required Skills vs Optional Skills
+        mandatory_gaps = [g for g in skill_gaps if g.is_mandatory]
+        preferred_gaps = [g for g in skill_gaps if not g.is_mandatory]
+
+        if mandatory_gaps:
+            g_names = [g.skill_name for g in mandatory_gaps[:2]]
+            limitations.append(
+                f"Core requirement without evidence: {', '.join(g_names)}."
+            )
+
         if partial_reqs:
             p_names = [p.skill_name for p in partial_reqs[:2]]
             limitations.append(
                 f"Candidate proficiency is below stated requirement for: {', '.join(p_names)}."
             )
 
-        if skill_gaps:
-            g_names = [g.skill_name for g in skill_gaps[:2]]
+        if preferred_gaps and len(limitations) < 4:
+            pref_names = [g.skill_name for g in preferred_gaps[:2]]
             limitations.append(
-                f"Candidate profile currently lacks evidence for: {', '.join(g_names)}."
+                f"Preferred skill to develop: {', '.join(pref_names)}."
             )
 
-        return limitations[:4]
+        return limitations[:5]
 
     def _synthesize_deterministic_summary(
         self,

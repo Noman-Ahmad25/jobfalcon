@@ -73,8 +73,14 @@ export interface CandidateEligibilityProfile {
 export interface CandidateCareerProfile {
   user_id: string;
   display_name?: string | null;
+  headline?: string | null;
+  location?: string | null;
+  bio?: string | null;
   profile_version: number;
   assessed_skills: AssessedSkill[];
+  work_experiences?: ExtractedWorkExperience[];
+  projects?: ExtractedProject[];
+  education?: ExtractedEducation[];
   current_career_path?: CareerPathNode | null;
   target_career_paths: CareerPathNode[];
   adjacent_career_paths: CareerPathNode[];

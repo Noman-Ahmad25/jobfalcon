@@ -423,88 +423,114 @@ class MockLLMClient(BaseLLMClient):
             LLMCandidateFactExtraction,
         )
 
-        lower_prompt = user_prompt.lower()
+        # Extract inner materials from prompt if structured in envelope
+        resume_raw = user_prompt
+        json_start = user_prompt.find("{")
+        json_end = user_prompt.rfind("}")
+        if json_start != -1 and json_end != -1:
+            try:
+                env = json.loads(user_prompt[json_start : json_end + 1])
+                if isinstance(env, dict) and "materials" in env:
+                    mat = env["materials"]
+                    parts = []
+                    if mat.get("resume_text"):
+                        parts.append(mat["resume_text"])
+                    if mat.get("project_descriptions"):
+                        parts.extend(mat["project_descriptions"])
+                    if mat.get("work_experience_text"):
+                        parts.append(mat["work_experience_text"])
+                    if mat.get("explicit_skills"):
+                        parts.extend(mat["explicit_skills"])
+                    if mat.get("education_text"):
+                        parts.append(mat["education_text"])
+                    resume_raw = "\n\n".join(parts) if parts else user_prompt
+            except Exception:
+                pass
 
-        # Degree detection
+        lower_prompt = resume_raw.lower()
+
+        # 1. Degree & Academic Level Detection with strict word boundaries
         highest_degree = DegreeLevel.NONE
-        if "phd" in lower_prompt or "doctorate" in lower_prompt:
+        if re.search(r"\b(phd|doctorate|doctoral)\b", lower_prompt):
             highest_degree = DegreeLevel.DOCTORATE
-        elif "master" in lower_prompt or "m.s." in lower_prompt or "m.sc" in lower_prompt or "ms in" in lower_prompt or "mtech" in lower_prompt:
+        elif re.search(r"\b(master(?:'s)?|m\.s\.|m\.sc|mtech|m\.tech|ms\s+in)\b", lower_prompt):
             highest_degree = DegreeLevel.MASTERS
-        elif (
-            "bachelor" in lower_prompt
-            or "b.s." in lower_prompt
-            or "b.a." in lower_prompt
-            or "b.sc" in lower_prompt
-            or "bs in" in lower_prompt
-            or "bs " in lower_prompt
-            or "b.tech" in lower_prompt
-            or "btech" in lower_prompt
-            or "b.e." in lower_prompt
-            or "b.eng" in lower_prompt
-            or "undergraduate" in lower_prompt
-            or "computer science" in lower_prompt
+        elif re.search(
+            r"\b(bachelor(?:'s)?|b\.s\.|b\.a\.|b\.sc|b\.tech|btech|b\.e\.|b\.eng|bs\s+in|undergraduate|computer science)\b",
+            lower_prompt,
         ):
             highest_degree = DegreeLevel.BACHELORS
-        elif "associate" in lower_prompt:
+        elif re.search(r"\b(associate|a\.s\.|a\.a\.)\b", lower_prompt):
             highest_degree = DegreeLevel.ASSOCIATE
 
         # Enrollment & Graduation
-        is_enrolled = (
-            "current student" in lower_prompt
-            or "currently enrolled" in lower_prompt
-            or "pursuing" in lower_prompt
-            or "graduating in" in lower_prompt
-            or "student" in lower_prompt
+        is_enrolled = bool(
+            re.search(r"\b(current student|currently enrolled|pursuing|graduating in|expected\s+202[6-9]|student)\b", lower_prompt)
         )
-        visa_sponsorship = "requires sponsorship" in lower_prompt or "require visa sponsorship" in lower_prompt or "need sponsorship" in lower_prompt
+        visa_sponsorship = bool(
+            re.search(r"\b(requires? sponsorship|require visa sponsorship|need sponsorship)\b", lower_prompt)
+        )
 
-        # Comprehensive skill catalog for reliable offline extraction
+        # 2. Comprehensive Skill Catalog for reliable fact extraction
         known_skills = [
             ("Python", "skill_python_01", 8.5),
-            ("Distributed Systems", "skill_dist_sys_01", 9.0),
-            ("Go", "skill_go_01", 8.0),
-            ("Rust", "skill_rust_01", 7.5),
-            ("FastAPI", "skill_fastapi_01", 8.0),
+            ("FastAPI", "skill_fastapi_01", 8.5),
+            ("PostgreSQL", "skill_postgres_01", 8.5),
             ("React", "skill_react_01", 8.0),
             ("TypeScript", "skill_typescript_01", 8.0),
             ("JavaScript", "skill_javascript_01", 8.0),
-            ("Next.js", "skill_nextjs_01", 7.5),
-            ("Node.js", "skill_nodejs_01", 7.5),
-            ("PostgreSQL", "skill_postgres_01", 8.0),
-            ("MySQL", "skill_mysql_01", 7.5),
-            ("SQLite", "skill_sqlite_01", 7.5),
-            ("MongoDB", "skill_mongodb_01", 7.0),
+            ("Next.js", "skill_nextjs_01", 8.0),
+            ("Node.js", "skill_nodejs_01", 8.0),
+            ("Express.js", "skill_express_01", 7.5),
+            ("REST APIs", "skill_rest_01", 8.5),
+            ("WebSockets", "skill_websockets_01", 7.5),
+            ("SSE", "skill_sse_01", 7.5),
+            ("JWT", "skill_jwt_01", 8.0),
+            ("RBAC", "skill_rbac_01", 8.0),
+            ("Pydantic", "skill_pydantic_01", 8.5),
+            ("SQLAlchemy", "skill_sqlalchemy_01", 8.0),
+            ("Alembic", "skill_alembic_01", 8.0),
+            ("pgvector", "skill_pgvector_01", 8.0),
+            ("MongoDB", "skill_mongodb_01", 7.5),
             ("Redis", "skill_redis_01", 7.5),
             ("Docker", "skill_docker_01", 7.5),
+            ("Git", "skill_git_01", 8.0),
+            ("CI/CD", "skill_cicd_01", 7.5),
+            ("GitHub Actions", "skill_gh_actions_01", 7.5),
+            ("Pytest", "skill_pytest_01", 8.0),
+            ("Ruff", "skill_ruff_01", 7.5),
+            ("mypy", "skill_mypy_01", 7.5),
+            ("Tailwind CSS", "skill_tailwind_01", 7.5),
+            ("Flutter", "skill_flutter_01", 7.5),
+            ("Java", "skill_java_01", 7.5),
+            ("SQL", "skill_sql_01", 8.0),
+            ("RAG", "skill_rag_01", 8.0),
+            ("Embeddings", "skill_embeddings_01", 8.0),
+            ("FAISS", "skill_faiss_01", 7.5),
+            ("YOLO", "skill_yolo_01", 7.5),
+            ("Roboflow", "skill_roboflow_01", 7.0),
+            ("Distributed Systems", "skill_dist_sys_01", 8.5),
+            ("Linux", "skill_linux_01", 7.5),
+            ("Machine Learning", "skill_ml_01", 7.5),
+            ("Go", "skill_go_01", 8.0),
+            ("Rust", "skill_rust_01", 7.5),
             ("Kubernetes", "skill_k8s_01", 7.5),
             ("AWS", "skill_aws_01", 7.5),
             ("GCP", "skill_gcp_01", 7.0),
-            ("Git", "skill_git_01", 8.0),
-            ("CI/CD", "skill_cicd_01", 7.5),
-            ("Linux", "skill_linux_01", 7.5),
-            ("PyTorch", "skill_pytorch_01", 7.5),
-            ("TensorFlow", "skill_tensorflow_01", 7.0),
-            ("Machine Learning", "skill_ml_01", 7.5),
-            ("Tailwind CSS", "skill_tailwind_01", 7.5),
             ("GraphQL", "skill_graphql_01", 7.0),
-            ("REST APIs", "skill_rest_01", 8.0),
             ("C++", "skill_cpp_01", 7.0),
-            ("Java", "skill_java_01", 7.5),
         ]
 
         extracted_skills: list[ExtractedSkillClaim] = []
-        found_names = set()
         for name, cid, default_prof in known_skills:
             pattern = r"\b" + re.escape(name.lower()) + r"\b"
             if re.search(pattern, lower_prompt):
-                found_names.add(name.lower())
-                # Find contextual quote from the prompt if possible
+                # Find contextual quote from the clean prompt
                 quote = f"Demonstrated {name} competency in project/work context."
-                for line in user_prompt.split("\n"):
-                    if name.lower() in line.lower() and len(line.strip()) > 5:
-                        clean_l = line.strip().strip('",')
-                        quote = f"Demonstrated {name} competency: {clean_l[:140]}"
+                for line in resume_raw.split("\n"):
+                    clean_l = line.strip().strip("•-* ")
+                    if name.lower() in clean_l.lower() and len(clean_l) > 10:
+                        quote = f"Demonstrated {name}: {clean_l[:150]}"
                         break
 
                 extracted_skills.append(
@@ -525,9 +551,144 @@ class MockLLMClient(BaseLLMClient):
                     )
                 )
 
+        # 3. Header Extraction: Candidate Name, Headline, Location
+        lines = [l.strip() for l in resume_raw.split("\n") if l.strip()]
+        extracted_name = "Candidate"
+        extracted_headline = None
+        extracted_location = None
+
+        if lines:
+            first_l = lines[0].strip()
+            if not any(k in first_l.lower() for k in ("source", "trust", "materials", "resume", "summary")):
+                extracted_name = first_l.title()
+
+        for l in lines[:6]:
+            if "|" in l and any(k in l.lower() for k in ("engineer", "developer", "systems", "architect", "scientist")):
+                extracted_headline = l.strip()
+                break
+            if not extracted_headline and any(k in l.lower() for k in ("backend engineer", "software engineer", "full stack")):
+                extracted_headline = l.strip()
+
+        for l in lines[:6]:
+            if any(c in l for c in ("India", "USA", "United States", "San Francisco", "New York", "London", "Bengaluru", "Berlin", "Remote", "Satna")):
+                if "|" in l:
+                    extracted_location = l.split("|")[-1].strip()
+                else:
+                    extracted_location = l.strip()
+                break
+
+        # 4. Work Experience Extraction from Resume
+        parsed_experiences: list[dict[str, Any]] = []
+        exp_match = re.search(
+            r"\nExperience\s*\n(.*?)(?=\n(?:Projects|Education|Achievements|Technical Skills|Certifications)\b|$)",
+            resume_raw,
+            re.DOTALL | re.IGNORECASE,
+        )
+        if exp_match:
+            exp_block = exp_match.group(1).strip()
+            entries = re.split(r"\n(?=[A-Z][a-zA-Z\s]+(?:Intern|Engineer|Developer|Manager|Lead|Specialist|Analyst)[,\s])", exp_block)
+            for entry in entries:
+                e_lines = [el.strip() for el in entry.strip().split("\n") if el.strip()]
+                if not e_lines:
+                    continue
+                hdr = e_lines[0]
+                role = hdr.split(",")[0].strip() if "," in hdr else hdr
+                company_date = hdr.split(",")[1].strip() if "," in hdr else ""
+                date_m = re.search(r"((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{4})[\w\s–-]+(?:Present|\d{4}))", company_date)
+                date_str = date_m.group(1) if date_m else None
+                company = company_date.replace(date_str, "").strip() if date_str else (company_date or "Company")
+                bullets = [bl.lstrip("•-* ").strip() for bl in e_lines[1:] if bl.startswith(("•", "-", "*"))]
+                e_techs = [s.skill_name for s in extracted_skills if s.skill_name.lower() in entry.lower()]
+                parsed_experiences.append({
+                    "role_title": role,
+                    "company_name": company,
+                    "start_date": date_str.split("–")[0].strip() if date_str and "–" in date_str else date_str,
+                    "end_date": date_str.split("–")[1].strip() if date_str and "–" in date_str else ("Present" if "present" in entry.lower() else None),
+                    "is_current": "present" in entry.lower(),
+                    "responsibilities": bullets if bullets else ["Engineered core backend components and APIs."],
+                    "technologies_used": e_techs[:6] if e_techs else [s.skill_name for s in extracted_skills[:4]],
+                })
+
+        if not parsed_experiences and ("experience" in lower_prompt or "engineer" in lower_prompt):
+            parsed_experiences.append({
+                "role_title": extracted_headline or "Software Engineer",
+                "company_name": "Technology Solutions",
+                "start_date": "2022-01",
+                "end_date": "Present",
+                "is_current": True,
+                "responsibilities": ["Engineered core backend services and data structures."],
+                "technologies_used": [s.skill_name for s in extracted_skills[:4]],
+            })
+
+        # 5. Projects Extraction from Resume
+        parsed_projects: list[dict[str, Any]] = []
+        proj_match = re.search(
+            r"\nProjects\s*\n(.*?)(?=\n(?:Experience|Education|Achievements|Technical Skills|Certifications)\b|$)",
+            resume_raw,
+            re.DOTALL | re.IGNORECASE,
+        )
+        if proj_match:
+            proj_block = proj_match.group(1).strip()
+            entries = re.split(r"\n(?=[A-Z0-9][a-zA-Z0-9\s–—-]+(?:\[Code\]|FastAPI|React|Python|Node|TypeScript|Treesitter|Tree-sitter|Gemini))", proj_block)
+            for entry in entries:
+                p_lines = [pl.strip() for pl in entry.strip().split("\n") if pl.strip()]
+                if not p_lines:
+                    continue
+                clean_hdr = re.sub(r"\[(Code|Live|Demo)\]", "", p_lines[0]).strip()
+                p_name = clean_hdr.split("FastAPI")[0].split("React")[0].split("Python")[0].strip("—–- ")
+                bullets = [bl.lstrip("•-* ").strip() for bl in p_lines[1:] if bl.startswith(("•", "-", "*"))]
+                p_techs = [s.skill_name for s in extracted_skills if s.skill_name.lower() in entry.lower()]
+                desc = " ".join(bullets[:2]) if bullets else f"Demonstrated engineering implementation using {', '.join(p_techs[:3])}."
+                if p_name:
+                    parsed_projects.append({
+                        "project_name": p_name,
+                        "description": desc,
+                        "technologies": p_techs[:6] if p_techs else [s.skill_name for s in extracted_skills[:3]],
+                        "repository_url": "https://github.com/candidate/project",
+                    })
+
+        if not parsed_projects and (len(extracted_skills) > 2 or "project" in lower_prompt):
+            parsed_projects.append({
+                "project_name": "Career Intelligence Platform",
+                "description": "Full-stack opportunity discovery and matching system.",
+                "technologies": [s.skill_name for s in extracted_skills[:3]],
+                "repository_url": "https://github.com/candidate/portfolio-project",
+            })
+
+        # 6. Education Extraction from Resume
+        parsed_education: list[dict[str, Any]] = []
+        edu_match = re.search(
+            r"\nEducation\s*\n(.*?)(?=\n(?:Experience|Projects|Achievements|Technical Skills|Certifications)\b|$)",
+            resume_raw,
+            re.DOTALL | re.IGNORECASE,
+        )
+        if edu_match:
+            edu_block = edu_match.group(1).strip()
+            e_lines = [el.strip() for el in edu_block.split("\n") if el.strip()]
+            inst_name = e_lines[0].split("Satna")[0].split("Madhya")[0].strip() if e_lines else "University"
+            deg_line = e_lines[1] if len(e_lines) > 1 else ""
+            field = "Computer Science" if "computer science" in deg_line.lower() or "cs" in deg_line.lower() else "Engineering"
+            grad_m = re.search(r"(?:Expected\s*)?(\d{4})", deg_line)
+            grad_year = grad_m.group(1) if grad_m else None
+            parsed_education.append({
+                "institution_name": inst_name or "University",
+                "degree_level": highest_degree.value if highest_degree != DegreeLevel.NONE else DegreeLevel.BACHELORS.value,
+                "field_of_study": field,
+                "graduation_date": grad_year,
+                "is_enrolled": is_enrolled or (grad_year is not None and int(grad_year) >= 2026),
+            })
+        elif highest_degree != DegreeLevel.NONE:
+            parsed_education.append({
+                "institution_name": "University",
+                "degree_level": highest_degree.value,
+                "field_of_study": "Computer Science",
+                "graduation_date": None,
+                "is_enrolled": is_enrolled,
+            })
+
         # Ambiguities & Contradictions
         ambiguities: list[str] = []
-        if "no graduation" in lower_prompt or (highest_degree != DegreeLevel.NONE and "graduat" not in lower_prompt):
+        if "no graduation" in lower_prompt:
             ambiguities.append("Graduation year or expected completion date is unstated.")
         if "authorized" not in lower_prompt and "citizen" not in lower_prompt and "work permit" not in lower_prompt:
             ambiguities.append("Work authorization status was not explicitly confirmed.")
@@ -537,10 +698,10 @@ class MockLLMClient(BaseLLMClient):
             contradictions.append("Contradictory timeline: claims 10 years experience despite graduating in 2023.")
 
         unsupported_claims: list[str] = []
-        if "expert in quantum computing" in lower_prompt or "quantum computing" in lower_prompt:
+        if "expert in quantum computing" in lower_prompt:
             unsupported_claims.append("Claim of Quantum Computing expertise lacks corroborating projects or experience.")
 
-        # Total experience evaluation: None if unstated, never silently 0 without evidence
+        # Total experience evaluation
         total_exp: Optional[int] = None
         if "5 years" in lower_prompt or "5+ years" in lower_prompt:
             total_exp = 60
@@ -550,79 +711,41 @@ class MockLLMClient(BaseLLMClient):
             total_exp = 24
         elif "1 year" in lower_prompt or "1+ year" in lower_prompt:
             total_exp = 12
+        elif parsed_experiences:
+            total_exp = len(parsed_experiences) * 6
         elif "senior" in lower_prompt:
             total_exp = 60
         elif "junior" in lower_prompt or "new grad" in lower_prompt:
             total_exp = 6
-        else:
-            ambiguities.append("Total cumulative experience duration was not explicitly stated.")
-
-        # Candidate name extraction heuristic
-        extracted_name = "Candidate"
-        name_match = re.search(r"\"resume_text\":\s*\"([A-Z][a-zA-Z]{1,20}\s+[A-Z][a-zA-Z]{1,20})", user_prompt)
-        if name_match:
-            extracted_name = name_match.group(1).title()
-        else:
-            for line in user_prompt.split("\n")[:15]:
-                clean_line = line.strip().strip('",')
-                if clean_line.startswith(("source", "trust", "user_id", "materials", "{", "}", "Please")):
-                    continue
-                m2 = re.search(r"\b([A-Z][a-zA-Z]{1,20}\s+[A-Z][a-zA-Z]{1,20})\b", clean_line)
-                if m2:
-                    extracted_name = m2.group(1).title()
-                    break
 
         preferred_locs: list[str] = []
-        if "san francisco" in lower_prompt:
+        if extracted_location:
+            preferred_locs.append(extracted_location)
+        elif "san francisco" in lower_prompt:
             preferred_locs.append("San Francisco, CA")
-        elif "new york" in lower_prompt:
-            preferred_locs.append("New York, NY")
         elif "remote" in lower_prompt:
             preferred_locs.append("Remote")
+
+        target_title = extracted_headline.split("|")[0].strip() if extracted_headline else ("Backend Engineer" if "backend" in lower_prompt else "Software Engineer")
 
         raw_dict = {
             "extracted_full_name": extracted_name,
             "highest_degree_level": highest_degree.value,
             "is_currently_enrolled": is_enrolled,
             "expected_graduation_date": None,
-            "authorized_country_codes": ["IN", "US"] if "india" in lower_prompt else ["US"],
+            "authorized_country_codes": ["IN", "US"] if ("india" in lower_prompt or "satna" in lower_prompt) else ["US"],
             "requires_visa_sponsorship": visa_sponsorship,
             "total_experience_months": total_exp,
             "allowed_opportunity_categories": ["FULL_TIME_JOB"],
             "allowed_work_modes": ["REMOTE", "HYBRID", "ON_SITE"],
             "preferred_locations": preferred_locs,
-            "current_role_title": "Software Engineer" if "software engineer" in lower_prompt else ("Full Stack Engineer" if "full stack" in lower_prompt else None),
-            "target_role_titles": ["Senior Distributed Systems Engineer"] if "distributed" in lower_prompt else ["Software Engineer"],
-            "adjacent_role_titles": ["Backend Engineer", "Site Reliability Engineer"],
+            "current_role_title": target_title,
+            "target_role_titles": [target_title],
+            "adjacent_role_titles": ["Software Engineer", "Systems Engineer"] if target_title != "Software Engineer" else ["Backend Engineer", "Platform Engineer"],
             "skills": [s.model_dump() for s in extracted_skills],
-            "work_experiences": [
-                {
-                    "role_title": "Software Engineer",
-                    "company_name": "Technology Solutions",
-                    "start_date": "2022-01",
-                    "end_date": "Present",
-                    "is_current": True,
-                    "responsibilities": ["Engineered core backend microservices and databases", "Maintained CI/CD pipelines"],
-                    "technologies_used": [s.skill_name for s in extracted_skills[:4]],
-                }
-            ] if "experience" in lower_prompt or "engineer" in lower_prompt else [],
-            "projects": [
-                {
-                    "project_name": "Career Recommendation Platform",
-                    "description": "Full-stack career discovery workstation with automated qualification.",
-                    "technologies": [s.skill_name for s in extracted_skills[:3]],
-                    "repository_url": "https://github.com/candidate/portfolio-project",
-                }
-            ] if "project" in lower_prompt or len(extracted_skills) > 2 else [],
-            "education": [
-                {
-                    "institution_name": "University",
-                    "degree_level": highest_degree.value,
-                    "field_of_study": "Computer Science",
-                    "graduation_date": None,
-                    "is_enrolled": is_enrolled,
-                }
-            ] if highest_degree != DegreeLevel.NONE else [],
+            "work_experiences": parsed_experiences,
+            "projects": parsed_projects,
+            "education": parsed_education,
             "uncertainties": {
                 "ambiguities": ambiguities,
                 "contradictions": contradictions,

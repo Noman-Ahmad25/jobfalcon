@@ -155,12 +155,33 @@ class CandidateProfilingService:
         else:
             overall_confidence = 0.50
 
-        # 7. Assemble aggregate CandidateCareerProfile
+        # 7. Assemble aggregate CandidateCareerProfile with rich history
+        candidate_loc = raw_extraction.preferred_locations[0] if raw_extraction.preferred_locations else None
+        headline_title = raw_extraction.current_role_title or (target_titles[0] if target_titles else "Software Engineer")
+
+        summary_bio: Optional[str] = None
+        if request.resume_text and "summary" in request.resume_text.lower():
+            import re
+            parts = re.split(r"\nSummary\s*\n", request.resume_text, flags=re.IGNORECASE)
+            if len(parts) > 1:
+                after = parts[1]
+                raw_bio = re.split(r"\n(?:Technical Skills|Skills|Experience|Projects|Education)\b", after, flags=re.IGNORECASE)[0].strip()
+                if raw_bio and len(raw_bio) > 20:
+                    summary_bio = " ".join(raw_bio.split())
+
+        bio_text = summary_bio or f"{headline_title} focused on {' and '.join(target_titles[:2])}."
+
         career_profile = CandidateCareerProfile(
             user_id=request.user_id,
             display_name=raw_extraction.extracted_full_name or None,
+            headline=headline_title,
+            location=candidate_loc,
+            bio=bio_text,
             profile_version=next_version,
             assessed_skills=assessed_skills,
+            work_experiences=raw_extraction.work_experiences,
+            education=raw_extraction.education,
+            projects=raw_extraction.projects,
             current_career_path=current_path,
             target_career_paths=target_paths,
             adjacent_career_paths=adjacent_paths,

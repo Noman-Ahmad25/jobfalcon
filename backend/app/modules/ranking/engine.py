@@ -792,12 +792,52 @@ class CandidateJobRankingEngine:
             else "Limited skill overlap."
         )
 
-        # Tradeoffs / risks
-        if missing_skills:
-            missing_names = [g.skill_name for g in missing_skills[:3]]
-            tradeoffs.append(
-                f"Candidate profile does not corroborate: {', '.join(missing_names)}"
+        # Tradeoffs / risks prioritized by significance: Experience -> Degree -> Required Skills -> Preferred Skills
+        cand_exp = candidate.eligibility_constraints.total_full_time_experience_months
+        min_exp = opportunity.eligibility_rules.min_experience_months
+        max_exp = opportunity.eligibility_rules.max_experience_months
+
+        # 1. Experience & Seniority Gap
+        if min_exp > 0 and cand_exp < min_exp:
+            exp_gap_str = (
+                f"{min_exp // 12}+ years" if min_exp >= 12 else f"{min_exp} months"
             )
+            cand_exp_str = (
+                f"{cand_exp // 12} yr {cand_exp % 12} mo"
+                if cand_exp >= 12
+                else f"{cand_exp} months"
+            )
+            tradeoffs.append(
+                f"Experience gap: Opportunity specifies {exp_gap_str} experience (profile documents {cand_exp_str})."
+            )
+
+        title_lower = opportunity.title.lower()
+        if any(w in title_lower for w in ("senior", "lead", "staff", "principal", "manager")) and cand_exp < 24:
+            tradeoffs.append(
+                f"Seniority consideration: '{opportunity.title}' typically expects multi-year independent system ownership."
+            )
+
+        # 2. Degree Gap
+        cand_deg = candidate.eligibility_constraints.highest_degree_level
+        min_deg = opportunity.eligibility_rules.minimum_degree_required
+        if DEGREE_HIERARCHY.get(min_deg, 0) > DEGREE_HIERARCHY.get(cand_deg, 0):
+            tradeoffs.append(
+                f"Qualification note: Listing indicates minimum degree of {min_deg.value} (profile has {cand_deg.value})."
+            )
+
+        # 3. Core Required Skills vs Preferred Skills
+        if missing_skills:
+            mandatory_missing = [g.skill_name for g in missing_skills if g.is_mandatory]
+            preferred_missing = [g.skill_name for g in missing_skills if not g.is_mandatory]
+
+            if mandatory_missing:
+                tradeoffs.append(
+                    f"Core required skills without corroborating evidence: {', '.join(mandatory_missing[:3])}."
+                )
+            if preferred_missing:
+                tradeoffs.append(
+                    f"Preferred skills to develop: {', '.join(preferred_missing[:3])}."
+                )
 
         if caveats:
             for cav in caveats:

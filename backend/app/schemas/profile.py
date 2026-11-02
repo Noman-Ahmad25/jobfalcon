@@ -148,6 +148,37 @@ class CandidateEligibilityProfile(BaseModel):
         return v
 
 
+class CandidateWorkExperience(BaseModel):
+    """Structured professional experience record."""
+
+    role_title: str = Field(..., description="Job or internship role title.")
+    company_name: str = Field(..., description="Organization or employer name.")
+    start_date: Optional[str] = Field(default=None, description="Start date (YYYY-MM or YYYY).")
+    end_date: Optional[str] = Field(default=None, description="End date (YYYY-MM, YYYY, or 'Present').")
+    is_current: bool = Field(default=False, description="True if currently employed in this role.")
+    responsibilities: list[str] = Field(default_factory=list, description="Key contributions and achievements.")
+    technologies_used: list[str] = Field(default_factory=list, description="Demonstrated technologies.")
+
+
+class CandidateProject(BaseModel):
+    """Structured practical portfolio project record."""
+
+    project_name: str = Field(..., description="Project name or headline.")
+    description: str = Field(..., description="Narrative summary of architecture and impact.")
+    technologies: list[str] = Field(default_factory=list, description="Demonstrated technologies.")
+    repository_url: Optional[str] = Field(default=None, description="Repository or project URL.")
+
+
+class CandidateEducation(BaseModel):
+    """Structured educational credential record."""
+
+    institution_name: str = Field(..., description="University, college, or bootcamp.")
+    degree_level: DegreeLevel = Field(default=DegreeLevel.NONE, description="Degree hierarchy level.")
+    field_of_study: Optional[str] = Field(default=None, description="Major, discipline, or field of study.")
+    graduation_date: Optional[str] = Field(default=None, description="Graduation year or completion date.")
+    is_enrolled: bool = Field(default=False, description="True if currently actively pursuing.")
+
+
 class CandidateCareerProfile(BaseModel):
     """Aggregate career profile contract combining evidence, career paths, and eligibility constraints."""
 
@@ -159,6 +190,18 @@ class CandidateCareerProfile(BaseModel):
         default=None,
         description="Human-readable display name for the candidate (e.g. 'Jane Doe').",
     )
+    headline: Optional[str] = Field(
+        default=None,
+        description="Professional headline or primary role title.",
+    )
+    location: Optional[str] = Field(
+        default=None,
+        description="Candidate residential city/country location.",
+    )
+    bio: Optional[str] = Field(
+        default=None,
+        description="Brief professional summary or candidate objective.",
+    )
     profile_version: int = Field(
         default=1,
         ge=1,
@@ -167,6 +210,18 @@ class CandidateCareerProfile(BaseModel):
     assessed_skills: list[AssessedSkill] = Field(
         default_factory=list,
         description="Validated competencies with underlying provenance.",
+    )
+    work_experiences: list[CandidateWorkExperience] = Field(
+        default_factory=list,
+        description="Chronological work, internship, and professional experiences.",
+    )
+    education: list[CandidateEducation] = Field(
+        default_factory=list,
+        description="Degrees, academic credentials, and educational background.",
+    )
+    projects: list[CandidateProject] = Field(
+        default_factory=list,
+        description="Portfolio projects and practical software implementations.",
     )
     current_career_path: Optional[CareerPathNode] = Field(
         default=None,
@@ -235,4 +290,9 @@ class StructuredProfileCreateRequest(BaseModel):
     target_occupation_code: str = Field(default="15-1252.00")
     adjacent_role_title: Optional[str] = Field(default=None, max_length=200)
     adjacent_occupation_code: Optional[str] = None
+    location: Optional[str] = Field(default=None, max_length=200)
+    bio: Optional[str] = Field(default=None, max_length=2000)
+    work_experiences: list[CandidateWorkExperience] = Field(default_factory=list)
+    education: list[CandidateEducation] = Field(default_factory=list)
+    projects: list[CandidateProject] = Field(default_factory=list)
     initial_skills: list[StructuredProfileSkillInput] = Field(default_factory=list)

@@ -11,7 +11,16 @@ from app.schemas.common import (
     OpportunityCategory,
     WorkMode,
 )
-from app.schemas.profile import CandidateCareerProfile
+from app.schemas.profile import (
+    CandidateCareerProfile,
+    CandidateEducation,
+    CandidateProject,
+    CandidateWorkExperience,
+)
+
+ExtractedWorkExperience = CandidateWorkExperience
+ExtractedProject = CandidateProject
+ExtractedEducation = CandidateEducation
 
 
 class CandidateProfilingRequest(BaseModel):
@@ -141,35 +150,7 @@ class ExtractedSkillClaim(BaseModel):
     )
 
 
-class ExtractedWorkExperience(BaseModel):
-    """Structured professional experience record."""
 
-    role_title: str
-    company_name: str
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
-    is_current: bool = False
-    responsibilities: list[str] = Field(default_factory=list)
-    technologies_used: list[str] = Field(default_factory=list)
-
-
-class ExtractedProject(BaseModel):
-    """Structured project record."""
-
-    project_name: str
-    description: str
-    technologies: list[str] = Field(default_factory=list)
-    repository_url: Optional[str] = None
-
-
-class ExtractedEducation(BaseModel):
-    """Structured education record."""
-
-    institution_name: str
-    degree_level: DegreeLevel = DegreeLevel.NONE
-    field_of_study: Optional[str] = None
-    graduation_date: Optional[str] = None
-    is_enrolled: bool = False
 
 
 class EpistemicUncertainties(BaseModel):

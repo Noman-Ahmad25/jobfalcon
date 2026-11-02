@@ -234,12 +234,14 @@ export default function Home() {
 
             {activeTab === 'profile' && (
               <ProfileWorkspace
+                key={selectedCandidateId + '_' + (candidateProfile.profile_version || 0)}
                 candidateProfile={candidateProfile}
                 candidateName={candidateName}
                 onNavigateTab={handleNavigateTab}
                 onProfileUpdated={(updated) => {
                   setCandidateProfile(updated);
                   setCandidateName(updated.display_name || updated.user_id);
+                  listProfiles().then(setCandidateSummaries).catch(() => {});
                 }}
               />
             )}

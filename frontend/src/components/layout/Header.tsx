@@ -197,6 +197,18 @@ export const Header: React.FC<HeaderProps> = ({
                       <span>View & Edit Career Profile</span>
                     </button>
 
+                    {onOpenUploadResume && (
+                      <button
+                        onClick={() => {
+                          onOpenUploadResume();
+                          setMenuOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center gap-2.5 transition-colors"
+                      >
+                        <Upload className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+                        <span>Upload or Replace Resume</span>
+                      </button>
+                    )}
                   </div>
 
                   {/* Profile Switching Section */}
