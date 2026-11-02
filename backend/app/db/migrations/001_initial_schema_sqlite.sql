@@ -9,6 +9,7 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS candidate_profiles (
     user_id TEXT PRIMARY KEY,
     profile_version INTEGER NOT NULL DEFAULT 1,
+    display_name TEXT,
     overall_confidence REAL NOT NULL,
     constraints_json TEXT NOT NULL,
     target_career_paths_json TEXT NOT NULL,
@@ -166,5 +167,38 @@ CREATE TABLE IF NOT EXISTS development_action_progress (
 );
 
 CREATE INDEX IF NOT EXISTS ix_development_action_progress_user ON development_action_progress(user_id, plan_id);
+
+-- 12. Persistent Discovery Runs & Observable Workflow History
+CREATE TABLE IF NOT EXISTS discovery_runs (
+    run_id TEXT PRIMARY KEY,
+    candidate_id TEXT NOT NULL,
+    status TEXT NOT NULL,
+    termination_reason TEXT,
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    iterations_completed INTEGER NOT NULL DEFAULT 0,
+    total_tool_calls INTEGER NOT NULL DEFAULT 0,
+    target_coverage_goal INTEGER NOT NULL DEFAULT 5,
+    connector_health_json TEXT NOT NULL DEFAULT '[]',
+    timeline_events_json TEXT NOT NULL DEFAULT '[]',
+    adaptation_history_json TEXT NOT NULL DEFAULT '[]',
+    search_strategy_json TEXT,
+    coverage_assessment_json TEXT,
+    total_discovered_raw INTEGER NOT NULL DEFAULT 0,
+    canonical_count INTEGER NOT NULL DEFAULT 0,
+    duplicate_count INTEGER NOT NULL DEFAULT 0,
+    eligible_count INTEGER NOT NULL DEFAULT 0,
+    uncertain_count INTEGER NOT NULL DEFAULT 0,
+    ineligible_count INTEGER NOT NULL DEFAULT 0,
+    canonical_opportunity_ids_json TEXT NOT NULL DEFAULT '[]',
+    eligible_opportunity_ids_json TEXT NOT NULL DEFAULT '[]',
+    response_json TEXT,
+    error_message TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_discovery_runs_candidate ON discovery_runs(candidate_id, created_at);
+CREATE INDEX IF NOT EXISTS ix_discovery_runs_status ON discovery_runs(status);
 
 

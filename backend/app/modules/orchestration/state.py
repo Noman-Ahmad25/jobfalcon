@@ -103,6 +103,8 @@ class AdaptiveDiscoveryGraphState(TypedDict, total=False):
 
     # Execution Observability & Safety
     timeline_events: Annotated[list[WorkflowTimelineEvent], operator.add]
+    rejections_by_code: dict[str, int]
+    sources_queried: list[str]
     current_stage: WorkflowStage
     termination_reason: TerminationReason
     error_message: Optional[str]

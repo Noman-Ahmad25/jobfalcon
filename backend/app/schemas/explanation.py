@@ -171,6 +171,10 @@ class OpportunityExplanation(BaseModel):
         default_factory=list,
         description="Material caveats (e.g. unstated compensation, missing requirement details, unverified domain).",
     )
+    what_to_verify: list[str] = Field(
+        default_factory=list,
+        description="Key facts the candidate should verify before applying.",
+    )
     is_llm_polished: bool = Field(
         default=False,
         description="True if language was polished by an LLM; False if generated deterministically.",

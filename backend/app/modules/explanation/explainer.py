@@ -200,6 +200,15 @@ class OpportunityExplanationEngine:
                     )
                 )
 
+        # 3b. Deduplication: each skill appears in exactly one category
+        matched_ids = {r.canonical_skill_id for r in matched_reqs}
+        partial_ids = {r.canonical_skill_id for r in partial_reqs}
+        partial_reqs = [r for r in partial_reqs if r.canonical_skill_id not in matched_ids]
+        skill_gaps = [
+            r for r in skill_gaps
+            if r.canonical_skill_id not in matched_ids and r.canonical_skill_id not in partial_ids
+        ]
+
         # 4. Resolve Dimension Scores and Top Drivers
         top_drivers: list[str] = []
         overall_fit = 0.70
@@ -228,12 +237,27 @@ class OpportunityExplanationEngine:
         # 7. Limitations and Material Uncertainties
         limitations = self._identify_limitations(candidate, opportunity, elig_caveats, partial_reqs, skill_gaps)
 
+        # 7b. What to Verify Before Applying
+        what_to_verify: list[str] = []
+        if not getattr(opportunity, "is_verified_posting", True):
+            what_to_verify.append("Confirm the job posting is active at the direct source URL.")
+        if not getattr(opportunity, "company_domain_verified", True):
+            what_to_verify.append("Verify the employer identity and company website before sharing contact details.")
+        if elig_caveats:
+            what_to_verify.append("Review specific eligibility constraints noted above for this opportunity.")
+        if skill_gaps:
+            top_gap_names = [g.skill_name for g in skill_gaps[:2]]
+            what_to_verify.append(f"Verify whether {', '.join(top_gap_names)} is strictly mandatory or preferred.")
+
         # 8. Deterministic Baseline Summary
         why_summary = self._synthesize_deterministic_summary(
+            candidate=candidate,
+            opportunity=opportunity,
             top_drivers=top_drivers,
             matched_reqs=matched_reqs,
             partial_reqs=partial_reqs,
             overall_fit=overall_fit,
+            elig_status=elig_status,
         )
 
         deterministic_explanation = OpportunityExplanation(
@@ -253,6 +277,7 @@ class OpportunityExplanationEngine:
             career_relevance=career_rel,
             growth_opportunity=growth_opp,
             limitations_and_uncertainties=limitations,
+            what_to_verify=what_to_verify,
             is_llm_polished=False,
             fallback_used=False,
             generated_at=datetime.now(timezone.utc),
@@ -329,23 +354,11 @@ class OpportunityExplanationEngine:
             for cav in caveats:
                 limitations.append(f"Eligibility note: {cav}")
 
-        if not opportunity.company_domain_verified:
+        if not getattr(opportunity, "company_domain_verified", True):
             limitations.append("Employer email domain is unverified; exercise standard due diligence.")
 
-        compensation_info = (
-            opportunity.category_specific_attributes.get("compensation")
-            or opportunity.category_specific_attributes.get("stipend")
-            or opportunity.category_specific_attributes.get("salary")
-        )
-        if not compensation_info:
-            limitations.append("Compensation details are unstated in the listing.")
-
-        deadline = (
-            opportunity.category_specific_attributes.get("application_deadline")
-            or opportunity.category_specific_attributes.get("deadline")
-        )
-        if not deadline:
-            limitations.append("Application deadline is rolling or unstated; early submission advised.")
+        if not getattr(opportunity, "is_verified_posting", True):
+            limitations.append("Source is an unverified search index result; verify direct requisition status.")
 
         if partial_reqs:
             p_names = [p.skill_name for p in partial_reqs[:2]]
@@ -354,33 +367,44 @@ class OpportunityExplanationEngine:
             )
 
         if skill_gaps:
-            g_names = [g.skill_name for g in skill_gaps[:3]]
+            g_names = [g.skill_name for g in skill_gaps[:2]]
             limitations.append(
                 f"Candidate profile currently lacks evidence for: {', '.join(g_names)}."
             )
 
-        return limitations
+        return limitations[:4]
 
     def _synthesize_deterministic_summary(
         self,
+        candidate: CandidateCareerProfile,
+        opportunity: PolymorphicOpportunity,
         top_drivers: list[str],
         matched_reqs: list[RequirementExplanation],
         partial_reqs: list[RequirementExplanation],
         overall_fit: float,
+        elig_status: EligibilityStatus,
     ) -> str:
         parts: list[str] = []
-        if top_drivers:
-            parts.append(f"Recommended based on strong {top_drivers[0]}.")
 
         if matched_reqs:
             top_matched = [m.skill_name for m in matched_reqs[:3]]
             parts.append(f"Demonstrates verified evidence in {', '.join(top_matched)}.")
 
+        if top_drivers:
+            parts.append(f"Recommended based on strong {top_drivers[0]}.")
+
         if partial_reqs:
             top_partial = [p.skill_name for p in partial_reqs[:2]]
             parts.append(f"Shows emerging evidence in {', '.join(top_partial)}.")
 
-        parts.append(f"Overall candidate fit score: {overall_fit:.2f}.")
+        elig_phrase = (
+            "Eligibility confirmed."
+            if elig_status == EligibilityStatus.ELIGIBLE
+            else "Eligibility unconfirmed — review constraints."
+            if elig_status == EligibilityStatus.ELIGIBLE_WITH_UNCERTAINTY
+            else "Review eligibility requirements carefully."
+        )
+        parts.append(f"Overall candidate fit score: {overall_fit:.2f}. {elig_phrase}")
         return " ".join(parts)
 
     # =========================================================================
@@ -458,6 +482,7 @@ class OpportunityExplanationEngine:
                         if polished.limitations_and_uncertainties
                         else base.limitations_and_uncertainties
                     ),
+                    what_to_verify=base.what_to_verify,
                     is_llm_polished=True,
                     fallback_used=False,
                     generated_at=base.generated_at,

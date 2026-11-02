@@ -1,18 +1,22 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 import uuid
+from datetime import datetime, timezone
 from typing import Optional
 
 from app.db.repositories.interfaces import (
     CandidateProfileRepository,
+    DiscoveryRunRepository,
     DuplicateClusterRepository,
     OpportunityRepository,
     RecommendationRepository,
 )
 from app.db.repositories.sqlite_repository import (
     SQLiteCandidateProfileRepository,
+    SQLiteDiscoveryRunRepository,
     SQLiteDuplicateClusterRepository,
     SQLiteOpportunityRepository,
     SQLiteRecommendationRepository,
@@ -21,6 +25,7 @@ from app.modules.discovery.connectors import (
     BaseDiscoveryConnector,
     get_default_connectors,
 )
+from app.modules.orchestration.events import discovery_event_manager
 from app.modules.orchestration.graph import AdaptiveDiscoveryGraphBuilder
 from app.modules.orchestration.state import AdaptiveDiscoveryGraphState
 from app.modules.profiling.llm_client import BaseLLMClient
@@ -28,11 +33,40 @@ from app.schemas.orchestration import (
     AdaptiveDiscoveryRequest,
     AdaptiveDiscoveryResponse,
     CoverageAssessment,
+    DiscoveryRun,
+    DiscoveryRunStatus,
+    DiscoveryRunStreamEvent,
     SearchStrategy,
     TerminationReason,
+    WorkflowStage,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _stage_to_status(stage: Optional[WorkflowStage]) -> DiscoveryRunStatus:
+    """Maps internal LangGraph workflow stages to durable discovery run lifecycle statuses."""
+    if stage == WorkflowStage.INITIALIZING:
+        return DiscoveryRunStatus.INITIALIZING
+    elif stage == WorkflowStage.STRATEGY_FORMULATION:
+        return DiscoveryRunStatus.STRATEGY_FORMULATION
+    elif stage == WorkflowStage.SEARCHING:
+        return DiscoveryRunStatus.SEARCHING
+    elif stage == WorkflowStage.EVALUATING:
+        return DiscoveryRunStatus.EVALUATING
+    elif stage == WorkflowStage.GAP_ANALYSIS:
+        return DiscoveryRunStatus.COLLECTING
+    elif stage == WorkflowStage.ADAPTING:
+        return DiscoveryRunStatus.SEARCHING
+    elif stage == WorkflowStage.RANKING:
+        return DiscoveryRunStatus.RANKING
+    elif stage == WorkflowStage.FINALIZING:
+        return DiscoveryRunStatus.COLLECTING
+    elif stage == WorkflowStage.COMPLETED:
+        return DiscoveryRunStatus.COMPLETED
+    elif stage == WorkflowStage.FAILED:
+        return DiscoveryRunStatus.FAILED
+    return DiscoveryRunStatus.INITIALIZING
 
 
 class AdaptiveDiscoveryWorkflow:
@@ -59,6 +93,7 @@ class AdaptiveDiscoveryWorkflow:
         cluster_repo: Optional[DuplicateClusterRepository] = None,
         profile_repo: Optional[CandidateProfileRepository] = None,
         rec_repo: Optional[RecommendationRepository] = None,
+        run_repo: Optional[DiscoveryRunRepository] = None,
         connectors: Optional[list[BaseDiscoveryConnector]] = None,
         llm_client: Optional[BaseLLMClient] = None,
     ) -> None:
@@ -66,13 +101,89 @@ class AdaptiveDiscoveryWorkflow:
         self.cluster_repo = cluster_repo or SQLiteDuplicateClusterRepository()
         self.profile_repo = profile_repo or SQLiteCandidateProfileRepository()
         self.rec_repo = rec_repo or SQLiteRecommendationRepository()
+        self.run_repo = run_repo or SQLiteDiscoveryRunRepository()
         self._raw_connectors = connectors
         self.llm_client = llm_client
 
-    async def run(self, request: AdaptiveDiscoveryRequest) -> AdaptiveDiscoveryResponse:
+    async def start_run(self, request: AdaptiveDiscoveryRequest) -> DiscoveryRun:
+        """Initiates an asynchronous discovery run or reconnects to an existing active run."""
+        candidate_id = request.user_id or (
+            request.candidate_profile.user_id if request.candidate_profile else "unknown"
+        )
+        active_run = self.run_repo.get_active_run_for_candidate(candidate_id)
+        if active_run:
+            logger.info(
+                "Found existing active discovery run %s for candidate %s; reconnecting",
+                active_run.run_id,
+                candidate_id,
+            )
+            return active_run
+
+        run_id = f"wf-{uuid.uuid4().hex[:12]}"
+        now = datetime.now(timezone.utc)
+        initial_run = DiscoveryRun(
+            run_id=run_id,
+            candidate_id=candidate_id,
+            status=DiscoveryRunStatus.CREATED,
+            started_at=now,
+            target_coverage_goal=request.target_coverage_goal,
+            created_at=now,
+            updated_at=now,
+        )
+        self.run_repo.save(initial_run)
+
+        # Dispatch background execution safely
+        asyncio.create_task(self._execute_run_safely(request, run_id))
+        return initial_run
+
+    async def _execute_run_safely(self, request: AdaptiveDiscoveryRequest, run_id: str) -> None:
+        try:
+            await self.run(request, run_id=run_id)
+        except Exception as exc:
+            logger.error(
+                "Background execution of discovery run %s encountered an error: %s",
+                run_id,
+                exc,
+                exc_info=True,
+            )
+
+    async def run(
+        self,
+        request: AdaptiveDiscoveryRequest,
+        run_id: Optional[str] = None,
+    ) -> AdaptiveDiscoveryResponse:
         """Executes the compiled LangGraph agent orchestration workflow."""
         t0 = time.perf_counter()
-        workflow_id = f"wf-{uuid.uuid4().hex[:12]}"
+        workflow_id = run_id or f"wf-{uuid.uuid4().hex[:12]}"
+        candidate_id = request.user_id or (
+            request.candidate_profile.user_id if request.candidate_profile else ""
+        )
+        now = datetime.now(timezone.utc)
+
+        # Record or retrieve run in repository
+        run_record = self.run_repo.get(workflow_id) or DiscoveryRun(
+            run_id=workflow_id,
+            candidate_id=candidate_id,
+            status=DiscoveryRunStatus.INITIALIZING,
+            started_at=now,
+            target_coverage_goal=request.target_coverage_goal,
+            created_at=now,
+            updated_at=now,
+        )
+        run_record.status = DiscoveryRunStatus.INITIALIZING
+        self.run_repo.save(run_record)
+
+        await discovery_event_manager.broadcast(
+            workflow_id,
+            DiscoveryRunStreamEvent(
+                run_id=workflow_id,
+                candidate_id=candidate_id,
+                status=DiscoveryRunStatus.INITIALIZING,
+                event_type="WORKFLOW_INITIALIZED",
+                summary=f"Initialized LangGraph adaptive discovery run {workflow_id}.",
+                stage=WorkflowStage.INITIALIZING,
+            ),
+        )
 
         # 1. Resolve active connectors
         mock_mode = not request.enable_live_discovery
@@ -98,9 +209,7 @@ class AdaptiveDiscoveryWorkflow:
         # 3. Construct initial LangGraph state
         initial_state: AdaptiveDiscoveryGraphState = {
             "workflow_id": workflow_id,
-            "candidate_id": request.user_id or (
-                request.candidate_profile.user_id if request.candidate_profile else ""
-            ),
+            "candidate_id": candidate_id,
             "candidate_profile": request.candidate_profile,
             "iteration": 1,
             "tool_call_count": 0,
@@ -123,103 +232,219 @@ class AdaptiveDiscoveryWorkflow:
             "adaptation_history": [],
         }
 
-        # 4. Invoke the LangGraph StateGraph
-        final_state: AdaptiveDiscoveryGraphState = await compiled_graph.ainvoke(initial_state)
+        # 4. Stream LangGraph execution with real-time state persistence and SSE broadcasting
+        seen_events_count = 0
+        final_state: AdaptiveDiscoveryGraphState = initial_state
 
-        # Handle profile resolution failures
-        if final_state.get("termination_reason") == TerminationReason.ABORTED_ERROR:
-            err = final_state.get("error_message") or "Candidate profile could not be resolved."
-            raise ValueError(f"{err} Please provide candidate_profile or valid user_id.")
+        try:
+            async for current_state in compiled_graph.astream(initial_state, stream_mode="values"):
+                final_state = current_state
+                curr_stage = current_state.get("current_stage")
+                if curr_stage:
+                    run_record.status = _stage_to_status(curr_stage)
 
-        elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
+                # Update live counts and telemetry
+                events = current_state.get("timeline_events", [])
+                run_record.timeline_events = events
+                raw_list = current_state.get("accumulated_raw", [])
+                canon_list = current_state.get("canonical_opportunities", [])
+                run_record.total_discovered_raw = len(raw_list)
+                run_record.canonical_count = len(canon_list)
+                run_record.duplicate_count = max(len(raw_list) - len(canon_list), 0)
+                run_record.total_tool_calls = current_state.get("tool_call_count", 0)
+                run_record.connector_health = current_state.get("connector_health", [])
+                run_record.search_strategy = current_state.get("search_strategy")
+                run_record.coverage_assessment = current_state.get("coverage_assessment")
+                run_record.adaptation_history = current_state.get("adaptation_history", [])
+                run_record.rejections_by_code = current_state.get("rejections_by_code", {})
+                run_record.sources_queried = current_state.get("sources_queried", [])
+                run_record.verified_opportunity_count = sum(
+                    1 for opp in canon_list if getattr(opp, "is_verified_posting", True) or getattr(opp, "company_domain_verified", False)
+                )
+                run_record.updated_at = datetime.now(timezone.utc)
+                self.run_repo.save(run_record)
 
-        # 5. Extract and compute final response metrics
-        accumulated_raw = final_state.get("accumulated_raw", [])
-        canonical_opportunities = final_state.get("canonical_opportunities", [])
-        duplicate_clusters = final_state.get("duplicate_clusters", {})
-        duplicate_records = final_state.get("duplicate_records", [])
-        eligibility_results = final_state.get("eligibility_results", [])
-        timeline_events = final_state.get("timeline_events", [])
-        adaptation_history = final_state.get("adaptation_history", [])
-        executed_query_hashes = final_state.get("executed_query_hashes", [])
-        connector_health = final_state.get("connector_health", [])
-        recommendations = final_state.get("recommendations")
-        termination_reason = final_state.get("termination_reason", TerminationReason.MAX_ITERATIONS_REACHED)
+            # Handle profile resolution failures
+            if final_state.get("termination_reason") == TerminationReason.ABORTED_ERROR:
+                err = final_state.get("error_message") or "Candidate profile could not be resolved."
+                run_record.status = DiscoveryRunStatus.FAILED
+                run_record.error_message = err
+                run_record.completed_at = datetime.now(timezone.utc)
+                self.run_repo.save(run_record)
+                await discovery_event_manager.broadcast(
+                    workflow_id,
+                    DiscoveryRunStreamEvent(
+                        run_id=workflow_id,
+                        candidate_id=candidate_id,
+                        status=DiscoveryRunStatus.FAILED,
+                        event_type="WORKFLOW_FAILED",
+                        summary=err,
+                        stage=WorkflowStage.FAILED,
+                        data={"error": err},
+                    ),
+                )
+                raise ValueError(f"{err} Please provide candidate_profile or valid user_id.")
 
-        # Categorize eligible vs uncertain vs ineligible
-        elig_map = {r.opportunity_id: r for r in eligibility_results}
-        eligible_canonical = []
-        eligible_count = 0
-        uncertain_count = 0
-        ineligible_count = 0
+            elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
 
-        for opp in canonical_opportunities:
-            res = elig_map.get(opp.opportunity_id)
-            if res and res.is_eligible:
-                eligible_canonical.append(opp)
-                if res.status.value == "ELIGIBLE_WITH_UNCERTAINTY":
-                    uncertain_count += 1
+            # 5. Extract and compute final response metrics
+            accumulated_raw = final_state.get("accumulated_raw", [])
+            canonical_opportunities = final_state.get("canonical_opportunities", [])
+            duplicate_clusters = final_state.get("duplicate_clusters", {})
+            duplicate_records = final_state.get("duplicate_records", [])
+            eligibility_results = final_state.get("eligibility_results", [])
+            timeline_events = final_state.get("timeline_events", [])
+            adaptation_history = final_state.get("adaptation_history", [])
+            executed_query_hashes = final_state.get("executed_query_hashes", [])
+            connector_health = final_state.get("connector_health", [])
+            recommendations = final_state.get("recommendations")
+            termination_reason = final_state.get(
+                "termination_reason", TerminationReason.MAX_ITERATIONS_REACHED
+            )
+
+            # Categorize eligible vs uncertain vs ineligible
+            elig_map = {r.opportunity_id: r for r in eligibility_results}
+            eligible_canonical = []
+            eligible_count = 0
+            uncertain_count = 0
+            ineligible_count = 0
+
+            for opp in canonical_opportunities:
+                res = elig_map.get(opp.opportunity_id)
+                if res and res.is_eligible:
+                    eligible_canonical.append(opp)
+                    if res.status.value == "ELIGIBLE_WITH_UNCERTAINTY":
+                        uncertain_count += 1
+                    else:
+                        eligible_count += 1
                 else:
-                    eligible_count += 1
-            else:
-                ineligible_count += 1
+                    ineligible_count += 1
 
-        # Count actual search iterations executed
-        iteration_events = [
-            e for e in timeline_events if "ITERATION_" in e.event_type and "_STARTED" in e.event_type
-        ]
-        iterations_completed = max(len(iteration_events), 1)
+            # Count actual search iterations executed
+            iteration_events = [
+                e
+                for e in timeline_events
+                if "ITERATION_" in e.event_type and "_STARTED" in e.event_type
+            ]
+            iterations_completed = max(len(iteration_events), 1)
 
-        # Ensure valid SearchStrategy and CoverageAssessment fallbacks
-        strategy = final_state.get("search_strategy") or SearchStrategy(
-            strategy_summary="Standard targeted discovery plan.",
-            target_role_priorities=[],
-            target_coverage_goal=request.target_coverage_goal,
-            selected_connector_ids=[c.connector_id for c in active_connectors],
-            initial_queries=[],
-        )
+            # Ensure valid SearchStrategy and CoverageAssessment fallbacks
+            strategy = final_state.get("search_strategy") or SearchStrategy(
+                strategy_summary="Standard targeted discovery plan.",
+                target_role_priorities=[],
+                target_coverage_goal=request.target_coverage_goal,
+                selected_connector_ids=[c.connector_id for c in active_connectors],
+                initial_queries=[],
+            )
 
-        coverage_assessment = final_state.get("coverage_assessment") or CoverageAssessment(
-            is_coverage_sufficient=False,
-            total_eligible_canonical=eligible_count,
-            target_role_coverage={},
-            identified_gaps=["No opportunities retrieved"],
-            recommended_action="STOP",
-        )
+            coverage_assessment = final_state.get("coverage_assessment") or CoverageAssessment(
+                is_coverage_sufficient=False,
+                total_eligible_canonical=eligible_count,
+                target_role_coverage={},
+                identified_gaps=["No opportunities retrieved"],
+                recommended_action="STOP",
+            )
 
-        candidate_id = final_state.get("candidate_id") or (
-            final_state["candidate_profile"].user_id if final_state.get("candidate_profile") else "unknown"
-        )
+            candidate_id_final = final_state.get("candidate_id") or (
+                final_state["candidate_profile"].user_id
+                if final_state.get("candidate_profile")
+                else candidate_id or "unknown"
+            )
 
-        return AdaptiveDiscoveryResponse(
-            workflow_id=final_state.get("workflow_id", workflow_id),
-            candidate_id=candidate_id,
-            termination_reason=termination_reason,
-            iterations_completed=iterations_completed,
-            total_tool_calls=final_state.get("tool_call_count", 0),
-            search_strategy=strategy,
-            coverage_assessment=coverage_assessment,
-            adaptation_history=adaptation_history,
-            total_discovered_raw=len(accumulated_raw),
-            canonical_count=len(canonical_opportunities),
-            duplicate_count=max(len(accumulated_raw) - len(canonical_opportunities), 0),
-            eligible_count=eligible_count,
-            uncertain_count=uncertain_count,
-            ineligible_count=ineligible_count,
-            canonical_opportunities=canonical_opportunities,
-            eligible_opportunities=eligible_canonical,
-            duplicate_clusters=duplicate_clusters,
-            duplicate_records=duplicate_records,
-            eligibility_results=eligibility_results,
-            connector_health=connector_health,
-            recommendations=recommendations,
-            timeline_events=timeline_events,
-            execution_metadata={
-                "duration_ms": elapsed_ms,
-                "executed_query_hashes": executed_query_hashes,
-                "max_iterations_configured": request.max_iterations,
-                "max_tool_calls_configured": request.max_tool_calls,
-                "deduplication_threshold": request.deduplication_threshold,
-                "orchestrator_engine": "langgraph-stategraph-v1",
-            },
-        )
+            response = AdaptiveDiscoveryResponse(
+                workflow_id=final_state.get("workflow_id", workflow_id),
+                candidate_id=candidate_id_final,
+                termination_reason=termination_reason,
+                iterations_completed=iterations_completed,
+                total_tool_calls=final_state.get("tool_call_count", 0),
+                search_strategy=strategy,
+                coverage_assessment=coverage_assessment,
+                adaptation_history=adaptation_history,
+                total_discovered_raw=len(accumulated_raw),
+                canonical_count=len(canonical_opportunities),
+                duplicate_count=max(len(accumulated_raw) - len(canonical_opportunities), 0),
+                eligible_count=eligible_count,
+                uncertain_count=uncertain_count,
+                ineligible_count=ineligible_count,
+                canonical_opportunities=canonical_opportunities,
+                eligible_opportunities=eligible_canonical,
+                duplicate_clusters=duplicate_clusters,
+                duplicate_records=duplicate_records,
+                eligibility_results=eligibility_results,
+                connector_health=connector_health,
+                recommendations=recommendations,
+                timeline_events=timeline_events,
+                rejections_by_code=final_state.get("rejections_by_code", {}),
+                sources_queried=final_state.get("sources_queried", []) or [c.connector_id for c in active_connectors],
+                verified_opportunity_count=sum(
+                    1 for opp in canonical_opportunities
+                    if getattr(opp, "is_verified_posting", True) or getattr(opp, "company_domain_verified", False)
+                ),
+                execution_metadata={
+                    "duration_ms": elapsed_ms,
+                    "executed_query_hashes": executed_query_hashes,
+                    "max_iterations_configured": request.max_iterations,
+                    "max_tool_calls_configured": request.max_tool_calls,
+                    "deduplication_threshold": request.deduplication_threshold,
+                    "orchestrator_engine": "langgraph-stategraph-v1",
+                },
+            )
+
+            # Persist completed DiscoveryRun
+            run_record.status = DiscoveryRunStatus.COMPLETED
+            run_record.termination_reason = termination_reason
+            run_record.completed_at = datetime.now(timezone.utc)
+            run_record.eligible_count = eligible_count
+            run_record.uncertain_count = uncertain_count
+            run_record.ineligible_count = ineligible_count
+            run_record.rejections_by_code = response.rejections_by_code
+            run_record.sources_queried = response.sources_queried
+            run_record.verified_opportunity_count = response.verified_opportunity_count
+            run_record.canonical_opportunity_ids = [
+                o.opportunity_id for o in canonical_opportunities
+            ]
+            run_record.eligible_opportunity_ids = [
+                o.opportunity_id for o in eligible_canonical
+            ]
+            run_record.response = response
+            run_record.updated_at = datetime.now(timezone.utc)
+            self.run_repo.save(run_record)
+
+            await discovery_event_manager.broadcast(
+                workflow_id,
+                DiscoveryRunStreamEvent(
+                    run_id=workflow_id,
+                    candidate_id=candidate_id,
+                    status=DiscoveryRunStatus.COMPLETED,
+                    event_type="RUN_COMPLETED",
+                    summary=f"Discovery completed with {eligible_count} eligible match(es).",
+                    stage=WorkflowStage.COMPLETED,
+                    data={
+                        "eligible_count": eligible_count,
+                        "canonical_count": len(canonical_opportunities),
+                        "total_raw": len(accumulated_raw),
+                    },
+                ),
+            )
+
+            return response
+
+        except Exception as exc:
+            run_record.status = DiscoveryRunStatus.FAILED
+            run_record.completed_at = datetime.now(timezone.utc)
+            run_record.error_message = str(exc)
+            run_record.updated_at = datetime.now(timezone.utc)
+            self.run_repo.save(run_record)
+            await discovery_event_manager.broadcast(
+                workflow_id,
+                DiscoveryRunStreamEvent(
+                    run_id=workflow_id,
+                    candidate_id=candidate_id,
+                    status=DiscoveryRunStatus.FAILED,
+                    event_type="RUN_FAILED",
+                    summary=f"Discovery run failed: {exc!s}",
+                    stage=WorkflowStage.FAILED,
+                    data={"error": str(exc)},
+                ),
+            )
+            raise

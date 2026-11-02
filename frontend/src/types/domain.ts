@@ -72,6 +72,7 @@ export interface CandidateEligibilityProfile {
 
 export interface CandidateCareerProfile {
   user_id: string;
+  display_name?: string | null;
   profile_version: number;
   assessed_skills: AssessedSkill[];
   current_career_path?: CareerPathNode | null;
@@ -402,9 +403,28 @@ export interface SearchStrategy {
   initial_queries: DiscoverySearchQuery[];
 }
 
+export type OpportunityRejectionCode =
+  | 'INVALID_URL'
+  | 'PLACEHOLDER_DOMAIN'
+  | 'SYNTHETIC_RESULT'
+  | 'NOT_AN_OPPORTUNITY'
+  | 'COLLECTION_PAGE'
+  | 'INFORMATIONAL_CONTENT'
+  | 'EXPIRED'
+  | 'EXPERIENCE_MISMATCH'
+  | 'CATEGORY_MISMATCH'
+  | 'COUNTRY_UNAUTHORIZED'
+  | 'DUPLICATE'
+  | 'UNVERIFIABLE'
+  | 'OTHER_HARD_CONSTRAINT'
+  | 'INSUFFICIENT_INDICATORS';
+
 export interface CoverageAssessment {
   is_coverage_sufficient: boolean;
   total_eligible_canonical: number;
+  verified_opportunity_count?: number;
+  duplicate_rate?: number;
+  quality_summary?: string;
   target_role_coverage: Record<string, number>;
   identified_gaps: string[];
   recommended_action: string;
@@ -458,7 +478,68 @@ export interface AdaptiveDiscoveryResponse {
   connector_health: ConnectorHealthReport[];
   recommendations?: RankingResponse | null;
   timeline_events: WorkflowTimelineEvent[];
+  rejections_by_code?: Record<string, number>;
+  sources_queried?: string[];
+  verified_opportunity_count?: number;
   execution_metadata: Record<string, unknown>;
+}
+
+export type DiscoveryRunStatus =
+  | 'CREATED'
+  | 'INITIALIZING'
+  | 'STRATEGY_FORMULATION'
+  | 'SEARCHING'
+  | 'COLLECTING'
+  | 'NORMALIZING'
+  | 'DEDUPLICATING'
+  | 'EVALUATING'
+  | 'RANKING'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'CANCELLED'
+  | 'PARTIALLY_COMPLETED';
+
+export interface DiscoveryRun {
+  run_id: string;
+  candidate_id: string;
+  status: DiscoveryRunStatus;
+  termination_reason?: TerminationReason | null;
+  started_at: string;
+  completed_at?: string | null;
+  iterations_completed: number;
+  total_tool_calls: number;
+  target_coverage_goal: number;
+  connector_health: ConnectorHealthReport[];
+  timeline_events: WorkflowTimelineEvent[];
+  adaptation_history: AdaptationEvent[];
+  search_strategy?: SearchStrategy | null;
+  coverage_assessment?: CoverageAssessment | null;
+  total_discovered_raw: number;
+  canonical_count: number;
+  duplicate_count: number;
+  eligible_count: number;
+  uncertain_count: number;
+  ineligible_count: number;
+  canonical_opportunity_ids: string[];
+  eligible_opportunity_ids: string[];
+  rejections_by_code?: Record<string, number>;
+  sources_queried?: string[];
+  verified_opportunity_count?: number;
+  response?: AdaptiveDiscoveryResponse | null;
+  error_message?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiscoveryRunStreamEvent {
+  run_id: string;
+  candidate_id: string;
+  status: DiscoveryRunStatus;
+  event_type: string;
+  summary: string;
+  stage?: WorkflowStage | null;
+  data: Record<string, unknown>;
+  timestamp: string;
 }
 
 export type RankingDimension =
@@ -785,6 +866,43 @@ export interface UpdateActionProgressRequest {
   status: ActionProgressStatus;
   verification_artifact_url?: string | null;
   candidate_notes?: string | null;
+}
+
+// =============================================================================
+// Profile Lifecycle & Onboarding
+// =============================================================================
+
+export interface CandidateProfileSummary {
+  user_id: string;
+  display_name: string;
+  overall_profile_confidence: number;
+  profile_version: number;
+  skill_count: number;
+  target_role: string | null;
+}
+
+export interface StructuredProfileCreateRequest {
+  user_id: string;
+  display_name: string;
+  headline?: string;
+  highest_degree_level: string;
+  is_currently_enrolled_student: boolean;
+  expected_graduation_date?: string;
+  total_full_time_experience_months: number;
+  authorized_country_codes: string[];
+  requires_visa_sponsorship: boolean;
+  allowed_opportunity_categories: string[];
+  allowed_work_modes: string[];
+  preferred_locations: string[];
+  target_role_title: string;
+  target_occupation_code: string;
+  adjacent_role_title?: string;
+  adjacent_occupation_code?: string;
+  initial_skills: Array<{
+    skill_name: string;
+    proficiency_score: number;
+    evidence_snippet: string;
+  }>;
 }
 
 

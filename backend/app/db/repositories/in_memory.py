@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 from app.db.repositories.interfaces import (
     CandidateProfileRepository,
+    DiscoveryRunRepository,
     DuplicateClusterRepository,
     EligibilityAuditRepository,
     OpportunityRepository,
@@ -13,6 +14,7 @@ from app.db.repositories.interfaces import (
 from app.schemas.deduplication import DuplicateRecord, OpportunityCluster
 from app.schemas.eligibility import EligibilityResult
 from app.schemas.opportunity import PolymorphicOpportunity
+from app.schemas.orchestration import DiscoveryRun, DiscoveryRunStatus
 from app.schemas.profile import CandidateCareerProfile
 from app.schemas.ranking import RankingResponse
 
@@ -244,4 +246,53 @@ class InMemoryRecommendationRepository(RecommendationRepository):
 
     def clear(self) -> None:
         self._evaluations.clear()
+
+
+class InMemoryDiscoveryRunRepository(DiscoveryRunRepository):
+    """In-memory dictionary-backed repository for DiscoveryRun lifecycle states."""
+
+    TERMINAL_STATUSES = {
+        DiscoveryRunStatus.COMPLETED,
+        DiscoveryRunStatus.FAILED,
+        DiscoveryRunStatus.CANCELLED,
+        DiscoveryRunStatus.PARTIALLY_COMPLETED,
+    }
+
+    def __init__(self) -> None:
+        self._runs: Dict[str, DiscoveryRun] = {}
+
+    def save(self, run: DiscoveryRun) -> None:
+        self._runs[run.run_id] = DiscoveryRun.model_validate(run.model_dump())
+
+    def get(self, run_id: str) -> Optional[DiscoveryRun]:
+        run = self._runs.get(run_id)
+        if run is None:
+            return None
+        return DiscoveryRun.model_validate(run.model_dump())
+
+    def get_latest_for_candidate(self, candidate_id: str) -> Optional[DiscoveryRun]:
+        matching = [r for r in self._runs.values() if r.candidate_id == candidate_id]
+        if not matching:
+            return None
+        matching.sort(key=lambda r: r.created_at, reverse=True)
+        return DiscoveryRun.model_validate(matching[0].model_dump())
+
+    def list_for_candidate(self, candidate_id: str, limit: int = 10) -> List[DiscoveryRun]:
+        matching = [r for r in self._runs.values() if r.candidate_id == candidate_id]
+        matching.sort(key=lambda r: r.created_at, reverse=True)
+        return [DiscoveryRun.model_validate(r.model_dump()) for r in matching[:limit]]
+
+    def get_active_run_for_candidate(self, candidate_id: str) -> Optional[DiscoveryRun]:
+        matching = [
+            r for r in self._runs.values()
+            if r.candidate_id == candidate_id and r.status not in self.TERMINAL_STATUSES
+        ]
+        if not matching:
+            return None
+        matching.sort(key=lambda r: r.created_at, reverse=True)
+        return DiscoveryRun.model_validate(matching[0].model_dump())
+
+    def clear(self) -> None:
+        self._runs.clear()
+
 

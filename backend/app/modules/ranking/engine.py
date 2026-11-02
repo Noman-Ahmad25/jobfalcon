@@ -286,6 +286,31 @@ class CandidateJobRankingEngine:
 
         # Calculate Total Weighted Fit Score
         overall_score = sum(d.weighted_score for d in dims.values())
+
+        # Principle: "A demonstrated skill is evidence of capability, not proof of years of professional experience."
+        # A candidate lacking significant years of required experience must not rank senior roles (10+ years)
+        # above suitable junior roles simply due to overlapping skill keywords.
+        cand_exp = candidate.eligibility_constraints.total_full_time_experience_months
+        min_exp = opportunity.eligibility_rules.min_experience_months
+        opp_title_lower = opportunity.title.lower()
+
+        if min_exp > 0 and cand_exp < min_exp:
+            deficit_months = min_exp - cand_exp
+            if deficit_months >= 24 or (cand_exp <= 12 and min_exp >= 36):
+                penalty_ratio = min(0.65, 0.20 + (deficit_months / 120.0) * 0.45)
+                overall_score = overall_score * (1.0 - penalty_ratio)
+                caveats.append(
+                    f"EXPERIENCE_MISMATCH: Candidate has {cand_exp} months experience vs required {min_exp} months. "
+                    f"Score penalized by {int(penalty_ratio * 100)}% to preserve seniority ranking integrity."
+                )
+        elif cand_exp <= 12 and any(k in opp_title_lower for k in ("principal", "staff", "director", "architect", "lead", "head of", "senior", "sr.")):
+            seniority_penalty = 0.40 if any(k in opp_title_lower for k in ("principal", "staff", "director", "architect")) else 0.25
+            overall_score = overall_score * (1.0 - seniority_penalty)
+            caveats.append(
+                f"SENIORITY_MISMATCH: Entry-level candidate evaluated against senior title '{opportunity.title}'. "
+                f"Score dampened by {int(seniority_penalty * 100)}% to prioritize entry-level opportunities."
+            )
+
         overall_score = max(0.0, min(1.0, overall_score))
 
         # Synthesize grounded natural-language explanation
@@ -455,15 +480,31 @@ class CandidateJobRankingEngine:
         """Evaluates whether the opportunity matches target ambition vs adjacent role."""
         opp_code = opportunity.mapped_occupation_code.strip()
         opp_title_lower = opportunity.title.lower()
+        cand_exp = candidate.eligibility_constraints.total_full_time_experience_months
+        is_early_career = cand_exp <= 12
+        is_senior_opp = any(
+            k in opp_title_lower
+            for k in ("principal", "staff", "director", "architect", "lead", "head of", "senior", "sr.")
+        )
 
         # Check explicit target career paths
         for target in candidate.target_career_paths:
             if target.occupation_code.strip() == opp_code:
+                if is_early_career and is_senior_opp and "senior" not in target.title.lower():
+                    return (
+                        0.45,
+                        f"Target ambition matches taxonomy ('{target.title}'), but job seniority ({opportunity.title}) exceeds candidate early career status.",
+                    )
                 return (
                     1.00,
                     f"Direct taxonomy match with target career ambition: '{target.title}'.",
                 )
             if target.title.lower() in opp_title_lower:
+                if is_early_career and is_senior_opp and "senior" not in target.title.lower():
+                    return (
+                        0.45,
+                        f"Target ambition '{target.title}' matches role, but opportunity seniority ({opportunity.title}) is misaligned with candidate experience.",
+                    )
                 return (
                     0.95,
                     f"Strong title match with target career ambition: '{target.title}'.",
@@ -680,7 +721,9 @@ class CandidateJobRankingEngine:
         max_exp = opportunity.eligibility_rules.max_experience_months
 
         # Experience fit
-        if cand_exp >= min_exp:
+        if min_exp < 0:
+            exp_score = 0.50
+        elif cand_exp >= min_exp:
             if max_exp is None or cand_exp <= max_exp:
                 exp_score = 1.00
             else:
@@ -688,8 +731,12 @@ class CandidateJobRankingEngine:
                 excess = cand_exp - max_exp
                 exp_score = max(0.40, 1.0 - (excess / float(max_exp + 12)))
         else:
-            # Below minimum (should be caught by eligibility, but handled gracefully)
-            exp_score = max(0.20, cand_exp / float(max(1, min_exp)))
+            # Below minimum
+            deficit = min_exp - cand_exp
+            if deficit >= 36 or (cand_exp <= 12 and min_exp >= 24):
+                exp_score = 0.05
+            else:
+                exp_score = max(0.10, cand_exp / float(max(1, min_exp)))
 
         # Degree fit
         cand_degree = candidate.eligibility_constraints.highest_degree_level

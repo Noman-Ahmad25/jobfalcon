@@ -188,6 +188,16 @@ class DiscoveryAgentDecisionMaker:
 
         total_eligible = len(eligible_canonical)
         coverage_goal = strategy.target_coverage_goal
+        verified_count = sum(
+            1 for opp in eligible_canonical
+            if opp.is_verified_posting or getattr(opp, "company_domain_verified", False)
+        )
+        total_canonical = len(canonical_opportunities)
+        dup_rate = max(0.0, float(total_canonical - total_eligible) / float(max(1, total_canonical)))
+        quality_summary = (
+            f"{verified_count}/{total_eligible} eligible listings verified authentic; "
+            f"{len(canonical_opportunities)} distinct canonical listings."
+        )
 
         # Identify deficit roles
         deficit_roles = [
@@ -208,6 +218,9 @@ class DiscoveryAgentDecisionMaker:
             assessment = CoverageAssessment(
                 is_coverage_sufficient=is_sufficient,
                 total_eligible_canonical=total_eligible,
+                verified_opportunity_count=verified_count,
+                duplicate_rate=round(dup_rate, 4),
+                quality_summary=quality_summary,
                 target_role_coverage=target_role_coverage,
                 identified_gaps=gaps,
                 recommended_action=action,
@@ -223,20 +236,25 @@ class DiscoveryAgentDecisionMaker:
             identified_gaps.append(f"Total eligible listings ({total_eligible}) below target goal ({coverage_goal}).")
 
         # Adaptive strategy selection based on iteration count
-        adaptation_type = "QUERY_RELAXATION"
         target_role = deficit_roles[0] if deficit_roles else strategy.target_role_priorities[0]
         summary = ""
         new_query: Optional[DiscoverySearchQuery] = None
         target_connectors = list(strategy.selected_connector_ids)
 
+        is_early_career = profile.eligibility_constraints.total_full_time_experience_months <= 12
+
         if iteration == 1:
-            # Level 1: Query Keyword Relaxation (broader role query)
+            # Level 1: Query Keyword Relaxation (preserve seniority and target direct ATS sources)
             adaptation_type = "QUERY_RELAXATION"
-            clean_role = target_role.replace("Software Engineer", "Developer").replace("Backend", "Software")
-            query_str = f'"{clean_role}" Python remote'
+            clean_role = target_role.replace("Senior ", "")
+            if is_early_career and "junior" not in clean_role.lower():
+                query_str = f'"{clean_role}" (entry level OR junior) (site:greenhouse.io OR site:lever.co OR site:ashbyhq.com)'
+            else:
+                query_str = f'"{clean_role}" hiring (site:greenhouse.io OR site:lever.co OR site:ashbyhq.com)'
+
             summary = (
-                f"Relaxed search query for '{target_role}' to broader title '{clean_role}' "
-                f"to increase opportunity recall."
+                f"Refined search query for '{clean_role}' targeting direct ATS job postings "
+                f"to optimize authentic individual vacancy precision."
             )
             new_query = DiscoverySearchQuery(
                 query_id=f"adapt_iter_{iteration}_{target_role[:10].lower()}",
@@ -247,7 +265,7 @@ class DiscoveryAgentDecisionMaker:
                 work_modes=profile.eligibility_constraints.allowed_work_modes,
                 target_locations=profile.eligibility_constraints.preferred_locations,
                 target_country_codes=profile.eligibility_constraints.authorized_country_codes,
-                seniority_level="ENTRY_LEVEL" if profile.eligibility_constraints.total_full_time_experience_months <= 12 else "MID_LEVEL",
+                seniority_level="ENTRY_LEVEL" if is_early_career else "MID_LEVEL",
                 relationship_type=CareerPathRelationship.TARGET,
             )
         elif iteration >= 2 and adjacent_roles:

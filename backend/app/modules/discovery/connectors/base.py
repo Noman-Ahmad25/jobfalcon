@@ -46,6 +46,8 @@ def create_normalized_opportunity(
     trust_score: float = 0.85,
     posted_at: Optional[datetime] = None,
     opportunity_id: Optional[str] = None,
+    is_verified_posting: bool = True,
+    company_domain_verified: Optional[bool] = None,
 ) -> PolymorphicOpportunity:
     """Helper to construct a validated, sanitized PolymorphicOpportunity with MinHash signature.
 
@@ -87,12 +89,19 @@ def create_normalized_opportunity(
         application_deadline=application_deadline,
     )
 
+    domain_verified = (
+        company_domain_verified
+        if company_domain_verified is not None
+        else (trust_score >= 0.80)
+    )
+
     return PolymorphicOpportunity(
         opportunity_id=opp_id,
         minhash_signature_hex=hex_digest,
         title=clean_title,
         company_name=clean_company,
-        company_domain_verified=trust_score >= 0.80,
+        company_domain_verified=domain_verified,
+        is_verified_posting=is_verified_posting,
         mapped_occupation_code=mapped_occupation_code,
         eligibility_rules=eligibility,
         skill_requirements=skill_requirements or [],

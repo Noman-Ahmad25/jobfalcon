@@ -12,6 +12,7 @@ from app.schemas.career_path import (
 from app.schemas.deduplication import DuplicateRecord, OpportunityCluster
 from app.schemas.eligibility import EligibilityResult
 from app.schemas.opportunity import PolymorphicOpportunity
+from app.schemas.orchestration import DiscoveryRun
 from app.schemas.profile import CandidateCareerProfile
 from app.schemas.ranking import RankingResponse
 
@@ -188,5 +189,35 @@ class CareerPathRepository(ABC):
     ) -> Optional[DevelopmentActionItem]:
         """Updates the status and artifact provenance for a specific development action."""
         raise NotImplementedError
+
+
+class DiscoveryRunRepository(ABC):
+    """Abstract port for persistent discovery run states and lifecycle telemetry."""
+
+    @abstractmethod
+    def save(self, run: DiscoveryRun) -> None:
+        """Persists or updates a discovery run."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get(self, run_id: str) -> Optional[DiscoveryRun]:
+        """Retrieves a discovery run by its run_id."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_latest_for_candidate(self, candidate_id: str) -> Optional[DiscoveryRun]:
+        """Retrieves the most recent discovery run for a candidate."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_for_candidate(self, candidate_id: str, limit: int = 10) -> list[DiscoveryRun]:
+        """Lists historical discovery runs for a candidate."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_active_run_for_candidate(self, candidate_id: str) -> Optional[DiscoveryRun]:
+        """Retrieves any currently executing (non-terminal) discovery run for a candidate."""
+        raise NotImplementedError
+
 
 

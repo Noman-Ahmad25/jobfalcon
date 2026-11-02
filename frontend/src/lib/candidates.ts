@@ -11,6 +11,10 @@ export interface CandidateEntry {
   profile: CandidateCareerProfile;
 }
 
+/** 
+ * @deprecated Demonstration profiles only. 
+ * Real local user profiles are persisted in SQLite and managed via `/api/v1/profile`.
+ */
 export const CANDIDATES: Record<string, CandidateEntry> = {
   'maya-chen-junior': {
     id: 'maya-chen-junior',

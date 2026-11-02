@@ -90,35 +90,57 @@ def extract_skills_from_text(
     return extracted
 
 
+def extract_experience_months_with_confidence(
+    text: str,
+    title: str = "",
+    default_months: int = 0,
+) -> tuple[int, bool]:
+    """Returns (months, is_confident).
+
+    is_confident=True means experience was explicitly stated OR strongly implied by a
+    seniority keyword in the title — a deterministic signal was found.
+    is_confident=False means no deterministic signal was found in the available text;
+    the caller should treat the requirement as UNCERTAIN rather than defaulting to 0.
+    """
+    full_text = f"{title} {text}".lower()
+
+    # Entry-level indicators: confident at 0 months required
+    if any(k in full_text for k in ("intern", "internship", "entry level", "entry-level", "junior", "associate", "new grad", "new-grad", "graduate")):
+        return 0, True
+
+    # Explicit year patterns: e.g., "5+ years", "3-5 years", "at least 4 years"
+    matches = re.findall(r"(\d+)\+?\s*(?:-\s*(\d+))?\s*(?:years?|yrs?)\b", full_text)
+    if matches:
+        years_found = [int(m[0]) for m in matches if m[0].isdigit() and 1 <= int(m[0]) <= 25]
+        if years_found:
+            return min(years_found) * 12, True
+
+    # Title seniority heuristics: deterministic signals from job title keywords
+    title_lower = title.lower()
+    if any(k in title_lower for k in ("principal", "director", "architect")):
+        return 96, True   # ~8 years
+    if any(k in title_lower for k in ("staff", "lead")):
+        return 72, True   # ~6 years
+    if "senior" in title_lower or "sr." in title_lower:
+        return 48, True   # ~4 years
+
+    # No deterministic signal found — caller should treat as UNCERTAIN
+    return default_months, False
+
+
 def extract_experience_months(
     text: str,
     title: str = "",
     default_months: int = 0,
 ) -> int:
-    """Extracts minimum experience requirements in months from title and description."""
-    full_text = f"{title} {text}".lower()
+    """Extracts minimum experience requirements in months from title and description.
 
-    # If title indicates intern or entry level, return 0
-    if any(k in full_text for k in ("intern", "internship", "entry level", "junior", "associate", "new grad")):
-        return 0
-
-    # Look for numeric year patterns: e.g., "5+ years", "3-5 years", "at least 4 years"
-    matches = re.findall(r"(\d+)\+?\s*(?:-\s*(\d+))?\s*(?:years?|yrs?)\b", full_text)
-    if matches:
-        # Use the lowest stated year bound
-        years_found = [int(m[0]) for m in matches if m[0].isdigit() and 1 <= int(m[0]) <= 20]
-        if years_found:
-            return min(years_found) * 12
-
-    # Title-based heuristic fallback if senior / lead / staff
-    if any(k in title.lower() for k in ("principal", "director", "architect")):
-        return 96  # 8 years
-    if any(k in title.lower() for k in ("staff", "lead")):
-        return 72  # 6 years
-    if "senior" in title.lower() or "sr." in title.lower():
-        return 48  # 4 years
-
-    return default_months
+    Thin backward-compatible wrapper around extract_experience_months_with_confidence.
+    Discards the confidence flag; use extract_experience_months_with_confidence directly
+    when the caller needs to distinguish 'confirmed 0' from 'unknown'.
+    """
+    months, _ = extract_experience_months_with_confidence(text, title, default_months)
+    return months
 
 
 def determine_work_mode(

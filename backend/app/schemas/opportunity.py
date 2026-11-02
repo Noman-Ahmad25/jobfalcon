@@ -42,8 +42,12 @@ class OpportunityEligibilityRules(BaseModel):
     )
     min_experience_months: int = Field(
         default=0,
-        ge=0,
-        description="Minimum mandatory full-time experience in months.",
+        ge=-1,
+        description=(
+            "Minimum mandatory full-time experience in months. "
+            "-1 is a sentinel value meaning 'unknown / not determinable from available metadata'; "
+            "the eligibility engine will treat this as UNCERTAIN rather than 0."
+        ),
     )
     max_experience_months: Optional[int] = Field(
         default=None,
@@ -134,6 +138,10 @@ class PolymorphicOpportunity(BaseModel):
     company_domain_verified: bool = Field(
         default=False,
         description="True if company email domain and corporate web presence have been verified.",
+    )
+    is_verified_posting: bool = Field(
+        default=True,
+        description="True if verified direct ATS requisition; False for unverified web discovery leads.",
     )
     mapped_occupation_code: str = Field(
         ...,

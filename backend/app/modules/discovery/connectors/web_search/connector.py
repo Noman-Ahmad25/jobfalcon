@@ -195,10 +195,13 @@ class WebSearchConnector(BaseDiscoveryConnector):
 
         # 3. Filter and Classify Job Results
         opportunities: list[PolymorphicOpportunity] = []
+        rejected_by_code: dict[str, int] = {}
         for raw in raw_results:
-            is_job, reason = JobSearchResultClassifier.evaluate(raw, query)
-            if not is_job:
-                logger.debug("Filtered out web search result '%s': %s", raw.title, reason)
+            eval_res = JobSearchResultClassifier.evaluate(raw, query)
+            if not eval_res.is_job:
+                code_str = eval_res.rejection_code.value if eval_res.rejection_code else "FILTERED"
+                rejected_by_code[code_str] = rejected_by_code.get(code_str, 0) + 1
+                logger.debug("Filtered out web search result '%s': %s (code=%s)", raw.title, eval_res.reason, code_str)
                 continue
 
             opp = normalize_search_result_to_opportunity(raw, query)
@@ -214,8 +217,9 @@ class WebSearchConnector(BaseDiscoveryConnector):
             status=status,
             opportunities=opportunities,
             raw_count=len(raw_results),
+            rejections_by_code=rejected_by_code,
             latency_ms=elapsed,
-            error_message=None,
+            error_message=None if opportunities else f"Filtered out {len(raw_results)} unverified/non-job search results.",
         )
 
     def _build_search_query_string(self, query: DiscoverySearchQuery) -> str:

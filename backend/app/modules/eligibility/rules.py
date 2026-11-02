@@ -21,6 +21,7 @@ from app.schemas.eligibility import (
     UNCERT_LOCATION_UNRESTRICTED,
     UNCERT_NO_DEADLINE_SPECIFIED,
     UNCERT_OPPORTUNITY_LOCATION_UNSPECIFIED,
+    UNCERT_EXPERIENCE_REQUIREMENT_UNKNOWN,
     ConstraintCheckResult,
     ConstraintStatus,
 )
@@ -211,6 +212,15 @@ def check_experience_duration(
     cand_exp = candidate.eligibility_constraints.total_full_time_experience_months
     min_exp = opportunity.eligibility_rules.min_experience_months
     max_exp = opportunity.eligibility_rules.max_experience_months
+
+    if min_exp < 0:
+        return ConstraintCheckResult(
+            constraint_name="experience_duration",
+            status=ConstraintStatus.UNCERTAIN,
+            rule_code=UNCERT_EXPERIENCE_REQUIREMENT_UNKNOWN,
+            message="Experience requirement could not be determined from available opportunity metadata.",
+            details={"candidate_months": cand_exp, "min_experience_months": "unknown"},
+        )
 
     if cand_exp < min_exp:
         return ConstraintCheckResult(

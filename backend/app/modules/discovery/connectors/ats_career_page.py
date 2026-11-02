@@ -155,22 +155,33 @@ class CompanyCareerPageConnector(BaseDiscoveryConnector):
         if not self._mock_mode:
             try:
                 live_opps = await self._search_live_ats(query, limit)
-                if live_opps:
-                    elapsed = round((time.perf_counter() - t0) * 1000, 2)
-                    return DiscoveryConnectorResult(
-                        connector_id=self.connector_id,
-                        source_name=self.source_name,
-                        query_id=query.query_id,
-                        status=ConnectorStatus.CONNECTED,
-                        opportunities=live_opps,
-                        raw_count=len(live_opps),
-                        latency_ms=elapsed,
-                        error_message=None,
-                    )
+                elapsed = round((time.perf_counter() - t0) * 1000, 2)
+                status = ConnectorStatus.CONNECTED if len(live_opps) > 0 else ConnectorStatus.DEGRADED
+                return DiscoveryConnectorResult(
+                    connector_id=self.connector_id,
+                    source_name=self.source_name,
+                    query_id=query.query_id,
+                    status=status,
+                    opportunities=live_opps,
+                    raw_count=len(live_opps),
+                    latency_ms=elapsed,
+                    error_message=None if live_opps else "No active ATS postings matched query.",
+                )
             except Exception as exc:
-                logger.warning("Live ATS search failed; falling back to deterministic fixtures: %s", exc)
+                elapsed = round((time.perf_counter() - t0) * 1000, 2)
+                logger.warning("Live ATS search failed: %s", exc)
+                return DiscoveryConnectorResult(
+                    connector_id=self.connector_id,
+                    source_name=self.source_name,
+                    query_id=query.query_id,
+                    status=ConnectorStatus.ERROR,
+                    opportunities=[],
+                    raw_count=0,
+                    latency_ms=elapsed,
+                    error_message=f"Live ATS search error: {exc!s}",
+                )
 
-        # 2. Deterministic Fixture Branch (when mock_mode=True or live failed)
+        # 2. Deterministic Fixture Branch (strictly when mock_mode=True)
         fixture_opps = self._generate_fixture_opportunities(query, limit)
         elapsed = round((time.perf_counter() - t0) * 1000, 2)
         status = ConnectorStatus.MOCKED_FALLBACK

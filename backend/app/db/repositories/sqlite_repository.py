@@ -8,6 +8,7 @@ from app.db.connection import DatabaseManager, db_manager
 from app.db.repositories.interfaces import (
     CandidateProfileRepository,
     CareerPathRepository,
+    DiscoveryRunRepository,
     DuplicateClusterRepository,
     EligibilityAuditRepository,
     OpportunityRepository,
@@ -36,6 +37,17 @@ from app.schemas.profile import (
     CandidateCareerProfile,
     CandidateEligibilityProfile,
     CareerPathNode,
+)
+from app.schemas.discovery import ConnectorHealthReport
+from app.schemas.orchestration import (
+    AdaptationEvent,
+    AdaptiveDiscoveryResponse,
+    CoverageAssessment,
+    DiscoveryRun,
+    DiscoveryRunStatus,
+    SearchStrategy,
+    TerminationReason,
+    WorkflowTimelineEvent,
 )
 from app.schemas.ranking import RankedOpportunity, RankingResponse
 
@@ -116,6 +128,7 @@ class SQLiteCandidateProfileRepository(CandidateProfileRepository):
 
             return CandidateCareerProfile(
                 user_id=profile_row["user_id"],
+                display_name=profile_row["display_name"] if "display_name" in profile_row.keys() else None,
                 profile_version=profile_row["profile_version"],
                 assessed_skills=assessed_skills,
                 current_career_path=current_path,
@@ -141,11 +154,12 @@ class SQLiteCandidateProfileRepository(CandidateProfileRepository):
             conn.execute(
                 """
                 INSERT INTO candidate_profiles (
-                    user_id, profile_version, overall_confidence, constraints_json,
+                    user_id, display_name, profile_version, overall_confidence, constraints_json,
                     target_career_paths_json, adjacent_career_paths_json,
                     current_career_path_json, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(user_id) DO UPDATE SET
+                    display_name = excluded.display_name,
                     profile_version = excluded.profile_version,
                     overall_confidence = excluded.overall_confidence,
                     constraints_json = excluded.constraints_json,
@@ -156,6 +170,7 @@ class SQLiteCandidateProfileRepository(CandidateProfileRepository):
                 """,
                 (
                     profile.user_id,
+                    profile.display_name,
                     profile.profile_version,
                     profile.overall_profile_confidence,
                     constraints_json,
@@ -882,5 +897,205 @@ class SQLiteCareerPathRepository(CareerPathRepository):
         plan.updated_at = now_utc
         self.save_development_plan(plan)
         return target_action
+
+
+class SQLiteDiscoveryRunRepository(DiscoveryRunRepository):
+    """SQLite implementation of DiscoveryRunRepository for durable workflow persistence."""
+
+    TERMINAL_STATUSES = {
+        DiscoveryRunStatus.COMPLETED,
+        DiscoveryRunStatus.FAILED,
+        DiscoveryRunStatus.CANCELLED,
+        DiscoveryRunStatus.PARTIALLY_COMPLETED,
+    }
+
+    def __init__(self, manager: Optional[DatabaseManager] = None) -> None:
+        self.manager = manager or db_manager
+
+    def save(self, run: DiscoveryRun) -> None:
+        """Persists or updates a discovery run idempotently."""
+        conn_health_json = json.dumps([h.model_dump(mode="json") for h in run.connector_health])
+        events_json = json.dumps([e.model_dump(mode="json") for e in run.timeline_events])
+        adapt_json = json.dumps([a.model_dump(mode="json") for a in run.adaptation_history])
+        strat_json = run.search_strategy.model_dump_json() if run.search_strategy else None
+        cov_json = run.coverage_assessment.model_dump_json() if run.coverage_assessment else None
+        canon_ids_json = json.dumps(run.canonical_opportunity_ids)
+        elig_ids_json = json.dumps(run.eligible_opportunity_ids)
+        resp_json = run.response.model_dump_json() if run.response else None
+
+        sql = """
+            INSERT INTO discovery_runs (
+                run_id, candidate_id, status, termination_reason,
+                started_at, completed_at, iterations_completed, total_tool_calls,
+                target_coverage_goal, connector_health_json, timeline_events_json,
+                adaptation_history_json, search_strategy_json, coverage_assessment_json,
+                total_discovered_raw, canonical_count, duplicate_count,
+                eligible_count, uncertain_count, ineligible_count,
+                canonical_opportunity_ids_json, eligible_opportunity_ids_json,
+                response_json, error_message, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(run_id) DO UPDATE SET
+                status = excluded.status,
+                termination_reason = excluded.termination_reason,
+                completed_at = excluded.completed_at,
+                iterations_completed = excluded.iterations_completed,
+                total_tool_calls = excluded.total_tool_calls,
+                target_coverage_goal = excluded.target_coverage_goal,
+                connector_health_json = excluded.connector_health_json,
+                timeline_events_json = excluded.timeline_events_json,
+                adaptation_history_json = excluded.adaptation_history_json,
+                search_strategy_json = excluded.search_strategy_json,
+                coverage_assessment_json = excluded.coverage_assessment_json,
+                total_discovered_raw = excluded.total_discovered_raw,
+                canonical_count = excluded.canonical_count,
+                duplicate_count = excluded.duplicate_count,
+                eligible_count = excluded.eligible_count,
+                uncertain_count = excluded.uncertain_count,
+                ineligible_count = excluded.ineligible_count,
+                canonical_opportunity_ids_json = excluded.canonical_opportunity_ids_json,
+                eligible_opportunity_ids_json = excluded.eligible_opportunity_ids_json,
+                response_json = excluded.response_json,
+                error_message = excluded.error_message,
+                updated_at = excluded.updated_at;
+        """
+
+        now_str = datetime.now(timezone.utc).isoformat()
+        with self.manager.transaction() as conn:
+            conn.execute(
+                sql,
+                (
+                    run.run_id,
+                    run.candidate_id,
+                    run.status.value,
+                    run.termination_reason.value if run.termination_reason else None,
+                    run.started_at.isoformat(),
+                    run.completed_at.isoformat() if run.completed_at else None,
+                    run.iterations_completed,
+                    run.total_tool_calls,
+                    run.target_coverage_goal,
+                    conn_health_json,
+                    events_json,
+                    adapt_json,
+                    strat_json,
+                    cov_json,
+                    run.total_discovered_raw,
+                    run.canonical_count,
+                    run.duplicate_count,
+                    run.eligible_count,
+                    run.uncertain_count,
+                    run.ineligible_count,
+                    canon_ids_json,
+                    elig_ids_json,
+                    resp_json,
+                    run.error_message,
+                    run.created_at.isoformat() if run.created_at else now_str,
+                    now_str,
+                ),
+            )
+
+    def _row_to_run(self, row: sqlite3.Row) -> DiscoveryRun:
+        response = (
+            AdaptiveDiscoveryResponse.model_validate_json(row["response_json"])
+            if row["response_json"]
+            else None
+        )
+        connector_health = [
+            ConnectorHealthReport.model_validate(h)
+            for h in json.loads(row["connector_health_json"] or "[]")
+        ]
+        timeline_events = [
+            WorkflowTimelineEvent.model_validate(e)
+            for e in json.loads(row["timeline_events_json"] or "[]")
+        ]
+        adaptation_history = [
+            AdaptationEvent.model_validate(a)
+            for a in json.loads(row["adaptation_history_json"] or "[]")
+        ]
+        search_strategy = (
+            SearchStrategy.model_validate_json(row["search_strategy_json"])
+            if row["search_strategy_json"]
+            else None
+        )
+        coverage_assessment = (
+            CoverageAssessment.model_validate_json(row["coverage_assessment_json"])
+            if row["coverage_assessment_json"]
+            else None
+        )
+        term_reason = (
+            TerminationReason(row["termination_reason"])
+            if row["termination_reason"]
+            else None
+        )
+
+        return DiscoveryRun(
+            run_id=row["run_id"],
+            candidate_id=row["candidate_id"],
+            status=DiscoveryRunStatus(row["status"]),
+            termination_reason=term_reason,
+            started_at=datetime.fromisoformat(row["started_at"]),
+            completed_at=datetime.fromisoformat(row["completed_at"]) if row["completed_at"] else None,
+            iterations_completed=row["iterations_completed"],
+            total_tool_calls=row["total_tool_calls"],
+            target_coverage_goal=row["target_coverage_goal"],
+            connector_health=connector_health,
+            timeline_events=timeline_events,
+            adaptation_history=adaptation_history,
+            search_strategy=search_strategy,
+            coverage_assessment=coverage_assessment,
+            total_discovered_raw=row["total_discovered_raw"],
+            canonical_count=row["canonical_count"],
+            duplicate_count=row["duplicate_count"],
+            eligible_count=row["eligible_count"],
+            uncertain_count=row["uncertain_count"],
+            ineligible_count=row["ineligible_count"],
+            canonical_opportunity_ids=json.loads(row["canonical_opportunity_ids_json"] or "[]"),
+            eligible_opportunity_ids=json.loads(row["eligible_opportunity_ids_json"] or "[]"),
+            response=response,
+            error_message=row["error_message"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+            updated_at=datetime.fromisoformat(row["updated_at"]),
+        )
+
+    def get(self, run_id: str) -> Optional[DiscoveryRun]:
+        with self.manager.read_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM discovery_runs WHERE run_id = ?;", (run_id,)
+            ).fetchone()
+            if not row:
+                return None
+            return self._row_to_run(row)
+
+    def get_latest_for_candidate(self, candidate_id: str) -> Optional[DiscoveryRun]:
+        with self.manager.read_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM discovery_runs WHERE candidate_id = ? ORDER BY created_at DESC LIMIT 1;",
+                (candidate_id,),
+            ).fetchone()
+            if not row:
+                return None
+            return self._row_to_run(row)
+
+    def list_for_candidate(self, candidate_id: str, limit: int = 10) -> list[DiscoveryRun]:
+        with self.manager.read_connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM discovery_runs WHERE candidate_id = ? ORDER BY created_at DESC LIMIT ?;",
+                (candidate_id, limit),
+            ).fetchall()
+            return [self._row_to_run(r) for r in rows]
+
+    def get_active_run_for_candidate(self, candidate_id: str) -> Optional[DiscoveryRun]:
+        terminal_values = tuple(s.value for s in self.TERMINAL_STATUSES)
+        placeholders = ",".join("?" for _ in terminal_values)
+        query = f"""
+            SELECT * FROM discovery_runs
+            WHERE candidate_id = ? AND status NOT IN ({placeholders})
+            ORDER BY created_at DESC LIMIT 1;
+        """
+        with self.manager.read_connection() as conn:
+            row = conn.execute(query, (candidate_id, *terminal_values)).fetchone()
+            if not row:
+                return None
+            return self._row_to_run(row)
+
 
 

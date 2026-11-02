@@ -145,7 +145,20 @@ class JobSpyMCPConnector(BaseDiscoveryConnector):
             )
 
         # 1. Live MCP Execution Branch
-        if not self._mock_mode and self.client.is_binary_available():
+        if not self._mock_mode:
+            if not self.client.is_binary_available():
+                elapsed = round((time.perf_counter() - t0) * 1000, 2)
+                return DiscoveryConnectorResult(
+                    connector_id=self.connector_id,
+                    source_name=self.source_name,
+                    query_id=query.query_id,
+                    status=ConnectorStatus.UNAVAILABLE_MISSING_BINARY,
+                    opportunities=[],
+                    raw_count=0,
+                    latency_ms=elapsed,
+                    error_message=f"JobSpy MCP binary '{self.client.binary_name}' is not installed in PATH.",
+                )
+
             try:
                 live_opps = await self._search_via_mcp(query, limit)
                 elapsed = round((time.perf_counter() - t0) * 1000, 2)
@@ -173,9 +186,19 @@ class JobSpyMCPConnector(BaseDiscoveryConnector):
                     )
             except Exception as exc:
                 elapsed = round((time.perf_counter() - t0) * 1000, 2)
-                logger.warning("Live MCP search failed: %s; falling back to deterministic fixtures", exc)
+                logger.warning("Live MCP search failed: %s", exc)
+                return DiscoveryConnectorResult(
+                    connector_id=self.connector_id,
+                    source_name=self.source_name,
+                    query_id=query.query_id,
+                    status=ConnectorStatus.ERROR,
+                    opportunities=[],
+                    raw_count=0,
+                    latency_ms=elapsed,
+                    error_message=f"Live MCP execution error: {exc!s}",
+                )
 
-        # 2. Deterministic Fixture Branch
+        # 2. Deterministic Fixture Branch (strictly when mock_mode=True)
         fixture_opps = self._generate_fixture_opportunities(query, limit)
         elapsed = round((time.perf_counter() - t0) * 1000, 2)
         return DiscoveryConnectorResult(

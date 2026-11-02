@@ -155,6 +155,10 @@ class CandidateCareerProfile(BaseModel):
         ...,
         description="Unique identifier of the candidate account.",
     )
+    display_name: Optional[str] = Field(
+        default=None,
+        description="Human-readable display name for the candidate (e.g. 'Jane Doe').",
+    )
     profile_version: int = Field(
         default=1,
         ge=1,
@@ -187,3 +191,48 @@ class CandidateCareerProfile(BaseModel):
         le=1.0,
         description="Aggregate epistemic confidence across all assessed profile attributes.",
     )
+
+
+class CandidateProfileSummary(BaseModel):
+    """Concise representation of a candidate profile for listing and selector UI."""
+
+    user_id: str
+    display_name: str
+    overall_profile_confidence: float
+    profile_version: int
+    skill_count: int
+    target_role: Optional[str] = None
+
+
+class StructuredProfileSkillInput(BaseModel):
+    """Input payload for a single self-reported or verified skill during onboarding."""
+
+    skill_name: str = Field(..., min_length=1, max_length=100)
+    proficiency_score: float = Field(default=7.0, ge=1.0, le=10.0)
+    evidence_snippet: str = Field(default="", max_length=1000)
+
+
+class StructuredProfileCreateRequest(BaseModel):
+    """Deterministic, structured profile creation payload bypassing LLM inference."""
+
+    user_id: str = Field(..., min_length=2, max_length=80)
+    display_name: str = Field(..., min_length=1, max_length=150)
+    headline: Optional[str] = Field(default=None, max_length=200)
+    highest_degree_level: DegreeLevel = Field(default=DegreeLevel.BACHELORS)
+    is_currently_enrolled_student: bool = Field(default=False)
+    expected_graduation_date: Optional[date] = None
+    total_full_time_experience_months: int = Field(default=0, ge=0)
+    authorized_country_codes: list[str] = Field(default_factory=lambda: ["US"])
+    requires_visa_sponsorship: bool = Field(default=False)
+    allowed_opportunity_categories: list[OpportunityCategory] = Field(
+        default_factory=lambda: [OpportunityCategory.FULL_TIME_JOB]
+    )
+    allowed_work_modes: list[WorkMode] = Field(
+        default_factory=lambda: [WorkMode.REMOTE, WorkMode.HYBRID]
+    )
+    preferred_locations: list[str] = Field(default_factory=list)
+    target_role_title: str = Field(default="Software Engineer", min_length=2, max_length=200)
+    target_occupation_code: str = Field(default="15-1252.00")
+    adjacent_role_title: Optional[str] = Field(default=None, max_length=200)
+    adjacent_occupation_code: Optional[str] = None
+    initial_skills: list[StructuredProfileSkillInput] = Field(default_factory=list)

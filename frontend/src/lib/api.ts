@@ -3,10 +3,12 @@ import {
   AdaptiveDiscoveryRequest,
   AdaptiveDiscoveryResponse,
   CandidateCareerProfile,
+  CandidateProfileSummary,
   CandidateProfilingRequest,
   CandidateProfilingResponse,
   ConnectorHealthReport,
   DiscoveryQueryPlan,
+  DiscoveryRun,
   DiscoveryRunRequest,
   DiscoveryRunResponse,
   PipelineEvaluationRequest,
@@ -21,6 +23,7 @@ import {
   PersonalizedDevelopmentPlan,
   DevelopmentActionItem,
   UpdateActionProgressRequest,
+  StructuredProfileCreateRequest,
 } from '@/types/domain';
 
 const DEFAULT_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -167,8 +170,48 @@ export async function runAdaptiveDiscovery(
   return fetchFromApi<AdaptiveDiscoveryResponse>('/api/v1/orchestration/discovery/run', {
     method: 'POST',
     body: JSON.stringify(payload),
-    timeoutMs: 25000,
+    timeoutMs: 30000,
   });
+}
+
+export async function startDiscoveryRun(
+  payload: AdaptiveDiscoveryRequest
+): Promise<DiscoveryRun> {
+  return fetchFromApi<DiscoveryRun>('/api/v1/orchestration/discovery/start', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    timeoutMs: 10000,
+  });
+}
+
+export async function getDiscoveryRun(runId: string): Promise<DiscoveryRun> {
+  return fetchFromApi<DiscoveryRun>(`/api/v1/orchestration/discovery/runs/${encodeURIComponent(runId)}`, {
+    method: 'GET',
+    timeoutMs: 8000,
+  });
+}
+
+export async function getLatestDiscoveryRunForCandidate(
+  candidateId: string
+): Promise<DiscoveryRun | null> {
+  try {
+    return await fetchFromApi<DiscoveryRun>(
+      `/api/v1/orchestration/discovery/candidate/${encodeURIComponent(candidateId)}/latest-run`,
+      {
+        method: 'GET',
+        timeoutMs: 8000,
+      }
+    );
+  } catch (err: unknown) {
+    if (err instanceof ApiError && err.statusCode === 404) {
+      return null;
+    }
+    throw err;
+  }
+}
+
+export function getDiscoveryRunStreamUrl(runId: string): string {
+  return `${DEFAULT_API_URL}/api/v1/orchestration/discovery/runs/${encodeURIComponent(runId)}/stream`;
 }
 
 export async function evaluateAndRankOpportunities(
@@ -343,8 +386,50 @@ export async function refreshCareerPathAssessment(
   );
 }
 
+// =============================================================================
+// Profile Lifecycle: List, Create, Update, Delete
+// =============================================================================
 
+/** List all stored candidate profile summaries from the backend repository. */
+export async function listProfiles(): Promise<CandidateProfileSummary[]> {
+  return fetchFromApi<CandidateProfileSummary[]>('/api/v1/profile/', {
+    method: 'GET',
+    timeoutMs: 5000,
+  });
+}
 
+/** Create a new candidate profile from structured form fields (no LLM). */
+export async function createStructuredProfile(
+  data: StructuredProfileCreateRequest
+): Promise<CandidateCareerProfile> {
+  return fetchFromApi<CandidateCareerProfile>('/api/v1/profile/create-structured', {
+    method: 'POST',
+    body: JSON.stringify(data),
+    timeoutMs: 8000,
+  });
+}
 
+/** Update (overwrite) a stored candidate profile by user_id. */
+export async function updateCandidateProfile(
+  userId: string,
+  profile: CandidateCareerProfile
+): Promise<CandidateCareerProfile> {
+  return fetchFromApi<CandidateCareerProfile>(
+    `/api/v1/profile/${encodeURIComponent(userId)}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(profile),
+      timeoutMs: 8000,
+    }
+  );
+}
+
+/** Permanently delete a candidate profile from the repository. */
+export async function deleteCandidateProfile(userId: string): Promise<void> {
+  await fetchFromApi<void>(`/api/v1/profile/${encodeURIComponent(userId)}`, {
+    method: 'DELETE',
+    timeoutMs: 5000,
+  });
+}
 
 

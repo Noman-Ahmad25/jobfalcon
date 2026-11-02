@@ -13,6 +13,25 @@ from app.schemas.opportunity import PolymorphicOpportunity
 from app.schemas.profile import CandidateCareerProfile
 
 
+class OpportunityRejectionCode(str, Enum):
+    """Reason codes for opportunity rejection at the verification / classification stage."""
+
+    INVALID_URL = "INVALID_URL"
+    PLACEHOLDER_DOMAIN = "PLACEHOLDER_DOMAIN"
+    SYNTHETIC_RESULT = "SYNTHETIC_RESULT"
+    NOT_AN_OPPORTUNITY = "NOT_AN_OPPORTUNITY"
+    COLLECTION_PAGE = "COLLECTION_PAGE"
+    INFORMATIONAL_CONTENT = "INFORMATIONAL_CONTENT"
+    EXPIRED = "EXPIRED"
+    EXPERIENCE_MISMATCH = "EXPERIENCE_MISMATCH"
+    CATEGORY_MISMATCH = "CATEGORY_MISMATCH"
+    COUNTRY_UNAUTHORIZED = "COUNTRY_UNAUTHORIZED"
+    DUPLICATE = "DUPLICATE"
+    UNVERIFIABLE = "UNVERIFIABLE"
+    OTHER_HARD_CONSTRAINT = "OTHER_HARD_CONSTRAINT"
+    INSUFFICIENT_INDICATORS = "INSUFFICIENT_INDICATORS"
+
+
 class ConnectorStatus(str, Enum):
     """Operational status of an external opportunity discovery connector."""
 
@@ -222,6 +241,10 @@ class DiscoveryConnectorResult(BaseModel):
     trust_level: str = Field(
         default="untrusted_external_data",
         description="Data provenance trust classification.",
+    )
+    rejections_by_code: dict[str, int] = Field(
+        default_factory=dict,
+        description="Lead rejection count breakdown by OpportunityRejectionCode.",
     )
 
 

@@ -46,7 +46,10 @@ from app.schemas.profile import (
     AssessedSkill,
     CandidateCareerProfile,
     CandidateEligibilityProfile,
+    CandidateProfileSummary,
     CareerPathNode,
+    StructuredProfileCreateRequest,
+    StructuredProfileSkillInput,
 )
 
 from app.schemas.discovery import (
@@ -65,6 +68,9 @@ from app.schemas.orchestration import (
     AdaptiveDiscoveryRequest,
     AdaptiveDiscoveryResponse,
     CoverageAssessment,
+    DiscoveryRun,
+    DiscoveryRunStatus,
+    DiscoveryRunStreamEvent,
     SearchStrategy,
     TerminationReason,
     WorkflowStage,
@@ -210,6 +216,9 @@ __all__ = [
     "AdaptationEvent",
     "AdaptiveDiscoveryRequest",
     "AdaptiveDiscoveryResponse",
+    "DiscoveryRunStatus",
+    "DiscoveryRun",
+    "DiscoveryRunStreamEvent",
     # Ranking
     "RankingDimension",
     "DEFAULT_RANKING_WEIGHTS",

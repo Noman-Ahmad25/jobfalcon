@@ -113,6 +113,12 @@ class Settings(BaseSettings):
         description="Default target country for JobSpy MCP scrapers (e.g., 'usa', 'uk', 'canada')",
     )
 
+    # Demo Data Seeding
+    SEED_DEMO_DATA: bool = Field(
+        default=False,
+        description="If True, seeds demo candidate profiles and opportunities on startup. Disable in real local-user mode.",
+    )
+
     # CORS Settings
     CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
 

@@ -106,6 +106,21 @@ class CoverageAssessment(BaseModel):
         ge=0,
         description="Number of canonical opportunities passing deterministic eligibility.",
     )
+    verified_opportunity_count: int = Field(
+        default=0,
+        ge=0,
+        description="Number of canonical opportunities with verified individual posting authenticity.",
+    )
+    duplicate_rate: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Fraction of retrieved listings that were redundant duplicates.",
+    )
+    quality_summary: str = Field(
+        default="",
+        description="Summary of lead authenticity, verification ratio, and source precision.",
+    )
     target_role_coverage: dict[str, int] = Field(
         default_factory=dict,
         description="Count of eligible canonical opportunities per role title.",
@@ -308,7 +323,101 @@ class AdaptiveDiscoveryResponse(BaseModel):
         default_factory=list,
         description="Observable timeline of workflow stages and actions.",
     )
+    rejections_by_code: dict[str, int] = Field(
+        default_factory=dict,
+        description="Structured count of lead rejections categorized by OpportunityRejectionCode.",
+    )
+    sources_queried: list[str] = Field(
+        default_factory=list,
+        description="List of external connector sources queried during the workflow.",
+    )
+    verified_opportunity_count: int = Field(
+        default=0,
+        ge=0,
+        description="Number of canonical opportunities with verified posting authentications.",
+    )
     execution_metadata: dict[str, Any] = Field(
         default_factory=dict,
         description="Telemetry metadata (duration_ms, query hashes, token budgets).",
     )
+
+
+class DiscoveryRunStatus(str, Enum):
+    """Lifecycle status of a persistent discovery run."""
+
+    CREATED = "CREATED"
+    INITIALIZING = "INITIALIZING"
+    STRATEGY_FORMULATION = "STRATEGY_FORMULATION"
+    SEARCHING = "SEARCHING"
+    COLLECTING = "COLLECTING"
+    NORMALIZING = "NORMALIZING"
+    DEDUPLICATING = "DEDUPLICATING"
+    EVALUATING = "EVALUATING"
+    RANKING = "RANKING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+    PARTIALLY_COMPLETED = "PARTIALLY_COMPLETED"
+
+
+class DiscoveryRun(BaseModel):
+    """Persistent, durable record of an agentic opportunity discovery workflow execution."""
+
+    run_id: str = Field(..., description="Unique run identifier (e.g. 'run-wf-1234abcd').")
+    candidate_id: str = Field(..., description="Target candidate identifier.")
+    status: DiscoveryRunStatus = Field(
+        default=DiscoveryRunStatus.CREATED,
+        description="Current lifecycle status of the discovery run.",
+    )
+    termination_reason: Optional[TerminationReason] = Field(
+        default=None,
+        description="Authoritative termination reason upon completion.",
+    )
+    started_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Timestamp when the discovery run was initiated.",
+    )
+    completed_at: Optional[datetime] = Field(
+        default=None,
+        description="Timestamp when the run reached terminal status.",
+    )
+    iterations_completed: int = Field(default=0, ge=0)
+    total_tool_calls: int = Field(default=0, ge=0)
+    target_coverage_goal: int = Field(default=5, ge=1)
+    connector_health: list[ConnectorHealthReport] = Field(default_factory=list)
+    timeline_events: list[WorkflowTimelineEvent] = Field(default_factory=list)
+    adaptation_history: list[AdaptationEvent] = Field(default_factory=list)
+    search_strategy: Optional[SearchStrategy] = None
+    coverage_assessment: Optional[CoverageAssessment] = None
+    total_discovered_raw: int = Field(default=0, ge=0)
+    canonical_count: int = Field(default=0, ge=0)
+    duplicate_count: int = Field(default=0, ge=0)
+    eligible_count: int = Field(default=0, ge=0)
+    uncertain_count: int = Field(default=0, ge=0)
+    ineligible_count: int = Field(default=0, ge=0)
+    verified_opportunity_count: int = Field(default=0, ge=0)
+    rejections_by_code: dict[str, int] = Field(default_factory=dict)
+    sources_queried: list[str] = Field(default_factory=list)
+    canonical_opportunity_ids: list[str] = Field(default_factory=list)
+    eligible_opportunity_ids: list[str] = Field(default_factory=list)
+    response: Optional[AdaptiveDiscoveryResponse] = Field(
+        default=None,
+        description="Complete serialized response available once run completes.",
+    )
+    error_message: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class DiscoveryRunStreamEvent(BaseModel):
+    """Server-Sent Event payload broadcast during discovery workflow execution."""
+
+    run_id: str
+    candidate_id: str
+    status: DiscoveryRunStatus
+    event_type: str
+    summary: str
+    stage: Optional[WorkflowStage] = None
+    data: dict[str, Any] = Field(default_factory=dict)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+

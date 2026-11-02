@@ -60,11 +60,13 @@ class DatabaseManager:
         return conn
 
     def initialize_schema(self) -> None:
-        """Applies initial schema migrations if tables do not exist."""
+        """Applies initial schema DDL and incremental column migrations idempotently."""
         if not self._is_sqlite:
             return
 
-        migration_file = Path(__file__).parent / "migrations" / "001_initial_schema_sqlite.sql"
+        migrations_dir = Path(__file__).parent / "migrations"
+
+        migration_file = migrations_dir / "001_initial_schema_sqlite.sql"
         if not migration_file.exists():
             raise FileNotFoundError(f"Migration script not found at {migration_file}")
 
@@ -77,6 +79,23 @@ class DatabaseManager:
             self._initialized = True
         finally:
             conn.close()
+
+        # Apply incremental migrations (002+), tolerating already-applied statements
+        incremental = sorted(migrations_dir.glob("0[0-9][2-9]_*.sql"))
+        for inc_path in incremental:
+            with open(inc_path, "r", encoding="utf-8") as f:
+                statements = [s.strip() for s in f.read().split(";") if s.strip()]
+            conn = self.get_raw_connection()
+            try:
+                for stmt in statements:
+                    try:
+                        conn.execute(stmt)
+                    except sqlite3.OperationalError:
+                        # Tolerate "duplicate column name" and similar idempotent errors
+                        pass
+                conn.commit()
+            finally:
+                conn.close()
 
     @contextmanager
     def read_connection(self) -> Generator[sqlite3.Connection, None, None]:
