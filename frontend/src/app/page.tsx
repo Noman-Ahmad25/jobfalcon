@@ -6,14 +6,10 @@ import { CANDIDATES } from '@/lib/candidates';
 import { CandidateCareerProfile, CandidateProfileSummary } from '@/types/domain';
 import { getBackendHealth, listProfiles, getCandidateProfile } from '@/lib/api';
 import { DiscoveryWorkspace } from '@/components/workspaces/DiscoveryWorkspace';
-import { MarketSearchWorkspace } from '@/components/workspaces/MarketSearchWorkspace';
-import { MarketIntelligenceWorkspace } from '@/components/workspaces/MarketIntelligenceWorkspace';
 import { ProfileWorkspace } from '@/components/workspaces/ProfileWorkspace';
-import { DevelopmentWorkspace } from '@/components/workspaces/DevelopmentWorkspace';
-import { CareerPathWorkspace } from '@/components/workspaces/CareerPathWorkspace';
 import { OnboardingScreen } from '@/components/onboarding/OnboardingScreen';
-import { getStoredTheme, applyTheme, ThemeMode } from '@/lib/theme';
-import { Users, UserPlus, Loader2 } from 'lucide-react';
+import { applyTheme, ThemeMode, useIsDarkMode } from '@/lib/theme';
+import { Loader2 } from 'lucide-react';
 
 const KNOWN_DEMO_IDS = new Set([
   'maya-chen-junior',
@@ -34,18 +30,11 @@ export default function Home() {
   const [backendOnline, setBackendOnline] = useState<boolean>(true);
   const [isLoadingProfile, setIsLoadingProfile] = useState<boolean>(true);
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
-  const [isDevMode, setIsDevMode] = useState<boolean>(false);
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    const saved = getStoredTheme();
-    applyTheme(saved);
-    return document.documentElement.classList.contains('dark');
-  });
+  const isDarkMode = useIsDarkMode();
 
   const handleToggleTheme = () => {
     const nextMode: ThemeMode = isDarkMode ? 'light' : 'dark';
     applyTheme(nextMode);
-    setIsDarkMode(!isDarkMode);
   };
 
   // Load a candidate profile from backend repository
@@ -109,21 +98,41 @@ export default function Home() {
         const realProfiles = summaries.filter((s) => !KNOWN_DEMO_IDS.has(s.user_id));
         const demoProfiles = summaries.filter((s) => KNOWN_DEMO_IDS.has(s.user_id));
 
-        if (realProfiles.length > 0) {
-          const profile = await getCandidateProfile(realProfiles[0].user_id);
-          if (!isMounted) return;
-          setCandidateProfile(profile);
-          setSelectedCandidateId(profile.user_id);
-          setCandidateName(profile.display_name || profile.user_id);
-          setCandidateHeadline(profile.target_career_paths[0]?.title || 'Candidate');
-          setShowOnboarding(false);
-        } else if (demoProfiles.length > 0) {
-          const profile = await getCandidateProfile(demoProfiles[0].user_id);
-          if (!isMounted) return;
-          setCandidateProfile(profile);
-          setSelectedCandidateId(profile.user_id);
-          setCandidateName(profile.display_name || profile.user_id);
-          setCandidateHeadline(profile.target_career_paths[0]?.title || 'Candidate');
+        // Find the first usable candidate profile (one that actually has skills extracted/saved)
+        let activeProfile: CandidateCareerProfile | null = null;
+        for (const s of realProfiles) {
+          try {
+            const p = await getCandidateProfile(s.user_id);
+            if (p && p.assessed_skills && p.assessed_skills.length > 0) {
+              activeProfile = p;
+              break;
+            }
+          } catch {
+            // continue checking
+          }
+        }
+
+        if (!activeProfile) {
+          for (const s of demoProfiles) {
+            try {
+              const p = await getCandidateProfile(s.user_id);
+              if (p && p.assessed_skills && p.assessed_skills.length > 0) {
+                activeProfile = p;
+                break;
+              }
+            } catch {
+              // continue checking
+            }
+          }
+        }
+
+        if (!isMounted) return;
+
+        if (activeProfile && activeProfile.assessed_skills.length > 0) {
+          setCandidateProfile(activeProfile);
+          setSelectedCandidateId(activeProfile.user_id);
+          setCandidateName(activeProfile.display_name || activeProfile.user_id);
+          setCandidateHeadline(activeProfile.target_career_paths[0]?.title || 'Candidate');
           setShowOnboarding(false);
         } else {
           setCandidateProfile(null);
@@ -171,7 +180,6 @@ export default function Home() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const realSummaries = candidateSummaries.filter((s) => !KNOWN_DEMO_IDS.has(s.user_id));
   const demoSummaries = candidateSummaries.filter((s) => KNOWN_DEMO_IDS.has(s.user_id));
 
   return (
@@ -182,11 +190,16 @@ export default function Home() {
         onTabChange={setActiveTab}
         candidateName={candidateName}
         candidateRole={candidateHeadline}
+        candidateId={selectedCandidateId}
         backendOnline={backendOnline}
-        isDevMode={isDevMode}
-        onToggleDevMode={() => setIsDevMode(!isDevMode)}
         isDarkMode={isDarkMode}
         onToggleTheme={handleToggleTheme}
+        candidateSummaries={candidateSummaries}
+        onSelectCandidate={handleSelectCandidate}
+        onNewProfile={() => setShowOnboarding(true)}
+        onOpenUploadResume={() => {
+          setActiveTab('profile');
+        }}
       />
 
       {/* Main Workstation Container */}
@@ -210,106 +223,12 @@ export default function Home() {
           />
         ) : (
           <>
-            {/* Candidate Switcher Bar */}
-            <div className="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <span className="p-1.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
-                  <Users className="w-4 h-4" />
-                </span>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-zinc-500 font-mono">Active Profile:</span>
-                  <select
-                    value={selectedCandidateId}
-                    onChange={(e) => handleSelectCandidate(e.target.value)}
-                    className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2.5 py-1 focus:ring-2 focus:ring-teal-500 focus:outline-hidden cursor-pointer"
-                  >
-                    {realSummaries.length > 0 && (
-                      <optgroup label="Local User Profiles">
-                        {realSummaries.map((cand) => (
-                          <option key={cand.user_id} value={cand.user_id}>
-                            {cand.display_name} ({cand.target_role || cand.user_id})
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-
-                    {demoSummaries.length > 0 && (
-                      <optgroup label="Development & Demo Candidates">
-                        {demoSummaries.map((cand) => (
-                          <option key={cand.user_id} value={cand.user_id}>
-                            [DEMO] {cand.display_name} ({cand.target_role || cand.user_id})
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-
-                    {candidateSummaries.length === 0 && (
-                      <optgroup label="Demo Candidates (In-Memory)">
-                        {Object.values(CANDIDATES).map((cand) => (
-                          <option key={cand.id} value={cand.id}>
-                            [DEMO] {cand.name} ({cand.role})
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-
-                    <option value="__NEW_PROFILE__">+ Create New Profile...</option>
-                  </select>
-                </div>
-
-                <button
-                  onClick={() => setShowOnboarding(true)}
-                  className="px-2.5 py-1 rounded-md border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[11px] font-medium text-zinc-600 dark:text-zinc-300 transition-colors flex items-center gap-1"
-                  title="Create another candidate profile"
-                >
-                  <UserPlus className="w-3 h-3 text-teal-600" />
-                  <span>New Profile</span>
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2 text-xs font-mono text-zinc-500 flex-wrap">
-                <span>
-                  Target:{' '}
-                  <strong className="text-zinc-800 dark:text-zinc-200">
-                    {candidateProfile.target_career_paths[0]?.title}
-                  </strong>
-                </span>
-                <span>•</span>
-                <span>{candidateProfile.assessed_skills.length} skills on file</span>
-                <span>•</span>
-                <span>Degree: {candidateProfile.eligibility_constraints.highest_degree_level}</span>
-                {KNOWN_DEMO_IDS.has(selectedCandidateId) && (
-                  <>
-                    <span>•</span>
-                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
-                      DEMO MODE
-                    </span>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Active Workspace View */}
+            {/* Active Workspace View: Strictly Two Main Areas */}
             {activeTab === 'discover' && (
               <DiscoveryWorkspace
                 candidateProfile={candidateProfile}
                 candidateName={candidateName}
                 onNavigateTab={handleNavigateTab}
-                isDevMode={isDevMode}
-              />
-            )}
-
-            {activeTab === 'search' && (
-              <MarketSearchWorkspace
-                candidateProfile={candidateProfile}
-                candidateName={candidateName}
-              />
-            )}
-
-            {activeTab === 'market' && (
-              <MarketIntelligenceWorkspace
-                candidateProfile={candidateProfile}
-                candidateName={candidateName}
               />
             )}
 
@@ -322,22 +241,6 @@ export default function Home() {
                   setCandidateProfile(updated);
                   setCandidateName(updated.display_name || updated.user_id);
                 }}
-              />
-            )}
-
-            {activeTab === 'development' && (
-              <DevelopmentWorkspace
-                candidateProfile={candidateProfile}
-                candidateName={candidateName}
-                onNavigateTab={handleNavigateTab}
-              />
-            )}
-
-            {activeTab === 'career-path' && (
-              <CareerPathWorkspace
-                candidateProfile={candidateProfile}
-                candidateName={candidateName}
-                onNavigateTab={handleNavigateTab}
               />
             )}
           </>

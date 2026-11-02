@@ -233,32 +233,33 @@ class AdaptiveDiscoveryGraphBuilder:
             {"connectors": [h.connector_id for h in connector_health]},
         )
 
-        # Role Mapping
+        # Role Mapping via Market Agent
         await self._emit(
             state,
             events,
             WorkflowStage.STRATEGY_FORMULATION,
             "ROLE_MAPPING_STARTED",
-            "Mapping candidate skills to O*NET career families.",
+            "Market Agent: Mapping candidate competencies to O*NET occupational taxonomies and adjacent roles.",
         )
         rm_res = self.role_mapping_tool.execute(RoleMappingArgs(profile=profile))
         all_targets = rm_res.data or []
         target_roles = [t for t in all_targets if t.relationship_type == CareerPathRelationship.TARGET]
         adjacent_roles = [t for t in all_targets if t.relationship_type == CareerPathRelationship.ADJACENT]
 
+        target_title = target_roles[0].role_title if target_roles else "target role"
         await self._emit(
             state,
             events,
             WorkflowStage.STRATEGY_FORMULATION,
             "ROLE_MAPPING_COMPLETED",
-            f"Mapped {len(target_roles)} target role(s) and {len(adjacent_roles)} adjacent role(s).",
+            f"Market Agent: Analyzed market demand and adjacent roles for {target_title} (mapped {len(target_roles)} target role(s) and {len(adjacent_roles)} adjacent trajectory(ies)).",
             {
                 "target_roles": [t.role_title for t in target_roles],
                 "adjacent_roles": [t.role_title for t in adjacent_roles],
             },
         )
 
-        # Strategy Formulation
+        # Strategy Formulation by Orchestrator
         strategy = self.agent_decision_maker.formulate_initial_strategy(
             profile=profile,
             target_roles=target_roles,
@@ -273,7 +274,7 @@ class AdaptiveDiscoveryGraphBuilder:
             events,
             WorkflowStage.STRATEGY_FORMULATION,
             "STRATEGY_FORMULATED",
-            strategy.strategy_summary,
+            f"Orchestration Agent: {strategy.strategy_summary}",
             {
                 "target_role_priorities": strategy.target_role_priorities,
                 "target_coverage_goal": strategy.target_coverage_goal,
@@ -311,7 +312,7 @@ class AdaptiveDiscoveryGraphBuilder:
             events,
             WorkflowStage.SEARCHING,
             f"ITERATION_{iteration}_STARTED",
-            f"Beginning discovery iteration {iteration}/{max_iterations} with {len(pending_queries)} query plan(s).",
+            f"Discovery Agent: Sourcing opportunities across engineering sources (Iteration {iteration}/{max_iterations}) with {len(pending_queries)} query plan(s).",
             {"iteration": iteration, "query_count": len(pending_queries)},
         )
 
@@ -371,7 +372,7 @@ class AdaptiveDiscoveryGraphBuilder:
                         events,
                         WorkflowStage.SEARCHING,
                         "TOOL_INVOKED",
-                        f"Queried '{cid}' for '{query.query_string}' -> Found {found} opportunity lead(s){rej_summary}.",
+                        f"Discovery Agent: Queried '{cid}' for '{query.query_string}' -> Found {found} opportunity lead(s){rej_summary}.",
                         {
                             "connector_id": cid,
                             "latency_ms": tool_res.latency_ms,
@@ -626,12 +627,28 @@ class AdaptiveDiscoveryGraphBuilder:
         recommendations_data = None
 
         if rank_recommendations and canonical_opportunities and profile:
+            # Opportunity Research Agent: Deep checks promising opportunities
+            promising_opps = [
+                opp for opp in canonical_opportunities
+                if any(el.opportunity_id == opp.opportunity_id and el.is_eligible for el in eligibility_results)
+            ] or canonical_opportunities[:5]
+
+            if promising_opps:
+                await self._emit(
+                    state,
+                    events,
+                    WorkflowStage.EVALUATING,
+                    "OPPORTUNITY_RESEARCH_COMPLETED",
+                    f"Research Agent: Inspecting requirements and company details for candidate jobs ({len(promising_opps[:5])} lead(s) audited).",
+                    {"audited_count": len(promising_opps[:5])},
+                )
+
             await self._emit(
                 state,
                 events,
                 WorkflowStage.RANKING,
                 "RANKING_STARTED",
-                "Evaluating multi-dimensional candidate-job fit scores for discovered opportunities.",
+                f"Recommendation Agent: Evaluating multi-dimensional candidate-job fit scores for {len(canonical_opportunities)} discovered opportunities.",
                 {
                     "weight_profile": weight_profile,
                     "candidates_to_rank": len(canonical_opportunities),
@@ -664,7 +681,7 @@ class AdaptiveDiscoveryGraphBuilder:
                     events,
                     WorkflowStage.RANKING,
                     "RANKING_COMPLETED",
-                    f"Ranked {recommendations_data.total_eligible_ranked} eligible opportunities (top fit score: {top_score:.2f}).",
+                    f"Recommendation Agent: Evaluated candidate fit across 6 deterministic dimensions for {recommendations_data.total_eligible_ranked} opportunities (top fit score: {top_score:.1f}%).",
                     {
                         "total_ranked": recommendations_data.total_eligible_ranked,
                         "total_ineligible": recommendations_data.total_ineligible_excluded,

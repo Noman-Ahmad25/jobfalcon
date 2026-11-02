@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import io
 import logging
 import re
+import zipfile
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Any
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
 from app.db.repositories.interfaces import CandidateProfileRepository
 from app.db.repositories.sqlite_repository import SQLiteCandidateProfileRepository
@@ -217,6 +221,174 @@ async def delete_candidate_profile(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Candidate profile '{user_id}' was not found.",
         )
+
+
+def extract_text_from_bytes(filename: str, data: bytes) -> str:
+    """Extracts clean, readable text from uploaded files (PDF, DOCX, DOC, TXT, MD).
+
+    Guarantees:
+    - Proper document parsing without sending raw binary or PDF syntax to downstream extractors.
+    - Meaningful text validation before AI extraction.
+    """
+    name_lower = filename.lower()
+
+    if name_lower.endswith((".txt", ".md", ".json")):
+        try:
+            return data.decode("utf-8")
+        except UnicodeDecodeError:
+            return data.decode("latin-1", errors="replace")
+
+    elif name_lower.endswith(".pdf"):
+        try:
+            import pypdf
+            reader = pypdf.PdfReader(io.BytesIO(data))
+            if reader.is_encrypted:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Uploaded PDF '{filename}' is password-protected or encrypted. Please upload an unencrypted file or paste resume text.",
+                )
+            pages_text: list[str] = []
+            for page_idx, page in enumerate(reader.pages):
+                try:
+                    page_text = page.extract_text()
+                    if page_text and page_text.strip():
+                        pages_text.append(page_text.strip())
+                except Exception as page_exc:
+                    logger.warning("Error extracting text from page %d of %s: %s", page_idx + 1, filename, page_exc)
+
+            extracted = "\n\n".join(pages_text).strip()
+            if not extracted:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Unable to extract readable text from PDF '{filename}'. The file appears to be scanned (image-only), empty, or formatted without readable text. Please provide a text-based PDF or paste your resume text.",
+                )
+            return extracted
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.error("pypdf parsing failed for %s: %s", filename, exc)
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Failed to parse PDF document '{filename}': {str(exc)}. Please check file integrity or paste text.",
+            ) from exc
+
+    elif name_lower.endswith(".docx"):
+        try:
+            with zipfile.ZipFile(io.BytesIO(data)) as z:
+                xml_content = z.read("word/document.xml")
+                tree = ET.fromstring(xml_content)
+                # WordprocessingML namespace
+                paragraphs: list[str] = []
+                for p in tree.iter():
+                    if p.tag.endswith("}p") or p.tag == "p":
+                        texts = [node.text for node in p.iter() if node.text and (node.tag.endswith("}t") or node.tag == "t")]
+                        if texts:
+                            para_str = "".join(texts).strip()
+                            if para_str:
+                                paragraphs.append(para_str)
+                extracted = "\n".join(paragraphs).strip()
+                if not extracted:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=f"DOCX file '{filename}' contains no readable paragraph text.",
+                    )
+                return extracted
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.warning("DOCX parsing error for %s: %s", filename, exc)
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Unable to parse DOCX document '{filename}': {str(exc)}",
+            ) from exc
+
+    elif name_lower.endswith(".doc"):
+        # Legacy binary Word document: attempt readable ASCII/Unicode text sequence extraction
+        readable_chunks = re.findall(rb"[\x20-\x7E\t\r\n]{4,}", data)
+        extracted = " ".join([c.decode("latin-1", errors="ignore") for c in readable_chunks if len(c.strip()) > 3])
+        # Clean consecutive whitespace
+        extracted = re.sub(r"\s+", " ", extracted).strip()
+        if len(extracted) < 40:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Legacy binary DOC file '{filename}' could not be cleanly parsed. Please save as PDF or DOCX, or paste text.",
+            )
+        return extracted
+
+    # Fallback generic decoding
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        return data.decode("latin-1", errors="replace")
+
+
+def validate_extracted_document_text(text: str, filename: str) -> str:
+    """Validates that extracted document text contains sufficient readable text before AI analysis."""
+    clean = text.strip()
+    if not clean or len(clean) < 30:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Extracted content from '{filename}' is too short ({len(clean)} characters). "
+                "The file may be blank, scanned (image-only), or corrupted. "
+                "Please upload a text-based document or paste resume text directly."
+            ),
+        )
+
+    # Detect raw unparsed binary PDF syntax
+    if clean.startswith("%PDF-") or "obj\n<</Filter" in clean or "endobj\nxref" in clean:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Uploaded file '{filename}' returned raw unparsed PDF binary syntax instead of readable text. "
+                "Please ensure the file is a standard readable document."
+            ),
+        )
+
+    # Verify meaningful proportion of alphabetic characters
+    alpha_chars = sum(1 for c in clean if c.isalpha())
+    if alpha_chars < 20 or (alpha_chars / max(len(clean), 1)) < 0.20:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Extracted text from '{filename}' does not contain sufficient human-readable words or letters. "
+                "Please upload a standard document or paste text directly."
+            ),
+        )
+
+    return clean
+
+
+@router.post(
+    "/parse-resume-file",
+    status_code=status.HTTP_200_OK,
+    summary="Parse readable text content from uploaded resume documents (PDF, DOCX, DOC, TXT, MD)",
+)
+async def parse_resume_file(file: UploadFile = File(...)) -> dict[str, Any]:
+    """Accepts uploaded resume files, extracts readable document text, and validates extraction quality."""
+    try:
+        content = await file.read()
+        filename = file.filename or "resume.txt"
+        if not content:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Uploaded file '{filename}' is empty (0 bytes).",
+            )
+        text = extract_text_from_bytes(filename, content)
+        clean_text = validate_extracted_document_text(text, filename)
+        return {
+            "filename": filename,
+            "text": clean_text,
+            "char_count": len(clean_text),
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Failed to parse resume file '%s': %s", file.filename, exc)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unable to parse file '{file.filename}': {str(exc)}",
+        ) from exc
 
 
 @router.post(

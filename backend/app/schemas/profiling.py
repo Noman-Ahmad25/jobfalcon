@@ -198,7 +198,10 @@ class LLMCandidateFactExtraction(BaseModel):
     expected_graduation_date: Optional[date] = None
     authorized_country_codes: list[str] = Field(default_factory=lambda: ["US"])
     requires_visa_sponsorship: bool = False
-    total_experience_months: int = 0
+    total_experience_months: Optional[int] = Field(
+        default=None,
+        description="Total full-time professional experience in months if explicitly stated or discernible. None indicates unstated.",
+    )
     allowed_opportunity_categories: list[OpportunityCategory] = Field(
         default_factory=lambda: [OpportunityCategory.FULL_TIME_JOB]
     )

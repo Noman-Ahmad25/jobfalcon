@@ -336,3 +336,122 @@ def test_api_candidate_extract_and_get(test_client):
     # 3. GET non-existent profile returns 404
     missing_res = test_client.get("/api/v1/profile/usr-does-not-exist")
     assert missing_res.status_code == 404
+
+
+def test_api_parse_resume_file(test_client):
+    """Verifies POST /api/v1/profile/parse-resume-file with text and document uploads."""
+    file_content = b"Candidate Name: Jordan Smith\nSkills: Python, React, PostgreSQL\nEducation: B.S. Computer Science\nExperience: 3 years building web APIs."
+    response = test_client.post(
+        "/api/v1/profile/parse-resume-file",
+        files={"file": ("jordan_resume.txt", file_content, "text/plain")},
+    )
+    assert response.status_code == 200
+    res_data = response.json()
+    assert res_data["filename"] == "jordan_resume.txt"
+    assert "Jordan Smith" in res_data["text"]
+    assert res_data["char_count"] > 10
+
+
+def test_api_parse_resume_file_pdf_success(test_client):
+    """Verifies parsing of a valid text-based PDF document."""
+    text = "Candidate Name: Elena Rostova\nRole: Senior Backend Engineer\nSkills: Python, FastAPI, Docker, PostgreSQL\nEducation: M.S. Software Engineering"
+    stream_content = f"BT /F1 12 Tf 50 700 Td ({text}) Tj ET"
+    stream_len = len(stream_content)
+    pdf_bytes = f"""%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length {stream_len} >>
+stream
+{stream_content}
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000266 00000 n 
+0000000344 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+424
+%%EOF
+""".encode("latin-1")
+
+    response = test_client.post(
+        "/api/v1/profile/parse-resume-file",
+        files={"file": ("elena_resume.pdf", pdf_bytes, "application/pdf")},
+    )
+    assert response.status_code == 200
+    res_data = response.json()
+    assert res_data["filename"] == "elena_resume.pdf"
+    assert "Elena Rostova" in res_data["text"]
+    assert "FastAPI" in res_data["text"]
+    assert res_data["char_count"] >= 30
+
+
+def test_api_parse_resume_file_pdf_corrupted_fails_gracefully(test_client):
+    """Verifies that unreadable or corrupted PDF documents return clear 422 errors instead of silent empty profiles."""
+    corrupted_pdf = b"%PDF-1.4\ncorrupted binary content without valid stream or xref"
+    response = test_client.post(
+        "/api/v1/profile/parse-resume-file",
+        files={"file": ("broken_resume.pdf", corrupted_pdf, "application/pdf")},
+    )
+    assert response.status_code == 422
+    err_detail = response.json()["detail"]
+    assert "broken_resume.pdf" in err_detail
+    assert "Please check file integrity" in err_detail or "scanned" in err_detail or "Unable to extract" in err_detail
+
+
+def test_api_parse_resume_file_empty_fails(test_client):
+    """Verifies that an empty file upload returns an explicit 422 error."""
+    response = test_client.post(
+        "/api/v1/profile/parse-resume-file",
+        files={"file": ("empty_resume.txt", b"", "text/plain")},
+    )
+    assert response.status_code == 422
+    assert "empty" in response.json()["detail"]
+
+
+def test_extraction_identifies_skills_from_projects_and_experience(in_memory_profile_repo):
+    """Verifies that AI profiling extracts skills demonstrated in projects and work experience even without explicit skills."""
+    mock_llm = MockLLMClient()
+    service = CandidateProfilingService(llm_client=mock_llm, profile_repo=in_memory_profile_repo)
+
+    req = CandidateProfilingRequest(
+        user_id="usr-project-skills",
+        resume_text=(
+            "Developer portfolio:\n"
+            "Project: High-Throughput Gateway built using FastAPI and Redis caching.\n"
+            "Experience: Full Stack Engineer at TechCorp developing React interfaces with TypeScript."
+        ),
+        # Notice: explicit_skills is empty!
+        explicit_skills=[],
+        project_descriptions=[
+            "Architected a scalable task orchestrator with Python, PostgreSQL, and Docker."
+        ],
+    )
+
+    response = service.profile_candidate(req)
+    extracted_skill_names = {s.skill_name for s in response.extracted_profile.assessed_skills}
+
+    # Skills from projects and experience should be extracted
+    assert len(extracted_skill_names) >= 3
+    assert "Python" in extracted_skill_names
+    assert "PostgreSQL" in extracted_skill_names or "FastAPI" in extracted_skill_names
+    # And experience duration should be unknown / not assumed 0
+    assert response.extracted_profile.user_id == "usr-project-skills"
+

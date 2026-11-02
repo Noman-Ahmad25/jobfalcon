@@ -126,8 +126,26 @@ export async function extractCandidateProfile(
   return fetchFromApi<CandidateProfilingResponse>('/api/v1/profile/extract', {
     method: 'POST',
     body: JSON.stringify(payload),
-    timeoutMs: 15000,
+    timeoutMs: 120000,
   });
+}
+
+export async function parseResumeFile(
+  file: File
+): Promise<{ filename: string; text: string; char_count: number }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const url = `${DEFAULT_API_URL}/api/v1/profile/parse-resume-file`;
+  const res = await fetch(url, {
+    method: 'POST',
+    body: formData,
+    headers: { ...globalAuthHeaders },
+  });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => null);
+    throw new Error(errorBody?.detail || `Failed to parse file '${file.name}'`);
+  }
+  return res.json();
 }
 
 export async function getCandidateProfile(

@@ -1,5 +1,7 @@
 'use client';
 
+import { useSyncExternalStore } from 'react';
+
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 export function getStoredTheme(): ThemeMode {
@@ -26,4 +28,39 @@ export function applyTheme(mode: ThemeMode): void {
   }
 
   localStorage.setItem('jf_theme', mode);
+  window.dispatchEvent(new Event('jf_theme_change'));
+}
+
+const emptySubscribe = () => () => {};
+
+export function useIsMounted(): boolean {
+  return useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
+}
+
+export function useIsDarkMode(): boolean {
+  return useSyncExternalStore(
+    (callback) => {
+      if (typeof window === 'undefined') return () => {};
+      window.addEventListener('jf_theme_change', callback);
+      const media = window.matchMedia('(prefers-color-scheme: dark)');
+      media.addEventListener('change', callback);
+      return () => {
+        window.removeEventListener('jf_theme_change', callback);
+        media.removeEventListener('change', callback);
+      };
+    },
+    () => {
+      if (typeof window === 'undefined') return false;
+      const stored = getStoredTheme();
+      return (
+        stored === 'dark' ||
+        (stored === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+      );
+    },
+    () => false
+  );
 }

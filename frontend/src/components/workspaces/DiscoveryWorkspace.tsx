@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Compass,
-  Play,
   RotateCw,
   ExternalLink,
   ShieldCheck,
@@ -16,11 +15,7 @@ import {
   CheckCircle2,
   MapPin,
   Building2,
-  Radio,
-  Clock,
-  Check,
   Eye,
-  Terminal,
 } from 'lucide-react';
 import {
   AdaptiveDiscoveryRequest,
@@ -52,41 +47,27 @@ interface DiscoveryWorkspaceProps {
   candidateProfile: CandidateCareerProfile;
   candidateName: string;
   onNavigateTab: (tab: WorkspaceTab, context?: { targetRole?: string; skillId?: string }) => void;
-  isDevMode?: boolean;
 }
 
 const HUMAN_PROGRESS_STAGES: Record<WorkflowStage, { step: number; text: string }> = {
   INITIALIZING: { step: 1, text: 'Finding opportunities matching your career direction' },
-  STRATEGY_FORMULATION: { step: 1, text: 'Preparing targeted search strategy across verified sources' },
-  SEARCHING: { step: 2, text: 'Searching relevant opportunity sources (Real Web & ATS feeds)' },
-  EVALUATING: { step: 3, text: 'Analyzing requirements and verifying candidate eligibility' },
-  GAP_ANALYSIS: { step: 4, text: 'Assessing coverage and identified market deficits' },
-  ADAPTING: { step: 4, text: 'Adapting search queries to maximize verified opportunity quality' },
-  RANKING: { step: 5, text: 'Comparing opportunities with your profile & computing fit' },
-  FINALIZING: { step: 5, text: 'Finalizing recommendations and evidence explanations' },
+  STRATEGY_FORMULATION: { step: 1, text: 'Market Agent researching demand and formulating search strategy' },
+  SEARCHING: { step: 2, text: 'Discovery Agent sourcing live opportunities across authentic sources' },
+  EVALUATING: { step: 3, text: 'Research Agent inspecting requirements and company context' },
+  GAP_ANALYSIS: { step: 4, text: 'Orchestrator assessing opportunity coverage' },
+  ADAPTING: { step: 4, text: 'Orchestrator adapting search strategy to maximize match quality' },
+  RANKING: { step: 5, text: 'Recommendation Agent computing 6D deterministic fit scores' },
+  FINALIZING: { step: 5, text: 'Finalizing verified career recommendations' },
   COMPLETED: { step: 5, text: 'Personalized opportunity discovery complete' },
   FAILED: { step: 0, text: 'Discovery workflow encountered an issue' },
 };
-
-const WORKFLOW_STEPS: { stage: WorkflowStage; label: string; description: string }[] = [
-  { stage: 'INITIALIZING', label: 'Init', description: 'Resolve Candidate' },
-  { stage: 'STRATEGY_FORMULATION', label: 'Strategy', description: 'Taxonomy & Plan' },
-  { stage: 'SEARCHING', label: 'Search', description: 'SearXNG & MCP' },
-  { stage: 'EVALUATING', label: 'Evaluate', description: 'MinHash & Eligibility' },
-  { stage: 'RANKING', label: 'Rank', description: 'Deterministic 6D' },
-  { stage: 'COMPLETED', label: 'Complete', description: 'Results Ready' },
-];
 
 export function DiscoveryWorkspace({
   candidateProfile,
   candidateName,
   onNavigateTab,
-  isDevMode = false,
 }: DiscoveryWorkspaceProps) {
-  // Technical Dev Observability State
-  const [showDevTelemetry, setShowDevTelemetry] = useState<boolean>(isDevMode);
   const [examinedOpportunity, setExaminedOpportunity] = useState<RankedOpportunity | null>(null);
-  const isTelemetryVisible = showDevTelemetry || isDevMode;
 
   // Discovery Configuration State
   const [targetGoal, setTargetGoal] = useState<number>(3);
@@ -407,8 +388,8 @@ export function DiscoveryWorkspace({
                 </>
               ) : (
                 <>
-                  <Play className="w-4 h-4 fill-current text-teal-400 dark:text-teal-600" />
-                  <span>{activeRun ? 'Re-run Discovery' : 'Launch Discovery Workflow'}</span>
+                  <Compass className="w-4 h-4 text-teal-400 dark:text-teal-600" />
+                  <span>{activeRun ? 'Re-discover Opportunities' : 'Discover opportunities for me'}</span>
                 </>
               )}
             </button>
@@ -561,28 +542,8 @@ export function DiscoveryWorkspace({
         </div>
       )}
 
-      {/* 2.1 Developer Observability Toggle Strip */}
+      {/* 2. Multi-Agent Research Activity Display */}
       {(isExecuting || activeRun || discoveryResponse) && (
-        <div className="flex items-center justify-between pt-1">
-          <button
-            onClick={() => setShowDevTelemetry(!showDevTelemetry)}
-            className="inline-flex items-center gap-1.5 text-xs font-mono text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
-          >
-            <Terminal className="w-3.5 h-3.5 text-zinc-400" />
-            <span>
-              {showDevTelemetry ? 'Hide Technical Telemetry' : 'View Technical Observability & Pipeline Trace'}
-            </span>
-          </button>
-          {showDevTelemetry && (
-            <span className="text-[10px] font-mono text-zinc-400 hidden sm:inline">
-              LangGraph StateGraph • MinHash LSH • Tool Budget Accounting
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* 2.2 Observable Workflow Stepper & Telemetry Monitor (Developer Mode) */}
-      {(isExecuting || activeRun || discoveryResponse) && isTelemetryVisible && (
         <div className="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs overflow-hidden space-y-4">
           {/* Stepper Header Strip */}
           <div className="px-6 py-4 bg-zinc-50/70 dark:bg-zinc-800/40 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between flex-wrap gap-3">
@@ -592,14 +553,10 @@ export function DiscoveryWorkspace({
                   isExecuting ? 'bg-teal-500 animate-pulse' : 'bg-emerald-500'
                 }`}
               />
-              <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
-                LangGraph StateGraph Execution Pipeline
+              <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                <Compass className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                Multi-Agent Career Opportunity Discovery
               </span>
-              {activeRun && (
-                <Badge variant="neutral" size="sm" mono>
-                  {activeRun.run_id}
-                </Badge>
-              )}
               {activeRun?.status && (
                 <Badge
                   variant={
@@ -612,144 +569,114 @@ export function DiscoveryWorkspace({
                   size="sm"
                   mono
                 >
-                  {activeRun.status}
+                  {activeRun.status === 'COMPLETED' ? 'RESULTS READY' : activeRun.status}
                 </Badge>
               )}
             </div>
 
-            {/* Live Numerical Telemetry Counters */}
+            {/* Live Funnel Counts */}
             <div className="flex items-center gap-4 text-xs font-mono text-zinc-500">
               <span className="flex items-center gap-1">
                 <span className="font-bold text-zinc-800 dark:text-zinc-200">
                   <NumberTicker value={liveRawCount} />
                 </span>{' '}
-                raw
+                leads
               </span>
               <span>•</span>
               <span className="flex items-center gap-1">
                 <span className="font-bold text-zinc-800 dark:text-zinc-200">
                   <NumberTicker value={liveCanonicalCount} />
                 </span>{' '}
-                canonical
-              </span>
-              <span>•</span>
-              <span className="flex items-center gap-1">
-                <span className="font-bold text-zinc-800 dark:text-zinc-200">
-                  <NumberTicker value={liveDuplicateCount} />
-                </span>{' '}
-                duplicates
+                unique
               </span>
               <span>•</span>
               <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
-                <NumberTicker value={liveEligibleCount} /> eligible
+                <NumberTicker value={liveEligibleCount} /> verified matches
               </span>
               <button
                 onClick={() => setShowTimeline(!showTimeline)}
                 className="text-[11px] text-teal-600 hover:underline font-sans ml-2"
               >
-                {showTimeline ? 'Collapse Trace' : 'Expand Trace'}
+                {showTimeline ? 'Hide Activity' : 'Show Activity'}
               </button>
             </div>
           </div>
 
-          {/* Adaptive Loop State Banner */}
+          {/* Adaptive Cycle Notice */}
           {adaptations.length > 0 && (
-            <div className="mx-6 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 flex items-center justify-between text-xs font-mono text-amber-800 dark:text-amber-300">
+            <div className="mx-6 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 flex items-center justify-between text-xs text-amber-800 dark:text-amber-300 font-mono">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
                 <span className="font-bold">Adaptive Loop Active: Iteration {currentIteration}</span>
                 <span>•</span>
-                <span className="font-sans text-[11px] truncate max-w-xl">
+                <span className="truncate max-w-xl text-[11px] font-sans">
                   {adaptations[adaptations.length - 1].action_summary}
                 </span>
               </div>
-              <Badge variant="outline" size="sm" mono>
-                {adaptations[adaptations.length - 1].adaptation_type}
-              </Badge>
             </div>
           )}
 
-          {/* Visual Tactile Stepper */}
-          <div className="px-6 py-2">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-              {WORKFLOW_STEPS.map((step, idx) => {
-                const stepOrder = WORKFLOW_STEPS.map((s) => s.stage);
-                const currentIdx = stepOrder.indexOf(currentStage);
-                const isPast =
-                  currentStage === 'COMPLETED' || (currentIdx !== -1 && idx < currentIdx);
-                const isCurrent = currentStage === step.stage;
-
-                return (
-                  <div
-                    key={step.stage}
-                    className={`p-2.5 rounded-lg border text-xs transition-all duration-150 ${
-                      isCurrent
-                        ? 'border-teal-500 bg-teal-50/50 dark:bg-teal-950/30 ring-1 ring-teal-500/30'
-                        : isPast
-                        ? 'border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/30 dark:bg-emerald-950/10'
-                        : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-800/20 opacity-70'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-mono font-bold uppercase text-zinc-400">
-                        0{idx + 1}
+          {/* Active Specialized Agent Indicator */}
+          <div className="px-6 py-1">
+            <div className="p-3 rounded-lg bg-teal-50/50 dark:bg-teal-950/20 border border-teal-200/80 dark:border-teal-800/60 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-3">
+                <div className="p-1.5 rounded-md bg-teal-600 text-white shrink-0">
+                  {currentStage === 'SEARCHING' ? (
+                    <Search className="w-4 h-4" />
+                  ) : currentStage === 'STRATEGY_FORMULATION' ? (
+                    <TrendingUp className="w-4 h-4" />
+                  ) : currentStage === 'EVALUATING' ? (
+                    <ShieldCheck className="w-4 h-4" />
+                  ) : (
+                    <Target className="w-4 h-4" />
+                  )}
+                </div>
+                <div>
+                  <div className="font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                    <span>
+                      {currentStage === 'SEARCHING'
+                        ? 'Discovery Agent Active'
+                        : currentStage === 'STRATEGY_FORMULATION'
+                        ? 'Market Agent & Orchestrator Active'
+                        : currentStage === 'EVALUATING'
+                        ? 'Opportunity Research Agent Active'
+                        : currentStage === 'RANKING'
+                        ? 'Recommendation Agent Active'
+                        : 'Orchestration Agent Active'}
+                    </span>
+                    {isExecuting && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-teal-100 dark:bg-teal-900 text-teal-800 dark:text-teal-200 font-normal">
+                        Coordinating
                       </span>
-                      {isPast ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                      ) : isCurrent ? (
-                        <Radio className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 animate-pulse" />
-                      ) : (
-                        <Clock className="w-3 h-3 text-zinc-300 dark:text-zinc-600" />
-                      )}
-                    </div>
-                    <div className="mt-1 font-bold text-zinc-800 dark:text-zinc-200 truncate">
-                      {step.label}
-                    </div>
-                    <div className="text-[10px] text-zinc-500 truncate">{step.description}</div>
+                    )}
                   </div>
-                );
-              })}
+                  <p className="text-zinc-600 dark:text-zinc-400 text-[11px] mt-0.5">
+                    {HUMAN_PROGRESS_STAGES[currentStage]?.text || 'Coordinating opportunity evaluation...'}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Genuine Telemetry Events Stream */}
+          {/* Clean Agent Activity Stream */}
           {showTimeline && (
             <div className="px-6 pb-6">
-              <div className="p-4 rounded-lg bg-zinc-50/80 dark:bg-zinc-800/40 border border-zinc-200/80 dark:border-zinc-800 max-h-56 overflow-y-auto space-y-2.5 font-mono text-xs divide-y divide-zinc-200/40 dark:divide-zinc-800/50">
+              <div className="p-4 rounded-lg bg-zinc-50/80 dark:bg-zinc-800/40 border border-zinc-200/80 dark:border-zinc-800 max-h-56 overflow-y-auto space-y-2.5 text-xs divide-y divide-zinc-200/40 dark:divide-zinc-800/50">
                 {liveEvents.length === 0 ? (
-                  <div className="text-zinc-400 text-center py-4 font-sans text-xs">
-                    Initializing real-time event listener for run...
+                  <div className="text-zinc-400 text-center py-4 text-xs font-sans">
+                    Agents are initializing discovery workflow...
                   </div>
                 ) : (
-                  liveEvents.map((evt, idx) => {
-                    const stageColor =
-                      {
-                        INITIALIZING: 'text-zinc-500',
-                        STRATEGY_FORMULATION: 'text-teal-600 dark:text-teal-400',
-                        SEARCHING: 'text-blue-600 dark:text-blue-400',
-                        EVALUATING: 'text-purple-600 dark:text-purple-400',
-                        GAP_ANALYSIS: 'text-amber-600 dark:text-amber-400',
-                        ADAPTING: 'text-orange-600 dark:text-orange-400',
-                        RANKING: 'text-emerald-600 dark:text-emerald-400',
-                        FINALIZING: 'text-zinc-600',
-                        COMPLETED: 'text-emerald-600 font-bold',
-                        FAILED: 'text-rose-600 font-bold',
-                      }[evt.stage] || 'text-zinc-600';
-
-                    return (
-                      <div key={idx} className="pt-2 first:pt-0 flex items-start gap-3">
-                        <span className="text-[10px] text-zinc-400 shrink-0 w-16">
-                          {new Date(evt.timestamp).toLocaleTimeString([], { hour12: false })}
-                        </span>
-                        <span className={`text-[11px] font-semibold shrink-0 w-36 truncate ${stageColor}`}>
-                          [{evt.stage}]
-                        </span>
-                        <span className="text-zinc-800 dark:text-zinc-200 font-sans flex-1">
-                          {evt.summary}
-                        </span>
-                      </div>
-                    );
-                  })
+                  liveEvents.map((evt, idx) => (
+                    <div key={idx} className="pt-2 first:pt-0 flex items-start gap-3">
+                      <span className="text-[10px] font-mono text-zinc-400 shrink-0 w-16">
+                        {new Date(evt.timestamp).toLocaleTimeString([], { hour12: false })}
+                      </span>
+                      <span className="text-zinc-800 dark:text-zinc-200 font-sans flex-1 leading-relaxed">
+                        {evt.summary}
+                      </span>
+                    </div>
+                  ))
                 )}
               </div>
             </div>
@@ -853,11 +780,11 @@ export function DiscoveryWorkspace({
           {recommendations.length > 0 && (
             <div className="flex items-center gap-2">
               <button
-                onClick={() => onNavigateTab('career-path')}
+                onClick={() => onNavigateTab('profile')}
                 className="text-xs text-teal-600 dark:text-teal-400 hover:underline flex items-center gap-1 font-medium"
               >
-                <TrendingUp className="w-3.5 h-3.5" />
-                View in Career Graph
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Review Profile Evidence
               </button>
             </div>
           )}
@@ -1175,12 +1102,12 @@ export function DiscoveryWorkspace({
                       <button
                         onClick={() => {
                           setAuditedOpportunity(null);
-                          onNavigateTab('development');
+                          onNavigateTab('profile');
                         }}
                         className="text-xs text-teal-600 hover:underline flex items-center gap-1 font-semibold"
                       >
                         <Target className="w-3.5 h-3.5" />
-                        Create Development Action
+                        Update Profile Skills
                       </button>
                     </div>
 

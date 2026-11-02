@@ -51,11 +51,11 @@ class Settings(BaseSettings):
         description="Model identifier (e.g., qwen2.5:14b-instruct or gpt-4o-mini)",
     )
     LLM_TIMEOUT_SECONDS: float = Field(
-        default=30.0,
+        default=120.0,
         description="Client timeout for model inference calls in seconds",
     )
     LLM_MAX_RETRIES: int = Field(
-        default=2,
+        default=1,
         description="Maximum retry attempts on transient model gateway errors",
     )
 

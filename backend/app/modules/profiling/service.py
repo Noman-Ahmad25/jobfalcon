@@ -108,7 +108,7 @@ class CandidateProfilingService:
             highest_degree_level=raw_extraction.highest_degree_level,
             is_currently_enrolled_student=raw_extraction.is_currently_enrolled,
             expected_graduation_date=raw_extraction.expected_graduation_date,
-            total_full_time_experience_months=raw_extraction.total_experience_months,
+            total_full_time_experience_months=raw_extraction.total_experience_months if raw_extraction.total_experience_months is not None else 0,
             allowed_opportunity_categories=raw_extraction.allowed_opportunity_categories,
             allowed_work_modes=raw_extraction.allowed_work_modes,
             preferred_locations=raw_extraction.preferred_locations,
@@ -158,6 +158,7 @@ class CandidateProfilingService:
         # 7. Assemble aggregate CandidateCareerProfile
         career_profile = CandidateCareerProfile(
             user_id=request.user_id,
+            display_name=raw_extraction.extracted_full_name or None,
             profile_version=next_version,
             assessed_skills=assessed_skills,
             current_career_path=current_path,
