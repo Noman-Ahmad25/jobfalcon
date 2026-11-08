@@ -256,14 +256,19 @@ class WebSearchConnector(BaseDiscoveryConnector):
         """Generates deterministic mock opportunities for testing."""
         opportunities: list[PolymorphicOpportunity] = []
         now = datetime.now(UTC)
-        company_pool = ["Acme Cloud Technologies", "Vanguard Media", "DataStream Analytics", "NextGen Solutions"]
+        mock_fixtures = [
+            ("Acme Cloud Technologies", ["San Francisco, CA"], WorkMode.HYBRID),
+            ("Vanguard Media", ["New York, NY"], WorkMode.ON_SITE),
+            ("DataStream Analytics", [], WorkMode.REMOTE),
+            ("NextGen Solutions", ["Seattle, WA"], WorkMode.HYBRID),
+        ]
         country_codes = query.target_country_codes or ["US"]
-        work_mode = query.work_modes[0] if query.work_modes else WorkMode.REMOTE
         category = query.category
 
         num_results = min(limit, 3)
         for idx in range(num_results):
-            company = company_pool[idx % len(company_pool)]
+            company, mock_locs, mock_mode = mock_fixtures[idx % len(mock_fixtures)]
+            work_mode = mock_mode
             title = f"{query.role_title}"
             desc = (
                 f"We are seeking a talented and driven {query.role_title} to join {company}. "
@@ -290,7 +295,7 @@ class WebSearchConnector(BaseDiscoveryConnector):
                 requires_active_student_status=category == OpportunityCategory.INTERNSHIP,
                 min_experience_months=0 if "INTERN" in query.seniority_level or "ENTRY" in query.seniority_level else 24,
                 work_mode=work_mode,
-                location_city_country=[query.target_locations[0]] if query.target_locations else [],
+                location_city_country=mock_locs,
                 skill_requirements=[
                     OpportunitySkillRequirement(
                         canonical_skill_id=f"skill_ws_{kw.lower()}",

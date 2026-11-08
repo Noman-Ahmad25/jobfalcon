@@ -14,6 +14,7 @@ import {
   WorkMode,
 } from '@/types/domain';
 import { evaluateAndRankOpportunities } from '@/lib/api';
+import { formatOpportunityLocation } from '@/lib/location';
 
 const SAMPLE_CANDIDATES: Record<string, { label: string; description: string; profile: CandidateCareerProfile }> = {
   maya: {
@@ -749,7 +750,7 @@ export function RecommendationDemo() {
                               </div>
                               <div className="text-xs text-zinc-600 mt-0.5">
                                 <span className="font-semibold text-zinc-800">{rec.opportunity.company_name}</span> •{' '}
-                                {rec.opportunity.eligibility_rules.location_city_country.join(', ')} ({rec.opportunity.eligibility_rules.work_mode})
+                                {formatOpportunityLocation(rec.opportunity)}
                               </div>
                             </div>
                           </div>

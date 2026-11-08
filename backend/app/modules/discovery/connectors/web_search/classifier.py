@@ -11,6 +11,7 @@ from app.modules.discovery.connectors.parsing_utils import (
     determine_work_mode,
     extract_experience_months_with_confidence,
     extract_skills_from_text,
+    parse_location_and_work_mode,
     strip_html_tags,
 )
 from app.modules.discovery.connectors.web_search.providers import RawSearchResult
@@ -340,10 +341,9 @@ def normalize_search_result_to_opportunity(
             for kw in query.expanded_keywords[:3]
         ]
 
-    # Work mode & experience
-    work_mode = determine_work_mode(f"{clean_title} {clean_snippet}")
-    if work_mode == WorkMode.ON_SITE and query.work_modes:
-        work_mode = query.work_modes[0]
+    # Work mode & location strictly extracted from verified listing snippet/title
+    # Never populate from candidate profile, query target_locations, or default config
+    locations, work_mode = parse_location_and_work_mode(text=clean_snippet, title=clean_title)
 
     min_exp, exp_confident = extract_experience_months_with_confidence(clean_snippet, title=clean_title)
     if "INTERN" in query.seniority_level or query.category == OpportunityCategory.INTERNSHIP:
@@ -376,7 +376,7 @@ def normalize_search_result_to_opportunity(
         requires_active_student_status=category == OpportunityCategory.INTERNSHIP,
         min_experience_months=min_exp,
         work_mode=work_mode,
-        location_city_country=query.target_locations or [],
+        location_city_country=locations,
         skill_requirements=extracted_skills,
         mapped_occupation_code="15-1252.00",
         completeness_score=0.75,

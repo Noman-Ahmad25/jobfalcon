@@ -211,8 +211,214 @@ def determine_work_mode(
 ) -> WorkMode:
     """Determines work mode from location text or ATS workplace type."""
     combined = f"{location_str} {workplace_type}".lower()
-    if "remote" in combined:
-        return WorkMode.REMOTE
     if "hybrid" in combined:
         return WorkMode.HYBRID
+    if "remote" in combined:
+        return WorkMode.REMOTE
     return WorkMode.ON_SITE
+
+
+KNOWN_TECH_CITIES: tuple[str, ...] = (
+    "Bengaluru", "Bangalore", "Hyderabad", "Pune", "Mumbai", "Delhi", "Gurgaon", "Gurugram",
+    "Noida", "Chennai", "Kolkata", "Ahmedabad", "San Francisco", "San Jose", "Sunnyvale",
+    "Mountain View", "Palo Alto", "Seattle", "Redmond", "Bellevue", "New York", "Austin",
+    "Boston", "Cambridge", "Chicago", "Denver", "Boulder", "Los Angeles", "San Diego",
+    "London", "Dublin", "Berlin", "Munich", "Amsterdam", "Paris", "Zurich", "Toronto",
+    "Vancouver", "Montreal", "Singapore", "Tokyo", "Sydney", "Melbourne",
+)
+
+REMOTE_SCOPE_CUES: tuple[str, ...] = (
+    "India", "United States", "US", "USA", "North America", "EMEA", "APAC", "LATAM",
+    "Europe", "UK", "United Kingdom", "Canada", "Germany", "Australia", "Global", "Worldwide",
+)
+
+
+def format_opportunity_location(
+    work_mode: WorkMode | str,
+    locations: Optional[list[str]] = None,
+) -> str:
+    """Formats opportunity location according to JobFalcon canonical rules:
+    - Explicit city/location in the listing -> Display that location.
+    - Explicit remote position with a specified geographic scope -> Display `Remote — [scope]`.
+    - Explicitly remote without geographic scope -> Display `Remote`.
+    - Hybrid position -> Display the actual location and hybrid designation.
+    - Location absent or unverifiable -> Display `Location not specified`.
+    """
+    mode_str = work_mode.value if isinstance(work_mode, WorkMode) else str(work_mode or "").upper()
+    valid_locs = [loc.strip() for loc in (locations or []) if loc and loc.strip()]
+
+    # Case: REMOTE
+    if mode_str == "REMOTE":
+        if not valid_locs:
+            return "Remote"
+
+        raw_scope = valid_locs[0]
+        lower_scope = raw_scope.lower()
+        if lower_scope in ("remote", "anywhere", "worldwide", "global", "flexible"):
+            return "Remote"
+
+        # Strip any redundant "Remote -", "Remote —", "Remote in", "Remote (India)", etc.
+        clean_scope = re.sub(r"^remote\s*(?:[-—–:,]|\bin\b|\bwithin\b)?\s*[\(\[]?", "", raw_scope, flags=re.IGNORECASE).strip()
+        clean_scope = re.sub(r"[\)\]]+$", "", clean_scope).strip()
+        clean_scope = re.sub(r"\bonly\b", "", clean_scope, flags=re.IGNORECASE).strip()
+        if not clean_scope or clean_scope.lower() in ("remote", "anywhere", "worldwide", "global", "flexible"):
+            return "Remote"
+
+        return f"Remote — {clean_scope}"
+
+    # Case: HYBRID
+    if mode_str == "HYBRID":
+        if not valid_locs:
+            return "Hybrid (Location not specified)"
+
+        raw_loc = ", ".join(valid_locs)
+        clean_loc = re.sub(r"\(?hybrid\)?", "", raw_loc, flags=re.IGNORECASE).strip(" -—–,")
+        if not clean_loc:
+            return "Hybrid (Location not specified)"
+        return f"{clean_loc} (Hybrid)"
+
+    # Case: ON_SITE or UNSPECIFIED
+    if not valid_locs:
+        return "Location not specified"
+
+    return ", ".join(valid_locs)
+
+
+def _extract_city_from_text(text: str) -> str:
+    """Extracts explicit city/location mention from text."""
+    if not text:
+        return ""
+
+    # Check for "Location: <city, country>" pattern
+    m_loc = re.search(
+        r"(?:location|office|based in)\s*:\s*([A-Za-z\s,\.-]+?)(?:\.|\n|;|\band\b|Full[- ]time|Part[- ]time|Competitive|Salary|Benefits|Apply|View|\Z)",
+        text,
+        re.IGNORECASE,
+    )
+    if m_loc:
+        cand = m_loc.group(1).strip(" -—–,")
+        if cand and len(cand) <= 60 and cand.lower() not in ("remote", "hybrid", "unspecified", "various", "flexible"):
+            return cand
+
+    # Check for "in <City>, <Country/State>"
+    m_in = re.search(
+        r"\bin\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?,\s*(?:[A-Z]{2}|[A-Z][a-zA-Z]+))\b",
+        text,
+    )
+    if m_in:
+        return m_in.group(1).strip()
+
+    # Search for known tech cities
+    for city in KNOWN_TECH_CITIES:
+        pattern = r"\b" + re.escape(city) + r"(?:,\s*([A-Za-z\s]+))?\b"
+        m_city = re.search(pattern, text)
+        if m_city:
+            if m_city.group(1):
+                country_state = m_city.group(1).strip()
+                if len(country_state) < 30 and "\n" not in country_state:
+                    return f"{city}, {country_state}"
+            return city
+
+    return ""
+
+
+def parse_location_and_work_mode(
+    raw_location: Optional[str] = None,
+    text: str = "",
+    title: str = "",
+    workplace_type: str = "",
+    is_remote: Optional[bool] = None,
+) -> tuple[list[str], WorkMode]:
+    """Deterministically parses location list and WorkMode from opportunity metadata and text.
+
+    Guarantees:
+    - Never populates opportunity location from candidate preferences or query parameters.
+    - Extracts explicit remote scopes (e.g. 'Remote - India' -> ['India'], WorkMode.REMOTE).
+    - Preserves explicit city/region locations for on-site and hybrid roles.
+    - Returns empty location list when location is absent or unverifiable.
+    """
+    combined_meta = f"{raw_location or ''} {workplace_type} {title}".strip()
+    full_text = f"{combined_meta} {text}"
+    full_lower = full_text.lower()
+
+    # 1. Determine WorkMode
+    is_hybrid_mode = (
+        "hybrid" in workplace_type.lower()
+        or (bool(raw_location) and "hybrid" in str(raw_location).lower())
+        or "(hybrid)" in title.lower()
+        or bool(re.search(r"\bhybrid\b", full_lower))
+    )
+
+    is_remote_mode = (
+        is_remote is True
+        or "remote" in workplace_type.lower()
+        or (bool(raw_location) and "remote" in str(raw_location).lower())
+        or bool(re.search(r"\b(?:remote|work from home|wfh|telecommute)\b", full_lower))
+    )
+
+    if is_hybrid_mode:
+        work_mode = WorkMode.HYBRID
+    elif is_remote_mode:
+        work_mode = WorkMode.REMOTE
+    else:
+        work_mode = WorkMode.ON_SITE
+
+    # 2. Extract Location / Scope
+    # Case A: REMOTE
+    if work_mode == WorkMode.REMOTE:
+        scope: Optional[str] = None
+        # Check raw_location first
+        if raw_location:
+            m = re.search(
+                r"remote\s*(?:[-—–:,]|\bin\b|\bwithin\b|\bfor\b)?\s*[\(\[]?([^()\]\n]+)[\)\]]?",
+                raw_location,
+                re.IGNORECASE,
+            )
+            if m:
+                cand_scope = m.group(1).strip(" -—–,")
+                cand_scope = re.sub(r"\bonly\b", "", cand_scope, flags=re.IGNORECASE).strip()
+                if cand_scope and cand_scope.lower() not in ("remote", "work", "job", "position", "anywhere", "worldwide", "global", "flexible"):
+                    scope = cand_scope
+            elif raw_location.lower() not in ("remote", "fully remote", "100% remote", "remote work", "work from home"):
+                scope = raw_location.strip()
+
+        # If no scope yet, check title & text for explicit remote scope cues
+        if not scope:
+            m = re.search(
+                r"remote\s*(?:[-—–:,]|\bin\b|\bwithin\b)\s*[\(\[]?([A-Za-z\s]+?)(?:[\)\]]|\bonly\b|\beligible\b|\bbased\b|\.|\n|$)",
+                f"{title} {text}",
+                re.IGNORECASE,
+            )
+            if m:
+                cand_scope = m.group(1).strip()
+                cand_scope = re.sub(r"\bonly\b", "", cand_scope, flags=re.IGNORECASE).strip()
+                if any(cand_scope.lower() == sc.lower() for sc in REMOTE_SCOPE_CUES):
+                    scope = cand_scope
+
+        if scope and scope.lower() not in ("remote", "work", "job", "position", "anywhere", "worldwide", "global", "flexible"):
+            return [scope], WorkMode.REMOTE
+        return [], WorkMode.REMOTE
+
+    # Case B: HYBRID
+    if work_mode == WorkMode.HYBRID:
+        loc_str = ""
+        if raw_location:
+            loc_str = re.sub(r"\(?hybrid\)?", "", raw_location, flags=re.IGNORECASE).strip(" -—–,")
+        if not loc_str:
+            loc_str = _extract_city_from_text(f"{title} {text}")
+        if loc_str:
+            return [loc_str], WorkMode.HYBRID
+        return [], WorkMode.HYBRID
+
+    # Case C: ON_SITE
+    loc_str = ""
+    if raw_location:
+        cleaned = raw_location.strip()
+        if cleaned.lower() not in ("unspecified", "not specified", "various", "n/a", "multiple locations", "unknown", "remote", "hybrid"):
+            loc_str = cleaned
+    if not loc_str:
+        loc_str = _extract_city_from_text(f"{title} {text}")
+    if loc_str:
+        return [loc_str], WorkMode.ON_SITE
+
+    return [], WorkMode.ON_SITE

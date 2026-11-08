@@ -35,6 +35,7 @@ import {
   getLatestDiscoveryRunForCandidate,
   startDiscoveryRun,
 } from '@/lib/api';
+import { formatOpportunityLocation } from '@/lib/location';
 import { Badge } from '@/components/ui/Badge';
 import { NumberTicker } from '@/components/ui/NumberTicker';
 import { ScoreBar } from '@/components/ui/ScoreBar';
@@ -881,7 +882,7 @@ export function DiscoveryWorkspace({
                         <span>•</span>
                         <span className="flex items-center gap-1">
                           <MapPin className="w-3.5 h-3.5" />
-                          {opp.eligibility_rules?.location_city_country.join(', ') || 'Remote / Flexible'}
+                          {formatOpportunityLocation(opp)}
                         </span>
                         <span>•</span>
                         <span className="font-mono">

@@ -16,6 +16,7 @@ from app.modules.discovery.connectors.parsing_utils import (
     determine_work_mode,
     extract_experience_months,
     extract_skills_from_text,
+    parse_location_and_work_mode,
     strip_html_tags,
 )
 from app.schemas.common import DegreeLevel, OpportunityCategory, WorkMode
@@ -224,9 +225,9 @@ class CompanyCareerPageConnector(BaseDiscoveryConnector):
                         if any(term in title_lower for term in search_terms) or "engineer" in title_lower:
                             clean_desc = strip_html_tags(job.get("content", ""))
                             skills = extract_skills_from_text(clean_desc)
-                            loc_name = job.get("location", {}).get("name", "Remote")
+                            loc_name = job.get("location", {}).get("name", "")
+                            locations, work_mode = parse_location_and_work_mode(raw_location=loc_name, text=clean_desc, title=title)
                             exp_months = extract_experience_months(clean_desc, title=title)
-                            work_mode = determine_work_mode(loc_name)
                             country_code = "US" if "us" in loc_name.lower() or "united states" in loc_name.lower() else "GB" if "london" in loc_name.lower() else "US"
 
                             opp = create_normalized_opportunity(
@@ -243,7 +244,7 @@ class CompanyCareerPageConnector(BaseDiscoveryConnector):
                                 requires_active_student_status=query.category == OpportunityCategory.INTERNSHIP,
                                 min_experience_months=exp_months,
                                 work_mode=work_mode,
-                                location_city_country=[loc_name] if loc_name != "Remote" else [],
+                                location_city_country=locations,
                                 skill_requirements=skills or [
                                     OpportunitySkillRequirement(
                                         canonical_skill_id="skill_react",
@@ -281,10 +282,10 @@ class CompanyCareerPageConnector(BaseDiscoveryConnector):
                             if any(term in title_lower for term in search_terms) or "engineer" in title_lower:
                                 desc_plain = job.get("descriptionPlain", "")
                                 skills = extract_skills_from_text(desc_plain)
-                                loc_name = job.get("location", "Remote")
+                                loc_name = job.get("location", "")
                                 workplace = job.get("workplaceType", "")
+                                locations, work_mode = parse_location_and_work_mode(raw_location=loc_name, text=desc_plain, title=title, workplace_type=workplace)
                                 exp_months = extract_experience_months(desc_plain, title=title)
-                                work_mode = determine_work_mode(loc_name, workplace)
 
                                 opp = create_normalized_opportunity(
                                     title=title,
@@ -300,7 +301,7 @@ class CompanyCareerPageConnector(BaseDiscoveryConnector):
                                     requires_active_student_status=query.category == OpportunityCategory.INTERNSHIP,
                                     min_experience_months=exp_months,
                                     work_mode=work_mode,
-                                    location_city_country=[loc_name] if loc_name != "Remote" else [],
+                                    location_city_country=locations,
                                     skill_requirements=skills or [
                                         OpportunitySkillRequirement(
                                             canonical_skill_id="skill_typescript",

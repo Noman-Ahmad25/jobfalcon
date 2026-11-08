@@ -10,6 +10,7 @@ from app.modules.discovery.connectors.parsing_utils import (
     determine_work_mode,
     extract_experience_months,
     extract_skills_from_text,
+    parse_location_and_work_mode,
     strip_html_tags,
 )
 from app.schemas.common import DegreeLevel, OpportunityCategory, WorkMode
@@ -76,15 +77,15 @@ class JobSpyMCPNormalizer:
             f"[MCP Tool Result: jobspy/search_jobs - Unverified Requisition] {clean_desc[:2200]}"
         )
 
-        # 4. Location & Work Mode
+        # 4. Location & Work Mode strictly from listing metadata and description
         loc_str = str(raw_job.get("location") or "")
-        is_remote_flag = bool(raw_job.get("is_remote"))
-        work_mode = WorkMode.REMOTE if is_remote_flag else determine_work_mode(loc_str)
-
-        # Align with candidate query preference if applicable
-        if work_mode == WorkMode.ON_SITE and query.work_modes:
-            if WorkMode.REMOTE in query.work_modes and "remote" in loc_str.lower():
-                work_mode = WorkMode.REMOTE
+        is_remote_flag = bool(raw_job.get("is_remote")) if raw_job.get("is_remote") is not None else None
+        location_list, work_mode = parse_location_and_work_mode(
+            raw_location=loc_str,
+            text=clean_desc,
+            title=clean_title,
+            is_remote=is_remote_flag,
+        )
 
         # 5. Skill Extraction
         extracted_skills = extract_skills_from_text(f"{clean_title} {clean_desc}")
@@ -140,8 +141,6 @@ class JobSpyMCPNormalizer:
                         posted_at = posted_at.replace(tzinfo=timezone.utc)
             except Exception:
                 pass
-
-        location_list = [loc_str] if loc_str and "remote" not in loc_str.lower() else []
 
         return create_normalized_opportunity(
             title=clean_title,

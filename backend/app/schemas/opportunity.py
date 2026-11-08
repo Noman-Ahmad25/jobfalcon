@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 from typing import Any, Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, computed_field, field_validator
 
 from app.core.sanitization import sanitize_untrusted_text
 from app.schemas.common import DegreeLevel, OpportunityCategory, WorkMode
@@ -80,6 +80,17 @@ class OpportunityEligibilityRules(BaseModel):
         if isinstance(v, list):
             return [sanitize_untrusted_text(str(loc)) for loc in v if str(loc).strip()]
         return v
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def display_location(self) -> str:
+        """Formatted location obeying JobFalcon canonical location normalization rules."""
+        from app.modules.discovery.connectors.parsing_utils import format_opportunity_location
+
+        return format_opportunity_location(
+            work_mode=self.work_mode,
+            locations=self.location_city_country,
+        )
 
 
 class OpportunitySkillRequirement(BaseModel):
@@ -202,3 +213,9 @@ class PolymorphicOpportunity(BaseModel):
     def source_system(self) -> str:
         """Returns the origin source system recorded in category_specific_attributes."""
         return str(self.category_specific_attributes.get("source_system", "generic"))
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def display_location(self) -> str:
+        """Formatted location obeying JobFalcon canonical location normalization rules."""
+        return self.eligibility_rules.display_location

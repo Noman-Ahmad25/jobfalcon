@@ -20,6 +20,7 @@ import {
 import { searchOpportunities } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
 import { OpportunityDetailModal } from '@/components/ui/OpportunityDetailModal';
+import { formatOpportunityLocation } from '@/lib/location';
 
 interface MarketSearchWorkspaceProps {
   candidateProfile: CandidateCareerProfile;
@@ -322,11 +323,7 @@ export function MarketSearchWorkspace({
 
                       <div className="flex items-center gap-1">
                         <MapPin className="w-3.5 h-3.5 text-zinc-400" />
-                        <span>
-                          {opp.eligibility_rules.location_city_country.length > 0
-                            ? opp.eligibility_rules.location_city_country.join(', ')
-                            : 'Remote / Unrestricted'}
-                        </span>
+                        <span>{formatOpportunityLocation(opp)}</span>
                       </div>
 
                       <span>•</span>

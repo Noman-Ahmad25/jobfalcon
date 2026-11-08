@@ -101,6 +101,7 @@ export interface OpportunityEligibilityRules {
   work_mode: WorkMode;
   location_city_country: string[];
   application_deadline?: string | null;
+  display_location?: string;
 }
 
 export interface OpportunitySkillRequirement {
@@ -127,6 +128,7 @@ export interface PolymorphicOpportunity {
   completeness_score: number;
   trust_score: number;
   is_duplicate: boolean;
+  display_location?: string;
 }
 
 export type EligibilityStatus =

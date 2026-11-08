@@ -17,6 +17,7 @@ import {
   getDiscoveryConnectors,
   runDiscovery,
 } from '@/lib/api';
+import { formatOpportunityLocation } from '@/lib/location';
 
 // Pre-configured candidate profiles for quick interactive testing
 const SAMPLE_CANDIDATES: Record<string, { label: string; description: string; profile: CandidateCareerProfile }> = {
@@ -709,8 +710,7 @@ export function DiscoveryDemo() {
                             <span>{opp.eligibility_rules.work_mode}</span>
                             <span>•</span>
                             <span>
-                              {opp.eligibility_rules.location_city_country.join(', ') ||
-                                opp.eligibility_rules.eligible_country_codes.join(', ')}
+                              {formatOpportunityLocation(opp)}
                             </span>
                             <span>•</span>
                             <span className="font-mono text-indigo-600">

@@ -20,6 +20,7 @@ import {
 } from '@/types/domain';
 import { Badge } from '@/components/ui/Badge';
 import { ScoreBar } from '@/components/ui/ScoreBar';
+import { formatOpportunityLocation } from '@/lib/location';
 
 interface OpportunityDetailModalProps {
   opportunity: PolymorphicOpportunity | RankedOpportunity | null;
@@ -128,11 +129,7 @@ export function OpportunityDetailModal({
 
               <div className="flex items-center gap-1">
                 <MapPin className="w-3.5 h-3.5 text-zinc-400" />
-                <span>
-                  {opp.eligibility_rules.location_city_country.length > 0
-                    ? opp.eligibility_rules.location_city_country.join(', ')
-                    : 'Remote / Unrestricted'}
-                </span>
+                <span>{formatOpportunityLocation(opp)}</span>
               </div>
 
               <span>•</span>
