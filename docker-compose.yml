@@ -21,18 +21,39 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - ENVIRONMENT=development
-      - DEBUG=true
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - DEBUG=${DEBUG:-true}
       - HOST=0.0.0.0
       - PORT=8000
-      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
-      - DATABASE_URL=sqlite:////app/data/jobfalcon_dev.db
-      - LLM_PROVIDER=mock
-      - LLM_MODEL=qwen2.5:14b-instruct
-      - WEB_SEARCH_PROVIDER=searxng
-      - SEARXNG_BASE_URL=http://searxng:8080
-      - MCP_JOBSPY_COMMAND=mcp-jobspy
-      - MCP_JOBSPY_TIMEOUT_SECONDS=12.0
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:////app/data/jobfalcon_dev.db}
+      - LLM_PROVIDER=${LLM_PROVIDER:-mock}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_BASE_URL=${LLM_BASE_URL:-http://localhost:4000/v1}
+      - LLM_MODEL=${LLM_MODEL:-qwen2.5:14b-instruct}
+      - LLM_TIMEOUT_SECONDS=${LLM_TIMEOUT_SECONDS:-30.0}
+      - LLM_MAX_RETRIES=${LLM_MAX_RETRIES:-2}
+      - PROFILING_MAX_INPUT_CHARS=${PROFILING_MAX_INPUT_CHARS:-25000}
+      - WEB_SEARCH_PROVIDER=${WEB_SEARCH_PROVIDER:-searxng}
+      - SEARXNG_BASE_URL=${SEARXNG_BASE_URL:-http://searxng:8080}
+      - WEB_SEARCH_API_KEY=${WEB_SEARCH_API_KEY:-}
+      - WEB_SEARCH_TIMEOUT_SECONDS=${WEB_SEARCH_TIMEOUT_SECONDS:-6.0}
+      - WEB_SEARCH_MAX_RESULTS=${WEB_SEARCH_MAX_RESULTS:-10}
+      - WEB_SEARCH_ENRICH_DESTINATIONS=${WEB_SEARCH_ENRICH_DESTINATIONS:-false}
+      - MCP_JOBSPY_COMMAND=${MCP_JOBSPY_COMMAND:-mcp-jobspy}
+      - MCP_JOBSPY_TIMEOUT_SECONDS=${MCP_JOBSPY_TIMEOUT_SECONDS:-12.0}
+      - MCP_JOBSPY_RESULTS_WANTED=${MCP_JOBSPY_RESULTS_WANTED:-5}
+      - MCP_JOBSPY_FETCH_DETAILS=${MCP_JOBSPY_FETCH_DETAILS:-true}
+      - MCP_JOBSPY_COUNTRY=${MCP_JOBSPY_COUNTRY:-usa}
+      - DISCOVERY_EXECUTION_MODE=${DISCOVERY_EXECUTION_MODE:-local}
+      - DISCOVERY_MAX_ITERATIONS=${DISCOVERY_MAX_ITERATIONS:-6}
+      - DISCOVERY_MAX_TOOL_CALLS=${DISCOVERY_MAX_TOOL_CALLS:-30}
+      - DISCOVERY_MAX_CALLS_PER_CONNECTOR=${DISCOVERY_MAX_CALLS_PER_CONNECTOR:-15}
+      - DISCOVERY_MAX_CONCURRENT_CONNECTOR_CALLS=${DISCOVERY_MAX_CONCURRENT_CONNECTOR_CALLS:-3}
+      - DISCOVERY_PER_TOOL_TIMEOUT_SECONDS=${DISCOVERY_PER_TOOL_TIMEOUT_SECONDS:-20.0}
+      - DISCOVERY_WORKFLOW_TIMEOUT_SECONDS=${DISCOVERY_WORKFLOW_TIMEOUT_SECONDS:-120.0}
+      - DISCOVERY_RETRY_LIMIT=${DISCOVERY_RETRY_LIMIT:-2}
+      - SEED_DEMO_DATA=${SEED_DEMO_DATA:-false}
     volumes:
       - jobfalcon_backend_data:/app/data
     depends_on:
@@ -55,7 +76,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - NEXT_PUBLIC_API_URL=http://localhost:8000
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     container_name: jobfalcon-frontend
     restart: unless-stopped
     ports:
@@ -63,7 +84,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     depends_on:
       backend:
         condition: service_healthy

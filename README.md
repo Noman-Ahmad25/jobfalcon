@@ -1,153 +1,375 @@
 # JobFalcon
 
-An Agentic AI-Powered Career Opportunity Recommendation System that builds evidence-backed skill profiles, analyzes labor-market trends, and discovers, evaluates, and ranks career opportunities based on deterministic eligibility, skill fit, and growth potential.
+An Agentic AI-Powered Career Opportunity Recommendation System that builds evidence-backed skill profiles, analyzes labor-market dynamics, and discovers, evaluates, and ranks career opportunities based on deterministic eligibility constraints, multidimensional skill fit, and growth potential.
 
-## Documentation & Architecture References
+---
+
+## Architecture Specification & Governance References
 
 - **Architecture Specification**: Complete 5-part architecture specification located in [`docs/`](file:///Users/nomanahmad/WorkSpace/Projects/JobFalcon/docs) (Sections 1–5).
-- **Engineering Guidelines & Rules**: Agent instructions, coding standards, and security requirements in [`AGENTS.md`](file:///Users/nomanahmad/WorkSpace/Projects/JobFalcon/AGENTS.md).
+- **Engineering Guidelines & Invariants**: Repository guidelines, determinism requirements, and security rules in [`AGENTS.md`](file:///Users/nomanahmad/WorkSpace/Projects/JobFalcon/AGENTS.md).
 - **Development Skill System**: 12 modular Antigravity development skills cataloged in [`docs/SKILLS_INDEX.md`](file:///Users/nomanahmad/WorkSpace/Projects/JobFalcon/docs/SKILLS_INDEX.md).
-- **Architectural Decisions & Calibration Items**: Open decisions and provisional formulas recorded in [`docs/UNRESOLVED_DECISIONS.md`](file:///Users/nomanahmad/WorkSpace/Projects/JobFalcon/docs/UNRESOLVED_DECISIONS.md).
+- **Architectural Decisions & Calibration Logs**: Open decisions and provisional formulas recorded in [`docs/UNRESOLVED_DECISIONS.md`](file:///Users/nomanahmad/WorkSpace/Projects/JobFalcon/docs/UNRESOLVED_DECISIONS.md).
+
+---
 
 ## System Architecture
 
 ```text
-┌───────────────────────────────┐
-│       Next.js Frontend        │ (App Router • React 19 • Tailwind CSS)
-│     http://localhost:3000     │
-└───────────────┬───────────────┘
-                │ HTTP Requests / Health Probes
-                ▼
-┌───────────────────────────────┐
-│        FastAPI Backend        │ (Modular Monolith • Python 3.12+)
-│     http://localhost:8000     │
-├───────────────────────────────┤
-│ • /healthz & /readyz          │ Liveness and readiness probes
-│ • /api/v1/healthz             │ Versioned API health diagnostic
-│ • /api/v1/...                 │ Future modular domain routers
-└───────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│                   Next.js Frontend Career Workspace                      │
+│                  http://localhost:3000 (React 19 • App Router)           │
+└────────────────────────────────────┬─────────────────────────────────────┘
+                                     │ HTTP REST / SSE Telemetry Stream
+                                     ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│                         FastAPI Backend Gateway                          │
+│                   http://localhost:8000 (Python 3.12+)                   │
+├──────────────────────────────────────────────────────────────────────────┤
+│ • Modular Application Services: Candidate Profile, Application Tracking  │
+│ • LangGraph StateGraph Multi-Agent Orchestrator (Cyclic Supervisor-Worker)│
+│ • 100% Pure Deterministic Eligibility Gate (Zero Probabilistic Bypass)   │
+│ • Mathematical 6-Dimensional MCDA Scoring & MinHash LSH Deduplication    │
+└──────────────┬───────────────────────────────┬───────────────────────────┘
+               │                               │
+       ┌───────▼────────┐             ┌────────▼────────┐
+       │   AI Gateway   │             │  External Tools │
+       │ (LiteLLM/Ollama│             │ & Search Feeds  │
+       │    / Mock)     │             └────────┬────────┘
+       └────────────────┘                      │
+                     ┌─────────────────────────┴──────────────────────────┐
+                     │                                                    │
+             ┌───────▼────────┐                                   ┌───────▼────────┐
+             │ SearXNG Search │                                   │   JobSpy MCP   │
+             │ (Meta-Search)  │                                   │(Stdio JSON-RPC)│
+             └────────────────┘                                   └────────────────┘
 ```
 
-1. **Modular Monolith**: FastAPI backend with decoupled application services and compiled LangGraph multi-agent orchestration.
-2. **Deterministic Primacy**: 100% deterministic rule enforcement for hard eligibility constraints and mathematical 6-dimensional MCDA ranking.
-3. **Evidence-Backed Career Intelligence**: Multi-source skill extraction anchored to ESCO v1.2.1 and O*NET v2.0 taxonomies with verifiability weighting and epistemic confidence.
-4. **Hierarchical Multi-Agent Supervisor**: Orchestrator coordinating specialist agents (Profile, Market Intelligence, Opportunity Discovery, Ranking, and Explanation) with bounded evaluator-optimizer loops and Map-Reduce parallelism.
-5. **Robust Local & Cloud Hybrid AI**: LiteLLM AI Gateway with Redis-backed circuit breakers and fallback cascade to local Ollama open-weights models.
+### Core Architectural Invariants
+
+1. **Modular Monolith**: Clean separation between standard application services (auth, profiles, tracking) and AI orchestration workflows. Services remain fully functional even when AI models are unavailable.
+2. **Deterministic Primacy Over Probabilistic Models**:
+   - Hard eligibility constraints (degree, enrollment status, work authorization, location, active deadlines) execute exclusively in pure Python/SQL deterministic code. Language models are strictly forbidden from evaluating or overriding eligibility.
+   - Mathematical 6-dimensional MCDA ranking (Skill Match, Growth Potential, Compensation Competitiveness, Role Quality, Commute & Work-Style Fit, Epistemic Uncertainty Discount) is strictly calculated via deterministic arithmetic. LLMs never invent or alter rank scores.
+3. **Evidence-Backed Career Intelligence**: Candidate skills and qualifications are bound to verifiable `EvidenceRecord` provenance with explicit epistemic confidence and taxonomy grounding (ESCO v1.2.1 and O*NET v2.0).
+4. **Resilient Multi-Agent Orchestration**: LangGraph cyclic `StateGraph` coordinating specialist nodes with adaptive iteration budgets, zero-result recovery cascades, and strict execution guardrails to prevent infinite loops.
+5. **Prompt Injection & Data Sanitization**: Untrusted external inputs (uploaded resumes, external job postings, search snippets) are normalized via Unicode NFKC, stripped of control characters, and enclosed in structured `tool_result` wrappers with untrusted trust headers.
 
 ---
 
-## Local Development Quickstart
+## Technology Stack
 
-### Prerequisites
-- Python 3.12+ (or Homebrew Python 3.14)
-- Node.js v20+ (v24 LTS recommended) and npm
-- `uv` (recommended for ultra-fast Python package management) or `pip3`
+| Layer | Technologies |
+| :--- | :--- |
+| **Frontend UI** | Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, Lucide Icons |
+| **Backend API** | Python 3.12+, FastAPI, Uvicorn, Pydantic v2, `sse-starlette`, `python-multipart` |
+| **Agent Orchestration** | LangGraph (StateGraph, checkpointing, supervised worker fan-out) |
+| **Document Extraction** | `pypdf`, `python-docx`, Markdown parsers with fallback resilience |
+| **Deduplication & Search** | MinHash LSH (128 permutations), SearXNG meta-search, DuckDuckGo Lite |
+| **Tool Protocol (MCP)** | Model Context Protocol (`mcp>=2.3.0`) via JSON-RPC 2.0 stdio pipes (`mcp-jobspy`) |
+| **Storage (Zero-Setup)** | SQLite (`sqlite:///./jobfalcon_dev.db`) file persistence |
+| **Storage (Production)** | PostgreSQL 16+ with `pgvector` HNSW indexing, Redis Stack (RedisVL semantic cache), MinIO S3 |
+| **Containerization** | Docker, multi-stage Alpine/Slim Dockerfiles, Docker Compose |
 
-### 1. Backend Setup
+---
 
+## Required Services & System Dependencies
+
+### Host Prerequisites
+- **Python**: Version 3.12+ (Python 3.14 on macOS supported)
+- **Node.js**: Version 20.x or 22.x LTS with `npm`
+- **Package Manager**: `uv` (strongly recommended for Python) or standard `pip`
+- **Docker & Docker Compose**: Required for containerized execution and local SearXNG search engine
+
+### External Discovery Services (Configurable)
+- **SearXNG**: Self-hosted meta-search engine running on port 8080 (included in Docker Compose)
+- **JobSpy MCP Server**: Python MCP CLI package (`mcp-jobspy`) for scraping public requisitions (Indeed, LinkedIn, Glassdoor, ZipRecruiter) over standard JSON-RPC 2.0 stdio
+- **LLM Gateway / Local Runner**:
+  - **Mock Provider** (Default): Zero API keys required; offline deterministic mock responses for testing and rapid development.
+  - **Ollama**: Local open-weights model execution (e.g. `qwen2.5:14b-instruct`, `llama3.1:8b-instruct`) at `http://localhost:11434/v1`.
+  - **LiteLLM / OpenAI**: Hosted or self-hosted API gateways.
+
+---
+
+## Execution Modes: Local Workstation vs. Hosted
+
+JobFalcon introduces distinct execution profiles via the `DISCOVERY_EXECUTION_MODE` environment variable:
+
+| Configuration Parameter | `local` Mode (Default) | `hosted` Mode | Purpose |
+| :--- | :--- | :--- | :--- |
+| `DISCOVERY_EXECUTION_MODE` | `local` | `hosted` | Selects behavioral profile |
+| `DISCOVERY_MAX_ITERATIONS` | **6** iterations | **3** iterations | Bounded loops for search-evaluate-adapt cycles |
+| `DISCOVERY_MAX_TOOL_CALLS` | **30** calls (or 0 for unlimited) | **10** calls | Budget ceiling across all external search connectors |
+| `DISCOVERY_MAX_CALLS_PER_CONNECTOR` | **15** calls | **5** calls | Prevents a single search connector from monopolizing budget |
+| `DISCOVERY_MAX_CONCURRENT_CONNECTOR_CALLS` | **3** parallel calls | **2** parallel calls | Concurrency throttle for external scraping and queries |
+| `DISCOVERY_PER_TOOL_TIMEOUT_SECONDS` | **20.0s** | **8.0s** | Timeout per individual connector invocation |
+| `DISCOVERY_WORKFLOW_TIMEOUT_SECONDS` | **120.0s** | **30.0s** | Total workflow timeout before returning partial results |
+| **Zero-Result Recovery** | **Adaptive Query Broadening** | Single retry fallback | Automatically widens query criteria when initial searches yield 0 results |
+
+---
+
+## Environment Configuration
+
+Both backend and frontend utilize decoupled environment configuration templates.
+
+### Backend Configuration (`backend/.env`)
+
+Copy `backend/.env.example` to `backend/.env`:
 ```bash
-# Navigate to backend directory
-cd backend
-
-# Create virtual environment and activate
-uv venv .venv
-source .venv/bin/activate
-
-# Copy example environment configuration
-cp .env.example .env
-
-# Install dependencies
-uv pip install fastapi uvicorn pydantic pydantic-settings pytest httpx mcp mcp-jobspy langgraph
-
-# Run automated tests
-.venv/bin/pytest -v
-
-# Start FastAPI development server
-.venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+cp backend/.env.example backend/.env
 ```
-The backend API will be available at `http://localhost:8000`. Test the health check endpoint:
-```bash
-curl http://localhost:8000/healthz
-```
 
-### 2. Real Web Search Configuration (Milestone 13)
-
-JobFalcon features genuine, multi-provider web search integration for external opportunity discovery without mandating paid third-party API subscriptions:
+Key environment variables:
 
 ```bash
-# Option A: Self-Hosted SearXNG (Default, Privacy-Preserving Meta-Search)
-docker run -d --name searxng -p 8080:8080 -e "SEARXNG_BASE_URL=http://localhost:8080" searxng/searxng
+# Core Runtime
+ENVIRONMENT=development
+DEBUG=true
+HOST=0.0.0.0
+PORT=8000
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 
-# Configure in backend/.env:
+# Persistence (SQLite default for zero-setup; PostgreSQL pgvector for full production)
+DATABASE_URL=sqlite:///./jobfalcon_dev.db
+
+# LLM Gateway (options: 'mock', 'litellm', 'ollama', 'openai')
+LLM_PROVIDER=mock
+LLM_BASE_URL=http://localhost:4000/v1
+LLM_MODEL=qwen2.5:14b-instruct
+
+# Web Search Provider (options: 'searxng', 'duckduckgo', 'mock')
 WEB_SEARCH_PROVIDER=searxng
 SEARXNG_BASE_URL=http://localhost:8080
-WEB_SEARCH_TIMEOUT_SECONDS=6.0
-WEB_SEARCH_MAX_RESULTS=10
 
-# Option B: Zero-Config Public Web Search (Zero API Key, Zero Container Setup)
-# Uses DuckDuckGo Lite endpoint with automatic URL decoding and anti-noise classification
-WEB_SEARCH_PROVIDER=duckduckgo
-
-# Option C: Custom REST JSON Search Gateway
-WEB_SEARCH_PROVIDER=custom_json
-CUSTOM_SEARCH_ENDPOINT_URL=https://search.mycompany.internal/api/search
-WEB_SEARCH_API_KEY=optional_secret_token
-```
-
-**Security & Provenance Invariants**:
-- All search result snippets are treated as **untrusted data**, sanitized against script injection and prompt injection attempts, and prepended with `[Search Index Result - Unverified Requisition]`.
-- Direct original requisition URLs are strictly preserved.
-- Unverified web search listings receive explicit confidence discounting (`trust_score=0.68–0.82`, `completeness_score=0.75`), and cannot alter deterministic eligibility or mathematical 6D ranking scores.
-- When providers are unreachable or misconfigured, connectors honestly report `UNAVAILABLE` or `MISCONFIGURED` without hallucinating fake listings or claiming false `CONNECTED` states.
-
-### 3. Model Context Protocol (MCP) Discovery Integration (Milestone 14)
-
-JobFalcon features genuine, protocol-compliant integration with Model Context Protocol (MCP) servers using standard JSON-RPC 2.0 communication over stdio pipes:
-
-```bash
-# 1. Install MCP Python SDK and JobSpy MCP server executable
-uv pip install "mcp>=2.3.0" "mcp-jobspy>=1.4.1"
-
-# 2. Configure in backend/.env:
+# JobSpy MCP Tool Integration
 MCP_JOBSPY_COMMAND=mcp-jobspy
 MCP_JOBSPY_TIMEOUT_SECONDS=12.0
 MCP_JOBSPY_RESULTS_WANTED=5
 MCP_JOBSPY_FETCH_DETAILS=true
 MCP_JOBSPY_COUNTRY=usa
+
+# Discovery Execution Budgets (Milestone 15)
+DISCOVERY_EXECUTION_MODE=local
+DISCOVERY_MAX_ITERATIONS=6
+DISCOVERY_MAX_TOOL_CALLS=30
+DISCOVERY_PER_TOOL_TIMEOUT_SECONDS=20.0
+DISCOVERY_WORKFLOW_TIMEOUT_SECONDS=120.0
 ```
 
-**MCP Operational & Protocol Invariants**:
-- **Genuine Protocol Communication**: Interacts strictly through the MCP protocol (`initialize` handshake, `list_tools` tool discovery, `call_tool` tool invocation) via official `mcp.client.stdio.stdio_client`. Does not use raw Python library calls or non-protocol subprocess hacks.
-- **Single-Session Detail Enrichment**: Executes `search_jobs` and subsequent `get_job_details` within an active MCP session, retrieving complete requisition descriptions and unmasking direct ATS application links (`job_url_direct`).
-- **Honest Health Reporting**:
-  - `CONNECTED`: Reported only when real MCP handshake succeeds and advertised tools (`search_jobs`, `get_job_details`) are discovered.
-  - `UNAVAILABLE_MISSING_BINARY`: Reported when the MCP executable is absent from PATH and virtualenv, accompanied by actionable remediation instructions.
-  - `MOCKED_FALLBACK`: Reported when running in offline testing mode.
-- **Provider Status**:
-  - **JobSpy MCP** (`mcp-jobspy`): Fully supported, active, and verified.
-  - **India Jobs MCP** (`@borgius/india-jobs-mcp`): Dropped. The npm package returns 404 Not Found on the npm registry and no binary exists. Accurately reports `UNAVAILABLE_MISSING_BINARY` in live mode without false connectivity claims.
-- **Deduplication & Determinism**: Discovered MCP listings are sanitized (`[MCP Tool Result: jobspy/search_jobs - Unverified Requisition]`), mapped to `PolymorphicOpportunity`, hashed for 128-permutation MinHash LSH cross-source deduplication, and filtered via pure Python deterministic eligibility rules.
+### Frontend Configuration (`frontend/.env.local`)
 
-### 4. Frontend Setup
+Copy `frontend/.env.example` to `frontend/.env.local`:
+```bash
+cp frontend/.env.example frontend/.env.local
+```
 
 ```bash
-# In a separate terminal, navigate to frontend directory
+# Backend FastAPI API Base URL (must be browser-accessible)
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+---
+
+## Local Development Startup (Without Docker)
+
+### 1. Backend Setup
+
+```bash
+# 1. Navigate to backend directory
+cd backend
+
+# 2. Create and activate a Python virtual environment
+uv venv .venv
+source .venv/bin/activate
+
+# 3. Install backend dependencies directly from pyproject.toml
+uv pip install -r pyproject.toml
+
+# 4. Copy environment configuration
+cp .env.example .env
+
+# 5. Launch FastAPI development server with auto-reload
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Verify backend health in another terminal:
+```bash
+curl -s http://localhost:8000/api/v1/healthz
+# Response: {"status":"ok","version":"0.1.0","environment":"development",...}
+```
+
+### 2. Frontend Setup
+
+```bash
+# 1. In a separate terminal, navigate to frontend directory
 cd frontend
 
-# Copy example environment configuration
-cp .env.example .env.local
-
-# Install dependencies (if not already installed)
+# 2. Install dependencies
 npm install
 
-# Run linters and type check
-npm run lint
-npx tsc --noEmit
+# 3. Copy environment configuration
+cp .env.example .env.local
 
-# Build production bundle
-npm run build
-
-# Start Next.js development server
+# 4. Run Next.js development server
 npm run dev
 ```
-Open `http://localhost:3000` in your browser. The initial dashboard will load and probe the live backend health endpoint.
+
+Open `http://localhost:3000` in your browser. The application dashboard will load and automatically connect to the backend API.
+
+---
+
+## Docker-Based Startup (Containerized)
+
+JobFalcon provides a multi-container Docker Compose setup supporting both zero-dependency lightweight mode and full infrastructure mode.
+
+### 1. Standard Mode (FastAPI Backend + Next.js Frontend + SearXNG Search)
+
+This mode runs the entire core application with zero external dependencies (uses SQLite database and local SearXNG meta-search):
+
+```bash
+# Build images and start all core containers
+docker compose up --build
+```
+
+Container endpoints:
+- **Frontend Workspace**: `http://localhost:3000`
+- **Backend API & Swagger Docs**: `http://localhost:8000` (docs at `http://localhost:8000/docs`)
+- **SearXNG Meta-Search**: `http://localhost:8080`
+
+To run in the background (detached mode):
+```bash
+docker compose up -d --build
+```
+
+To view logs:
+```bash
+docker compose logs -f
+```
+
+To stop containers:
+```bash
+docker compose down
+```
+
+### 2. Full Infrastructure Mode (PostgreSQL pgvector + Redis Stack + MinIO)
+
+When evaluating vector embeddings, RedisVL semantic caching, or S3 resume storage:
+
+```bash
+# Start all core services plus PostgreSQL pgvector, Redis Stack, and MinIO
+docker compose --profile full up --build
+```
+
+Additional service ports:
+- **PostgreSQL 16 (pgvector)**: `localhost:5432` (`jobfalcon:jobfalcon_user:devpassword123`)
+- **Redis Stack**: `localhost:6379`
+- **MinIO Console**: `http://localhost:9001` (`minioadmin:minioadmin`) / S3 API at `localhost:9000`
+
+---
+
+## Available Discovery Sources & Configuration
+
+JobFalcon connects multiple discovery channels into a unified candidate exploration workflow:
+
+### 1. Web Search Connector (SearXNG / DuckDuckGo)
+- **SearXNG (Recommended)**: Privacy-preserving meta-search aggregator querying Google, Bing, DuckDuckGo, and specialized engines without rate limiting.
+- **DuckDuckGo Lite**: Fallback web search requiring zero configuration and zero API keys.
+- **Sanitization & Provenance**: Search snippets are sanitized via Unicode NFKC normalization, stripped of script tags, and bounded in untrusted data blocks. Direct requisition links are extracted and preserved.
+
+### 2. Model Context Protocol (MCP) JobSpy Connector
+- **JobSpy MCP (`mcp-jobspy`)**: Scrapes and standardizes job postings from LinkedIn, Indeed, Glassdoor, and ZipRecruiter over standard JSON-RPC 2.0 stdio pipes.
+- **Detail Enrichment**: Automatically retrieves complete job descriptions and direct employer ATS application links (`job_url_direct`).
+- **Country Domain Routing**: Automatically resolves ISO country codes (e.g. US, IN, UK, CA, DE, FR, AU, SG) to target job boards.
+
+### 3. Adaptive Discovery & Zero-Result Recovery
+- **Multi-Iteration Orchestration**: If initial search queries yield zero opportunities, the LangGraph coordinator enters an adaptive relaxation loop.
+- **Query Relaxation**: Progressively broadens title filters, removes overly specific keywords, and expands geographical boundaries.
+- **Budget Protection**: Enforces explicit per-run limits (`DISCOVERY_MAX_TOOL_CALLS` and `DISCOVERY_MAX_ITERATIONS`) to prevent runaways while providing sufficient discovery depth.
+- **Deduplication**: Cross-connector deduplication uses 128-permutation MinHash LSH to identify near-identical postings across different job boards.
+
+---
+
+## Testing & Verification Commands
+
+JobFalcon maintains rigorous automated testing across all architectural layers.
+
+### Backend Verification
+
+```bash
+# Activate backend virtualenv
+source backend/.venv/bin/activate
+
+# 1. Run full unit and integration test suite (226+ tests)
+PYTHONPATH=backend pytest backend/tests
+
+# 2. Run specific deterministic eligibility engine tests
+PYTHONPATH=backend pytest backend/tests/test_eligibility_engine.py
+
+# 3. Run adaptive discovery and budget tests
+PYTHONPATH=backend pytest backend/tests/test_adaptive_discovery_budget.py
+
+# 4. Run LangGraph orchestration workflow tests
+PYTHONPATH=backend pytest backend/tests/test_langgraph_orchestration.py
+
+# 5. Run Python code linting and style check
+ruff check backend/
+ruff format --check backend/
+```
+
+### Frontend Verification
+
+```bash
+cd frontend
+
+# 1. Run TypeScript static type check
+npx tsc --noEmit
+
+# 2. Run Next.js / ESLint static analysis
+npm run lint
+
+# 3. Verify production build compilation
+npm run build
+```
+
+### Docker Verification
+
+```bash
+# Validate docker-compose.yml configuration syntax
+docker compose config
+```
+
+---
+
+## Repository Structure
+
+```text
+JobFalcon/
+├── .agents/skills/          # 12 Antigravity development skills & workflows
+├── backend/                 # FastAPI modular monolith application
+│   ├── app/
+│   │   ├── api/v1/          # Modular API routers (health, candidate, discovery, etc.)
+│   │   ├── core/            # Configuration (Settings), security, and logging
+│   │   ├── models/          # Relational and vector database models
+│   │   ├── schemas/         # Strict Pydantic v2 domain schemas & contracts
+│   │   ├── services/        # Business logic services (eligibility, deduplication, etc.)
+│   │   └── workflows/       # LangGraph StateGraph agents & discovery orchestrator
+│   ├── tests/               # Pytest suite (eligibility, scoring, orchestration, discovery)
+│   ├── Dockerfile           # Multi-stage production container build (uv + Python 3.12)
+│   ├── .dockerignore        # Excludes virtual environments, caches, and database files
+│   ├── .env.example         # Complete environment variable template
+│   └── pyproject.toml       # Python packaging and dependency specifications
+├── frontend/                # Next.js 15 App Router Career Workspace UI
+│   ├── src/
+│   │   ├── app/             # Next.js App Router pages and layouts
+│   │   ├── components/      # UI components (profile, discovery, recommendations, etc.)
+│   │   └── lib/             # Typed API clients and SSE streaming handlers
+│   ├── Dockerfile           # Multi-stage production container build (Node.js 20 Alpine)
+│   ├── .dockerignore        # Excludes node_modules, build artifacts, and local environments
+│   ├── .env.example         # Frontend environment variable template
+│   └── package.json         # Frontend dependencies and build scripts
+├── docs/                    # Architecture documentation & decision records
+├── docker-compose.yml       # Multi-container orchestration (Backend, Frontend, SearXNG, etc.)
+├── .dockerignore            # Root-level docker build ignore specification
+├── AGENTS.md                # Agent instructions, engineering guidelines & invariants
+└── README.md                # Root project documentation (this document)
+```

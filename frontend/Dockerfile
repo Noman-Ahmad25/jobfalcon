@@ -14,8 +14,8 @@ RUN npm ci
 # Copy frontend source code and configuration
 COPY . .
 
-# Build-time environment argument for backend API URL
-ARG NEXT_PUBLIC_API_URL=http://backend:8000
+# Build-time environment argument for backend API URL (browser client accessible)
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
 # Build Next.js production bundle

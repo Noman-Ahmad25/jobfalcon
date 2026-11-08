@@ -19,9 +19,9 @@ COPY --from=ghcr.io/astral-sh/uv:0.5.21 /uv /uvx /bin/
 # Copy dependency definition
 COPY pyproject.toml .
 
-# Install dependencies into virtualenv
+# Install dependencies into virtualenv using pyproject.toml
 RUN uv venv /opt/venv && \
-    VIRTUAL_ENV=/opt/venv uv pip install .
+    VIRTUAL_ENV=/opt/venv uv pip install -r pyproject.toml
 
 # ==============================================================================
 # Runner Stage
