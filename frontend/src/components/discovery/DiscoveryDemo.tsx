@@ -219,7 +219,7 @@ export function DiscoveryDemo() {
   const [dedupThreshold, setDedupThreshold] = useState<number>(0.85);
 
   const [loadingConnectors, setLoadingConnectors] = useState<boolean>(false);
-  const [isLiveMode, setIsLiveMode] = useState<boolean>(false);
+  const [isLiveMode, setIsLiveMode] = useState<boolean>(true);
   const [planningLoading, setPlanningLoading] = useState<boolean>(false);
   const [discoveryLoading, setDiscoveryLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -228,7 +228,7 @@ export function DiscoveryDemo() {
 
   // Load connector health on mount
   useEffect(() => {
-    refreshConnectors(false);
+    refreshConnectors(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

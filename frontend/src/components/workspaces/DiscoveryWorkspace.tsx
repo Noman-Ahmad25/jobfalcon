@@ -98,12 +98,12 @@ export function DiscoveryWorkspace({
   const activeEventSourceRef = useRef<EventSource | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load connector health on mount
+  // Load connector health on mount and when operating mode changes
   useEffect(() => {
     let isMounted = true;
     async function loadConnectors() {
       try {
-        const reports = await getDiscoveryConnectors(false);
+        const reports = await getDiscoveryConnectors(enableLiveDiscovery);
         if (isMounted) setConnectors(reports);
       } catch (err) {
         console.warn('Unable to load discovery connectors:', err);
@@ -113,7 +113,7 @@ export function DiscoveryWorkspace({
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [enableLiveDiscovery]);
 
   // Helper to fetch final results and set response
   const finalizeRun = useCallback(async (runId: string) => {
@@ -122,6 +122,11 @@ export function DiscoveryWorkspace({
       setActiveRun(finalRun);
       if (finalRun.response) {
         setDiscoveryResponse(finalRun.response);
+        if (finalRun.response.connector_health?.length) {
+          setConnectors(finalRun.response.connector_health);
+        }
+      } else if (finalRun.connector_health?.length) {
+        setConnectors(finalRun.connector_health);
       }
       if (finalRun.timeline_events?.length) {
         setLiveEvents(finalRun.timeline_events);
@@ -268,8 +273,13 @@ export function DiscoveryWorkspace({
 
           if (latest.status === 'COMPLETED' && latest.response) {
             setDiscoveryResponse(latest.response);
+            if (latest.response.connector_health?.length) {
+              setConnectors(latest.response.connector_health);
+            }
             setCurrentStage('COMPLETED');
             setIsExecuting(false);
+          } else if (latest.connector_health?.length) {
+            setConnectors(latest.connector_health);
           } else if (
             latest.status !== 'COMPLETED' &&
             latest.status !== 'FAILED' &&
@@ -322,9 +332,15 @@ export function DiscoveryWorkspace({
 
       if (run.status === 'COMPLETED' && run.response) {
         setDiscoveryResponse(run.response);
+        if (run.response.connector_health?.length) {
+          setConnectors(run.response.connector_health);
+        }
         setCurrentStage('COMPLETED');
         setIsExecuting(false);
       } else {
+        if (run.connector_health?.length) {
+          setConnectors(run.connector_health);
+        }
         attachStream(run.run_id);
       }
     } catch (err: unknown) {
@@ -424,16 +440,36 @@ export function DiscoveryWorkspace({
             </span>
             <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
               {connectors.length > 0 ? (
-                connectors.map((c) => (
-                  <Badge
-                    key={c.connector_id}
-                    variant={c.status === 'ERROR' ? 'disqualified' : c.is_mock_fallback ? 'outline' : 'teal'}
-                    size="sm"
-                    mono
-                  >
-                    {c.source_name.split(' ')[0]} ({c.status})
-                  </Badge>
-                ))
+                connectors.map((c) => {
+                  let badgeVariant: 'teal' | 'verified' | 'caveat' | 'disqualified' | 'outline' | 'neutral' = 'neutral';
+                  if (c.status === 'CONNECTED') {
+                    badgeVariant = 'teal';
+                  } else if (c.status === 'ERROR') {
+                    badgeVariant = 'disqualified';
+                  } else if (
+                    c.status === 'UNAVAILABLE_MISSING_BINARY' ||
+                    c.status === 'UNAVAILABLE' ||
+                    c.status === 'MISCONFIGURED' ||
+                    c.status === 'DEGRADED' ||
+                    c.status === 'RATE_LIMITED'
+                  ) {
+                    badgeVariant = 'caveat';
+                  } else if (c.is_mock_fallback || c.status === 'MOCKED_FALLBACK') {
+                    badgeVariant = 'outline';
+                  }
+
+                  return (
+                    <Badge
+                      key={c.connector_id}
+                      variant={badgeVariant}
+                      size="sm"
+                      mono
+                      title={`${c.source_name}: ${c.status}`}
+                    >
+                      {c.source_name.split(' ')[0]} ({c.status})
+                    </Badge>
+                  );
+                })
               ) : (
                 <>
                   <Badge variant="teal" size="sm" mono>

@@ -174,7 +174,7 @@ class OpportunitySearchTool:
     def __init__(
         self,
         connectors: Optional[list[BaseDiscoveryConnector]] = None,
-        mock_mode: bool = True,
+        mock_mode: bool = False,
         simulate_failure_connector: Optional[str] = None,
     ) -> None:
         self.tool_name = "opportunity_search_tool"

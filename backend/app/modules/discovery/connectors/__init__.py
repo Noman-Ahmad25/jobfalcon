@@ -13,7 +13,7 @@ from app.modules.discovery.connectors.web_search import WebSearchConnector
 
 
 def get_default_connectors(
-    mock_mode: bool = True,
+    mock_mode: bool = False,
     simulate_failure_connector: Optional[str] = None,
 ) -> list[BaseDiscoveryConnector]:
     """Instantiates the 4 discovery connectors with optional fault injection for testing resilience."""

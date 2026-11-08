@@ -15,6 +15,7 @@ interface BadgeProps {
   children: React.ReactNode;
   mono?: boolean;
   className?: string;
+  title?: string;
 }
 
 export function Badge({
@@ -24,6 +25,7 @@ export function Badge({
   children,
   mono = false,
   className = '',
+  title,
 }: BadgeProps) {
   const sizeClasses =
     size === 'sm'
@@ -47,6 +49,7 @@ export function Badge({
 
   return (
     <span
+      title={title}
       className={`inline-flex items-center gap-1.5 rounded-md font-sans tracking-tight transition-colors ${sizeClasses} ${variantClasses} ${
         mono ? 'font-mono' : ''
       } ${className}`}

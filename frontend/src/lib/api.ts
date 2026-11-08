@@ -157,8 +157,8 @@ export async function getCandidateProfile(
   });
 }
 
-export async function getDiscoveryConnectors(live: boolean = false): Promise<ConnectorHealthReport[]> {
-  const query = live ? '?live=true' : '';
+export async function getDiscoveryConnectors(live: boolean = true): Promise<ConnectorHealthReport[]> {
+  const query = live ? '?live=true' : '?live=false';
   return fetchFromApi<ConnectorHealthReport[]>(`/api/v1/discovery/connectors${query}`, {
     method: 'GET',
     timeoutMs: live ? 12000 : 5000,

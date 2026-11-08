@@ -53,7 +53,8 @@ def get_discovery_coordinator() -> DiscoveryCoordinator:
     summary="List Discovery Connectors and Operational Health",
 )
 async def list_connectors(
-    live: bool = Query(default=False, description="When true, performs genuine live network connectivity probes"),
+    live: bool = Query(default=True, description="When true, inspects genuine configured discovery connectors; when false, inspects mock implementations"),
+    mock_mode: Optional[bool] = Query(default=None, description="Explicit mock mode override. If true, returns deterministic mock fixtures"),
 ) -> list[ConnectorHealthReport]:
     """Inspects the operational health and connectivity of configured discovery connectors.
 
@@ -65,7 +66,8 @@ async def list_connectors(
 
     Status indicates CONNECTED, UNAVAILABLE, MISCONFIGURED, DEGRADED, or MOCKED_FALLBACK without falsified claims.
     """
-    connectors = get_default_connectors(mock_mode=not live)
+    is_mock = mock_mode if mock_mode is not None else (not live)
+    connectors = get_default_connectors(mock_mode=is_mock)
     reports = []
     for connector in connectors:
         try:

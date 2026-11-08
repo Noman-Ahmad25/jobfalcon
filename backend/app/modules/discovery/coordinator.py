@@ -178,7 +178,7 @@ class DiscoveryCoordinator:
         self,
         connector_ids: Optional[list[str]],
         simulate_failure_connector: Optional[str],
-        mock_mode: bool = True,
+        mock_mode: bool = False,
     ) -> list[BaseDiscoveryConnector]:
         """Configures and filters active connectors."""
         if self._connectors is not None:

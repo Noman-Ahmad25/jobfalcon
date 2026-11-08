@@ -406,3 +406,37 @@ def test_api_discovery_endpoints() -> None:
     fail_data = fail_run_resp.json()
     assert fail_data["execution_metadata"]["failed_connectors"] == 1
     assert fail_data["canonical_count"] > 0
+
+
+def test_connector_status_classification_accuracy() -> None:
+    """Verifies that GET /connectors returns accurate status reflecting real runtime state,
+    and does NOT label real implementations as MOCKED_FALLBACK."""
+    client = TestClient(app)
+
+    # 1. Default endpoint call inspects real configured connectors
+    resp = client.get("/api/v1/discovery/connectors")
+    assert resp.status_code == 200
+    connectors = {c["connector_id"]: c for c in resp.json()}
+
+    # JobSpy MCP is installed in environment -> CONNECTED with is_mock_fallback=False
+    assert connectors["jobspy_mcp"]["status"] == ConnectorStatus.CONNECTED
+    assert connectors["jobspy_mcp"]["is_mock_fallback"] is False
+
+    # India Jobs MCP is not installed on PATH -> UNAVAILABLE_MISSING_BINARY (honest reporting)
+    assert connectors["india_jobs_mcp"]["status"] == ConnectorStatus.UNAVAILABLE_MISSING_BINARY
+    assert connectors["india_jobs_mcp"]["is_mock_fallback"] is False
+
+    # Web Search is configured -> not MOCKED_FALLBACK
+    assert connectors["web_search"]["status"] != ConnectorStatus.MOCKED_FALLBACK
+    assert connectors["web_search"]["is_mock_fallback"] is False
+
+    # Direct ATS has live endpoints verified -> not MOCKED_FALLBACK
+    assert connectors["ats_career_pages"]["is_mock_fallback"] is False
+
+    # 2. When mock mode is explicitly requested, returns MOCKED_FALLBACK
+    mock_resp = client.get("/api/v1/discovery/connectors?live=false")
+    assert mock_resp.status_code == 200
+    for c in mock_resp.json():
+        assert c["status"] == ConnectorStatus.MOCKED_FALLBACK
+        assert c["is_mock_fallback"] is True
+
