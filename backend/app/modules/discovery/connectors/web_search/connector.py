@@ -173,8 +173,12 @@ class WebSearchConnector(BaseDiscoveryConnector):
 
         # 2. Live Provider Execution
         try:
-            # Build targeted web query string
-            effective_query = self._build_search_query_string(query)
+            # Prefer explicit adaptive query string if provided, else construct targeted query
+            effective_query = (
+                query.query_string.strip()
+                if (query.query_string and query.query_string.strip())
+                else self._build_search_query_string(query)
+            )
             raw_results: list[RawSearchResult] = await self.provider.search(
                 query=effective_query,
                 limit=limit,

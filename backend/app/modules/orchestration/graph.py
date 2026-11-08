@@ -6,6 +6,7 @@ from typing import Any, Optional
 
 from langgraph.graph import END, START, StateGraph
 
+from app.core.config import get_settings
 from app.db.repositories.interfaces import (
     CandidateProfileRepository,
     DuplicateClusterRepository,
@@ -44,6 +45,7 @@ from app.schemas.orchestration import (
     CoverageAssessment,
     DiscoveryRunStatus,
     DiscoveryRunStreamEvent,
+    SearchCallOutcome,
     SearchStrategy,
     TerminationReason,
     WorkflowStage,
@@ -289,7 +291,7 @@ class AdaptiveDiscoveryGraphBuilder:
             "connector_health": connector_health,
             "search_strategy": strategy,
             "pending_queries": list(strategy.initial_queries),
-            "tool_call_count": state.get("tool_call_count", 0) + 1,
+            "tool_call_count": state.get("tool_call_count", 0),
             "current_stage": WorkflowStage.STRATEGY_FORMULATION,
             "timeline_events": events,
         }
@@ -320,7 +322,14 @@ class AdaptiveDiscoveryGraphBuilder:
         newly_fetched: list[PolymorphicOpportunity] = []
         new_hashes: list[str] = []
         tool_call_count = state.get("tool_call_count", 0)
-        max_tool_calls = state.get("max_tool_calls", 10)
+        
+        settings = get_settings()
+        configured_max = state.get("max_tool_calls")
+        max_tool_calls = settings.get_effective_max_tool_calls(configured_max)
+        is_unlimited = (configured_max == 0) or (configured_max == -1)
+        max_calls_per_connector = state.get("max_calls_per_connector", settings.DISCOVERY_MAX_CALLS_PER_CONNECTOR)
+        calls_by_source = dict(state.get("search_calls_by_source", {}))
+        search_outcomes: list[SearchCallOutcome] = []
         existing_hashes = set(state.get("executed_query_hashes", []))
 
         budget_exhausted = False
@@ -331,8 +340,14 @@ class AdaptiveDiscoveryGraphBuilder:
                 skipped_calls += len(selected_cids)
                 continue
             for cid in selected_cids:
-                if tool_call_count >= max_tool_calls:
+                # Check overall search tool budget
+                if not is_unlimited and tool_call_count >= max_tool_calls:
                     budget_exhausted = True
+                    skipped_calls += 1
+                    continue
+
+                # Check per-connector limit
+                if calls_by_source.get(cid, 0) >= max_calls_per_connector:
                     skipped_calls += 1
                     continue
 
@@ -345,6 +360,9 @@ class AdaptiveDiscoveryGraphBuilder:
                 if cid not in sources_queried:
                     sources_queried.append(cid)
 
+                calls_by_source[cid] = calls_by_source.get(cid, 0) + 1
+                tool_call_count += 1
+
                 tool_res = await search_tool.execute(
                     OpportunitySearchArgs(
                         connector_id=cid,
@@ -352,42 +370,87 @@ class AdaptiveDiscoveryGraphBuilder:
                         limit=4,
                     )
                 )
-                tool_call_count += 1
 
                 if tool_res.success and tool_res.data:
                     found = len(tool_res.data.opportunities)
                     newly_fetched.extend(tool_res.data.opportunities)
                     rejections = getattr(tool_res.data, "rejections_by_code", {})
                     rejection_parts = []
+                    total_rej = 0
                     if rejections:
                         for r_code, r_count in rejections.items():
                             rejections_by_code[r_code] = rejections_by_code.get(r_code, 0) + r_count
+                            total_rej += r_count
                             if r_count > 0:
                                 rejection_parts.append(f"{r_code}: {r_count}")
 
                     rej_summary = f" (Filtered: {', '.join(rejection_parts)})" if rejection_parts else ""
 
+                    outcome_status = "SUCCESS" if found > 0 else "ZERO_RESULTS"
+                    search_outcomes.append(
+                        SearchCallOutcome(
+                            connector_id=cid,
+                            query_string=query.query_string,
+                            status=outcome_status,
+                            raw_count=found,
+                            filtered_count=total_rej,
+                            latency_ms=tool_res.latency_ms,
+                            error_message=None,
+                        )
+                    )
+
+                    event_type = "TOOL_INVOKED" if found > 0 else "SEARCH_ZERO_RESULTS"
+                    summary_msg = (
+                        f"Discovery Agent: Queried '{cid}' for '{query.query_string}' -> Found {found} opportunity lead(s){rej_summary}."
+                        if found > 0
+                        else f"Discovery Agent: Queried '{cid}' for '{query.query_string}' -> Returned 0 results."
+                    )
+
                     await self._emit(
                         state,
                         events,
                         WorkflowStage.SEARCHING,
-                        "TOOL_INVOKED",
-                        f"Discovery Agent: Queried '{cid}' for '{query.query_string}' -> Found {found} opportunity lead(s){rej_summary}.",
+                        event_type,
+                        summary_msg,
                         {
                             "connector_id": cid,
                             "latency_ms": tool_res.latency_ms,
                             "raw_count": found,
                             "rejections": rejections,
+                            "outcome_status": outcome_status,
                         },
                     )
                 else:
+                    err_msg = tool_res.error_message or "Unknown failure"
+                    err_lower = err_msg.lower()
+                    if "timeout" in err_lower or "timed out" in err_lower or tool_res.provenance.get("status") == "TIMEOUT":
+                        outcome_status = "TIMEOUT"
+                    elif "missing" in err_lower or "not installed" in err_lower:
+                        outcome_status = "PROVIDER_UNAVAILABLE"
+                    elif "pipe" in err_lower or "protocol" in err_lower:
+                        outcome_status = "PROTOCOL_ERROR"
+                    else:
+                        outcome_status = "PROVIDER_ERROR"
+
+                    search_outcomes.append(
+                        SearchCallOutcome(
+                            connector_id=cid,
+                            query_string=query.query_string,
+                            status=outcome_status,
+                            raw_count=0,
+                            filtered_count=0,
+                            latency_ms=tool_res.latency_ms,
+                            error_message=err_msg,
+                        )
+                    )
+
                     await self._emit(
                         state,
                         events,
                         WorkflowStage.SEARCHING,
                         "TOOL_FAILED",
-                        f"Connector '{cid}' reported failure or timeout: {tool_res.error_message}",
-                        {"connector_id": cid, "error": tool_res.error_message},
+                        f"Connector '{cid}' reported {outcome_status}: {err_msg}",
+                        {"connector_id": cid, "error": err_msg, "outcome_status": outcome_status},
                     )
 
         if budget_exhausted and skipped_calls > 0:
@@ -408,6 +471,8 @@ class AdaptiveDiscoveryGraphBuilder:
             "accumulated_raw": newly_fetched,
             "executed_query_hashes": new_hashes,
             "tool_call_count": tool_call_count,
+            "search_calls_by_source": calls_by_source,
+            "search_outcomes": search_outcomes,
             "rejections_by_code": rejections_by_code,
             "sources_queried": sources_queried,
             "current_stage": WorkflowStage.SEARCHING,
@@ -437,7 +502,6 @@ class AdaptiveDiscoveryGraphBuilder:
                 threshold=state.get("deduplication_threshold", 0.85),
             )
         )
-        tool_call_count += 1
         canonical_opportunities = dedup_res.data.canonical_opportunities if dedup_res.data else []
         duplicate_clusters = dedup_res.data.clusters if dedup_res.data else {}
         duplicate_records = dedup_res.data.duplicate_records if dedup_res.data else []
@@ -470,7 +534,6 @@ class AdaptiveDiscoveryGraphBuilder:
                 canonical_opportunities=canonical_opportunities,
             )
         )
-        tool_call_count += 1
         eligibility_results = elig_res.data or []
 
         if elig_res.success:
@@ -502,10 +565,13 @@ class AdaptiveDiscoveryGraphBuilder:
     ) -> dict[str, Any]:
         """Coverage Decision Node: Evaluates coverage against target goals, enforces loop bounds, and formulates adaptations."""
         events: list[WorkflowTimelineEvent] = []
+        settings = get_settings()
         iteration = state.get("iteration", 1)
-        max_iterations = state.get("max_iterations", 3)
+        max_iterations = state.get("max_iterations", settings.get_effective_max_iterations())
         tool_call_count = state.get("tool_call_count", 0)
-        max_tool_calls = state.get("max_tool_calls", 10)
+        configured_max = state.get("max_tool_calls")
+        max_tool_calls = settings.get_effective_max_tool_calls(configured_max)
+        is_unlimited = (configured_max == 0) or (configured_max == -1)
         strategy = state.get("search_strategy")
         profile = state.get("candidate_profile")
         canonical_opportunities = state.get("canonical_opportunities", [])
@@ -555,7 +621,7 @@ class AdaptiveDiscoveryGraphBuilder:
                 "timeline_events": events,
             }
 
-        if tool_call_count >= max_tool_calls:
+        if not is_unlimited and tool_call_count >= max_tool_calls:
             await self._emit(
                 state,
                 events,
@@ -581,6 +647,21 @@ class AdaptiveDiscoveryGraphBuilder:
             return {
                 "coverage_assessment": assessment,
                 "termination_reason": TerminationReason.MAX_ITERATIONS_REACHED,
+                "current_stage": WorkflowStage.GAP_ANALYSIS,
+                "timeline_events": events,
+            }
+
+        if adaptation is None:
+            await self._emit(
+                state,
+                events,
+                WorkflowStage.GAP_ANALYSIS,
+                "ALL_SOURCES_EXHAUSTED",
+                "All progressive query variations and sources have been thoroughly explored without meeting coverage goal.",
+            )
+            return {
+                "coverage_assessment": assessment,
+                "termination_reason": TerminationReason.ALL_SOURCES_EXHAUSTED,
                 "current_stage": WorkflowStage.GAP_ANALYSIS,
                 "timeline_events": events,
             }
@@ -662,7 +743,6 @@ class AdaptiveDiscoveryGraphBuilder:
                     weight_profile_name=weight_profile,
                 )
             )
-            tool_call_count += 1
             if rank_tool_res.success and rank_tool_res.data:
                 recommendations_data = rank_tool_res.data
                 if state.get("persist_to_repository", False) and self.rec_repo:
@@ -723,7 +803,6 @@ class AdaptiveDiscoveryGraphBuilder:
                     clusters=duplicate_clusters,
                 )
             )
-            tool_call_count += 1
             if persist_res.success:
                 await self._emit(
                     state,
@@ -761,18 +840,24 @@ class AdaptiveDiscoveryGraphBuilder:
             TerminationReason.BUDGET_EXHAUSTED,
             TerminationReason.MAX_ITERATIONS_REACHED,
             TerminationReason.ALL_SOURCES_EXHAUSTED,
+            TerminationReason.TIMEOUT,
+            TerminationReason.NO_PROGRESS_EXHAUSTED,
             TerminationReason.ABORTED_ERROR,
         ):
             return "ranking_worker"
 
         # Check loop guards
+        settings = get_settings()
         iteration = state.get("iteration", 1)
-        max_iterations = state.get("max_iterations", 3)
+        max_iterations = state.get("max_iterations") or settings.get_effective_max_iterations()
         tool_call_count = state.get("tool_call_count", 0)
-        max_tool_calls = state.get("max_tool_calls", 10)
+        configured_max = state.get("max_tool_calls")
+        max_tool_calls = settings.get_effective_max_tool_calls(configured_max)
+        is_unlimited = max_tool_calls <= 0
+        budget_ok = is_unlimited or (tool_call_count < max_tool_calls)
         pending_queries = state.get("pending_queries", [])
 
-        if iteration <= max_iterations and tool_call_count < max_tool_calls and pending_queries:
+        if iteration <= max_iterations and budget_ok and pending_queries:
             return "discovery_worker"
 
         return "ranking_worker"

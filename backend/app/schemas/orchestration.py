@@ -40,6 +40,23 @@ class TerminationReason(str, Enum):
     BUDGET_EXHAUSTED = "BUDGET_EXHAUSTED"
     ALL_SOURCES_EXHAUSTED = "ALL_SOURCES_EXHAUSTED"
     ABORTED_ERROR = "ABORTED_ERROR"
+    TIMEOUT = "TIMEOUT"
+    NO_PROGRESS_EXHAUSTED = "NO_PROGRESS_EXHAUSTED"
+
+
+class SearchCallOutcome(BaseModel):
+    """Structured telemetry record for an individual search tool invocation."""
+
+    connector_id: str = Field(..., description="Connector identifier queried.")
+    query_string: str = Field(..., description="Query string executed.")
+    status: str = Field(
+        ...,
+        description="Execution outcome: SUCCESS, ZERO_RESULTS, TIMEOUT, PROVIDER_UNAVAILABLE, PROTOCOL_ERROR, FILTERED",
+    )
+    raw_count: int = Field(default=0, ge=0, description="Raw listings returned prior to filtering.")
+    filtered_count: int = Field(default=0, ge=0, description="Listings rejected by classification or dedup.")
+    latency_ms: float = Field(default=0.0, ge=0.0, description="Latency in milliseconds.")
+    error_message: Optional[str] = Field(default=None, description="Error details on failure.")
 
 
 class WorkflowTimelineEvent(BaseModel):
@@ -183,16 +200,20 @@ class AdaptiveDiscoveryRequest(BaseModel):
         description="Minimum number of eligible opportunities desired before stopping.",
     )
     max_iterations: int = Field(
-        default=3,
+        default=6,
         ge=1,
-        le=5,
+        le=20,
         description="Upper bound on search-evaluate-adapt loop iterations.",
     )
-    max_tool_calls: int = Field(
-        default=10,
-        ge=2,
-        le=20,
-        description="Upper bound on total tool executions allowed.",
+    max_tool_calls: Optional[int] = Field(
+        default=None,
+        ge=0,
+        description="Upper bound on total tool executions allowed (0 or None represents unlimited / system default).",
+    )
+    workflow_timeout_seconds: Optional[float] = Field(
+        default=None,
+        ge=5.0,
+        description="Optional upper bound on total workflow duration in seconds before returning partial results.",
     )
     connector_ids: Optional[list[str]] = Field(
         default=None,
@@ -336,6 +357,32 @@ class AdaptiveDiscoveryResponse(BaseModel):
         ge=0,
         description="Number of canonical opportunities with verified posting authentications.",
     )
+    search_outcomes: list[SearchCallOutcome] = Field(
+        default_factory=list,
+        description="Structured outcome records for each search tool execution.",
+    )
+    search_calls_by_source: dict[str, int] = Field(
+        default_factory=dict,
+        description="Actual search calls executed per connector source.",
+    )
+    search_failures_count: int = Field(
+        default=0,
+        ge=0,
+        description="Count of search executions that failed or timed out.",
+    )
+    collection_pages_rejected: int = Field(
+        default=0,
+        ge=0,
+        description="Count of collection/aggregator listing pages filtered out.",
+    )
+    stopping_condition_summary: str = Field(
+        default="",
+        description="Clear explanation of why discovery stopped.",
+    )
+    discovery_summary_notice: str = Field(
+        default="",
+        description="Summary notice on market opportunity yield.",
+    )
     execution_metadata: dict[str, Any] = Field(
         default_factory=dict,
         description="Telemetry metadata (duration_ms, query hashes, token budgets).",
@@ -398,6 +445,8 @@ class DiscoveryRun(BaseModel):
     verified_opportunity_count: int = Field(default=0, ge=0)
     rejections_by_code: dict[str, int] = Field(default_factory=dict)
     sources_queried: list[str] = Field(default_factory=list)
+    search_calls_by_source: dict[str, int] = Field(default_factory=dict)
+    search_outcomes: list[SearchCallOutcome] = Field(default_factory=list)
     canonical_opportunity_ids: list[str] = Field(default_factory=list)
     eligible_opportunity_ids: list[str] = Field(default_factory=list)
     response: Optional[AdaptiveDiscoveryResponse] = Field(

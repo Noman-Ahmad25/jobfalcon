@@ -15,6 +15,7 @@ from app.schemas.opportunity import PolymorphicOpportunity
 from app.schemas.orchestration import (
     AdaptationEvent,
     CoverageAssessment,
+    SearchCallOutcome,
     SearchStrategy,
     TerminationReason,
     WorkflowStage,
@@ -85,7 +86,9 @@ class AdaptiveDiscoveryGraphState(TypedDict, total=False):
     tool_call_count: int
     target_coverage_goal: int
     max_iterations: int
-    max_tool_calls: int
+    max_tool_calls: Optional[int]
+    max_calls_per_connector: int
+    workflow_timeout_seconds: Optional[float]
     deduplication_threshold: float
     simulate_failure_connector: Optional[str]
     force_adaptive_gap_for_testing: bool
@@ -94,6 +97,8 @@ class AdaptiveDiscoveryGraphState(TypedDict, total=False):
     coverage_assessment: Optional[CoverageAssessment]
     adaptation_history: Annotated[list[AdaptationEvent], operator.add]
     executed_query_hashes: Annotated[list[str], operator.add]
+    search_outcomes: Annotated[list[SearchCallOutcome], operator.add]
+    search_calls_by_source: dict[str, int]
 
     # Ranking, Persistence & Results
     rank_recommendations: bool

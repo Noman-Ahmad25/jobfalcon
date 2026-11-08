@@ -71,7 +71,6 @@ export function DiscoveryWorkspace({
 
   // Discovery Configuration State
   const [targetGoal, setTargetGoal] = useState<number>(3);
-  const maxIterations = 2;
   const [enableLiveDiscovery, setEnableLiveDiscovery] = useState<boolean>(true);
   const selectedConnectorIds = ['web_search', 'jobspy_mcp'];
 
@@ -313,8 +312,6 @@ export function DiscoveryWorkspace({
         candidate_profile: candidateProfile,
         connector_ids: selectedConnectorIds.length > 0 ? selectedConnectorIds : undefined,
         target_coverage_goal: targetGoal,
-        max_iterations: maxIterations,
-        max_tool_calls: 8,
         enable_live_discovery: enableLiveDiscovery,
         persist_to_repository: true,
         rank_recommendations: true,

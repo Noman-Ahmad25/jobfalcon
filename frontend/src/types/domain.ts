@@ -487,6 +487,20 @@ export interface AdaptiveDiscoveryResponse {
   rejections_by_code?: Record<string, number>;
   sources_queried?: string[];
   verified_opportunity_count?: number;
+  search_outcomes?: Array<{
+    connector_id: string;
+    query_string: string;
+    status: string;
+    raw_count: number;
+    filtered_count: number;
+    latency_ms: number;
+    error_message?: string | null;
+  }>;
+  search_calls_by_source?: Record<string, number>;
+  search_failures_count?: number;
+  collection_pages_rejected?: number;
+  stopping_condition_summary?: string;
+  discovery_summary_notice?: string;
   execution_metadata: Record<string, unknown>;
 }
 
@@ -531,6 +545,16 @@ export interface DiscoveryRun {
   rejections_by_code?: Record<string, number>;
   sources_queried?: string[];
   verified_opportunity_count?: number;
+  search_outcomes?: Array<{
+    connector_id: string;
+    query_string: string;
+    status: string;
+    raw_count: number;
+    filtered_count: number;
+    latency_ms: number;
+    error_message?: string | null;
+  }>;
+  search_calls_by_source?: Record<string, number>;
   response?: AdaptiveDiscoveryResponse | null;
   error_message?: string | null;
   created_at: string;

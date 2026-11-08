@@ -3,11 +3,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import time
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from app.core.config import get_settings
+from app.core.config import get_settings, resolve_jobspy_country
 from app.modules.discovery.connectors.base import (
     BaseDiscoveryConnector,
     create_normalized_opportunity,
@@ -212,6 +213,18 @@ class JobSpyMCPConnector(BaseDiscoveryConnector):
             error_message=None,
         )
 
+    @staticmethod
+    def _clean_mcp_search_term(query: DiscoverySearchQuery) -> str:
+        """Extracts clean role title and key technologies for ATS/job-board search without boolean noise."""
+        base = query.role_title or query.query_string or ""
+        # Strip site: operators and excessive quotes/brackets
+        base = re.sub(r"site:[^\s)]+", "", base)
+        base = re.sub(r'[\"\'\(\)]', " ", base)
+        base = re.sub(r"\b(OR|AND|NOT)\b", " ", base)
+        base = re.sub(r"\b(hiring|apply|careers)\b", " ", base, flags=re.IGNORECASE)
+        cleaned = " ".join(base.split())
+        return cleaned or query.role_title or "Software Engineer"
+
     async def _search_via_mcp(
         self,
         query: DiscoverySearchQuery,
@@ -220,11 +233,14 @@ class JobSpyMCPConnector(BaseDiscoveryConnector):
         """Invokes MCP tool 'search_jobs' and optionally 'get_job_details' through the MCP client."""
         settings = get_settings()
         results_wanted = min(limit, settings.MCP_JOBSPY_RESULTS_WANTED)
-        search_term = query.query_string or query.role_title
+        search_term = self._clean_mcp_search_term(query)
+        country_code = resolve_jobspy_country(
+            query.target_country_codes, default_fallback=settings.MCP_JOBSPY_COUNTRY
+        )
         location = (
             query.target_locations[0]
             if query.target_locations
-            else ("remote" if WorkMode.REMOTE in query.work_modes else "USA")
+            else ("remote" if WorkMode.REMOTE in query.work_modes else country_code.upper())
         )
         is_remote = WorkMode.REMOTE in query.work_modes
 
@@ -234,7 +250,7 @@ class JobSpyMCPConnector(BaseDiscoveryConnector):
             "site_name": ["indeed"],  # Indeed is fast, reliable, and provides initial descriptions
             "results_wanted": results_wanted,
             "is_remote": is_remote,
-            "country_indeed": settings.MCP_JOBSPY_COUNTRY,
+            "country_indeed": country_code,
         }
 
         # Step 1 & 2: Execute search_jobs and get_job_details in a single MCP session

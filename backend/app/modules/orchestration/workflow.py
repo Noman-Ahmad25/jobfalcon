@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+from app.core.config import get_settings
 from app.db.repositories.interfaces import (
     CandidateProfileRepository,
     DiscoveryRunRepository,
@@ -206,7 +207,12 @@ class AdaptiveDiscoveryWorkflow:
         )
         compiled_graph = graph_builder.build_graph()
 
-        # 3. Construct initial LangGraph state
+        # 3. Construct initial LangGraph state with effective runtime configuration
+        settings = get_settings()
+        effective_max_iterations = settings.get_effective_max_iterations(request.max_iterations)
+        effective_max_tool_calls = settings.get_effective_max_tool_calls(request.max_tool_calls)
+        workflow_timeout_seconds = request.workflow_timeout_seconds or settings.DISCOVERY_WORKFLOW_TIMEOUT_SECONDS
+
         initial_state: AdaptiveDiscoveryGraphState = {
             "workflow_id": workflow_id,
             "candidate_id": candidate_id,
@@ -214,8 +220,10 @@ class AdaptiveDiscoveryWorkflow:
             "iteration": 1,
             "tool_call_count": 0,
             "target_coverage_goal": request.target_coverage_goal,
-            "max_iterations": request.max_iterations,
-            "max_tool_calls": request.max_tool_calls,
+            "max_iterations": effective_max_iterations,
+            "max_tool_calls": effective_max_tool_calls,
+            "max_calls_per_connector": settings.DISCOVERY_MAX_CALLS_PER_CONNECTOR,
+            "workflow_timeout_seconds": workflow_timeout_seconds,
             "deduplication_threshold": request.deduplication_threshold,
             "simulate_failure_connector": request.simulate_failure_connector,
             "force_adaptive_gap_for_testing": request.force_adaptive_gap_for_testing,
@@ -230,6 +238,8 @@ class AdaptiveDiscoveryWorkflow:
             "timeline_events": [],
             "executed_query_hashes": [],
             "adaptation_history": [],
+            "search_outcomes": [],
+            "search_calls_by_source": {},
         }
 
         # 4. Stream LangGraph execution with real-time state persistence and SSE broadcasting
@@ -237,32 +247,63 @@ class AdaptiveDiscoveryWorkflow:
         final_state: AdaptiveDiscoveryGraphState = initial_state
 
         try:
-            async for current_state in compiled_graph.astream(initial_state, stream_mode="values"):
-                final_state = current_state
-                curr_stage = current_state.get("current_stage")
-                if curr_stage:
-                    run_record.status = _stage_to_status(curr_stage)
+            async def _consume_stream() -> None:
+                nonlocal final_state
+                async for current_state in compiled_graph.astream(initial_state, stream_mode="values"):
+                    final_state = current_state
+                    curr_stage = current_state.get("current_stage")
+                    if curr_stage:
+                        run_record.status = _stage_to_status(curr_stage)
 
-                # Update live counts and telemetry
-                events = current_state.get("timeline_events", [])
-                run_record.timeline_events = events
-                raw_list = current_state.get("accumulated_raw", [])
-                canon_list = current_state.get("canonical_opportunities", [])
-                run_record.total_discovered_raw = len(raw_list)
-                run_record.canonical_count = len(canon_list)
-                run_record.duplicate_count = max(len(raw_list) - len(canon_list), 0)
-                run_record.total_tool_calls = current_state.get("tool_call_count", 0)
-                run_record.connector_health = current_state.get("connector_health", [])
-                run_record.search_strategy = current_state.get("search_strategy")
-                run_record.coverage_assessment = current_state.get("coverage_assessment")
-                run_record.adaptation_history = current_state.get("adaptation_history", [])
-                run_record.rejections_by_code = current_state.get("rejections_by_code", {})
-                run_record.sources_queried = current_state.get("sources_queried", [])
-                run_record.verified_opportunity_count = sum(
-                    1 for opp in canon_list if getattr(opp, "is_verified_posting", True) or getattr(opp, "company_domain_verified", False)
-                )
-                run_record.updated_at = datetime.now(timezone.utc)
-                self.run_repo.save(run_record)
+                    # Update live counts and telemetry
+                    events = current_state.get("timeline_events", [])
+                    run_record.timeline_events = events
+                    raw_list = current_state.get("accumulated_raw", [])
+                    canon_list = current_state.get("canonical_opportunities", [])
+                    run_record.total_discovered_raw = len(raw_list)
+                    run_record.canonical_count = len(canon_list)
+                    run_record.duplicate_count = max(len(raw_list) - len(canon_list), 0)
+                    run_record.total_tool_calls = current_state.get("tool_call_count", 0)
+                    run_record.connector_health = current_state.get("connector_health", [])
+                    run_record.search_strategy = current_state.get("search_strategy")
+                    run_record.coverage_assessment = current_state.get("coverage_assessment")
+                    run_record.adaptation_history = current_state.get("adaptation_history", [])
+                    run_record.rejections_by_code = current_state.get("rejections_by_code", {})
+                    run_record.sources_queried = current_state.get("sources_queried", [])
+                    run_record.search_calls_by_source = current_state.get("search_calls_by_source", {})
+                    run_record.search_outcomes = current_state.get("search_outcomes", [])
+                    run_record.verified_opportunity_count = sum(
+                        1 for opp in canon_list if getattr(opp, "is_verified_posting", True) or getattr(opp, "company_domain_verified", False)
+                    )
+                    run_record.updated_at = datetime.now(timezone.utc)
+                    self.run_repo.save(run_record)
+
+            if workflow_timeout_seconds and workflow_timeout_seconds > 0:
+                try:
+                    async with asyncio.timeout(workflow_timeout_seconds):
+                        await _consume_stream()
+                except TimeoutError:
+                    logger.warning(
+                        "Discovery workflow %s exceeded workflow_timeout_seconds (%ss); terminating gracefully",
+                        workflow_id,
+                        workflow_timeout_seconds,
+                    )
+                    final_state["termination_reason"] = TerminationReason.TIMEOUT
+                    # Gracefully complete ranking and persistence for any partial results collected
+                    if request.rank_recommendations and final_state.get("canonical_opportunities") and not final_state.get("recommendations"):
+                        try:
+                            rank_update = await graph_builder.ranking_worker_node(final_state)
+                            final_state.update(rank_update)
+                        except Exception as rank_err:
+                            logger.warning("Could not execute ranking after timeout: %s", rank_err)
+                    if request.persist_to_repository and final_state.get("accumulated_raw"):
+                        try:
+                            fin_update = await graph_builder.finalizing_worker_node(final_state)
+                            final_state.update(fin_update)
+                        except Exception as fin_err:
+                            logger.warning("Could not execute finalizing persistence after timeout: %s", fin_err)
+            else:
+                await _consume_stream()
 
             # Handle profile resolution failures
             if final_state.get("termination_reason") == TerminationReason.ABORTED_ERROR:
@@ -351,6 +392,43 @@ class AdaptiveDiscoveryWorkflow:
                 else candidate_id or "unknown"
             )
 
+            # Telemetry compilation
+            search_outcomes = final_state.get("search_outcomes", [])
+            search_calls_by_source = final_state.get("search_calls_by_source", {})
+            search_failures_count = sum(
+                1 for o in search_outcomes if o.status in ("TIMEOUT", "PROVIDER_UNAVAILABLE", "PROTOCOL_ERROR", "PROVIDER_ERROR")
+            )
+            rejections_by_code = final_state.get("rejections_by_code", {})
+            collection_pages_rejected = rejections_by_code.get("AGGREGATOR_COLLECTION", 0)
+            sources_queried = final_state.get("sources_queried", []) or [c.connector_id for c in active_connectors]
+
+            # Authoritative stopping condition explanation
+            max_iter = initial_state.get("max_iterations", 6)
+            max_tc = initial_state.get("max_tool_calls")
+            tc_count = final_state.get("tool_call_count", 0)
+            if termination_reason == TerminationReason.COVERAGE_SATISFIED:
+                stopping_condition_summary = f"Reached target coverage goal of {request.target_coverage_goal} eligible opportunities."
+            elif termination_reason == TerminationReason.BUDGET_EXHAUSTED:
+                stopping_condition_summary = f"Execution budget reached ({tc_count}/{max_tc} calls)."
+            elif termination_reason == TerminationReason.MAX_ITERATIONS_REACHED:
+                stopping_condition_summary = f"Reached maximum iteration limit ({iterations_completed}/{max_iter})."
+            elif termination_reason == TerminationReason.ALL_SOURCES_EXHAUSTED:
+                stopping_condition_summary = "All available search sources, queries, and role/geographic expansions were exhausted."
+            elif termination_reason == TerminationReason.TIMEOUT:
+                stopping_condition_summary = f"Workflow execution timed out after {workflow_timeout_seconds}s limit."
+            elif termination_reason == TerminationReason.NO_PROGRESS_EXHAUSTED:
+                stopping_condition_summary = "Consecutive search iterations yielded no new opportunities."
+            else:
+                stopping_condition_summary = f"Discovery execution concluded ({termination_reason.value})."
+
+            if eligible_count > 0:
+                discovery_summary_notice = f"Identified {eligible_count} qualified career opportunities across {len(sources_queried)} source(s)."
+            else:
+                discovery_summary_notice = (
+                    "No qualified opportunities were found in the current search burst. "
+                    "The system broadened criteria across roles and locations; try updating candidate preferences or widening search location filters."
+                )
+
             response = AdaptiveDiscoveryResponse(
                 workflow_id=final_state.get("workflow_id", workflow_id),
                 candidate_id=candidate_id_final,
@@ -374,17 +452,25 @@ class AdaptiveDiscoveryWorkflow:
                 connector_health=connector_health,
                 recommendations=recommendations,
                 timeline_events=timeline_events,
-                rejections_by_code=final_state.get("rejections_by_code", {}),
-                sources_queried=final_state.get("sources_queried", []) or [c.connector_id for c in active_connectors],
+                rejections_by_code=rejections_by_code,
+                sources_queried=sources_queried,
                 verified_opportunity_count=sum(
                     1 for opp in canonical_opportunities
                     if getattr(opp, "is_verified_posting", True) or getattr(opp, "company_domain_verified", False)
                 ),
+                search_outcomes=search_outcomes,
+                search_calls_by_source=search_calls_by_source,
+                search_failures_count=search_failures_count,
+                collection_pages_rejected=collection_pages_rejected,
+                stopping_condition_summary=stopping_condition_summary,
+                discovery_summary_notice=discovery_summary_notice,
                 execution_metadata={
                     "duration_ms": elapsed_ms,
                     "executed_query_hashes": executed_query_hashes,
                     "max_iterations_configured": request.max_iterations,
                     "max_tool_calls_configured": request.max_tool_calls,
+                    "effective_max_iterations": effective_max_iterations,
+                    "effective_max_tool_calls": effective_max_tool_calls,
                     "deduplication_threshold": request.deduplication_threshold,
                     "orchestrator_engine": "langgraph-stategraph-v1",
                 },
@@ -394,11 +480,15 @@ class AdaptiveDiscoveryWorkflow:
             run_record.status = DiscoveryRunStatus.COMPLETED
             run_record.termination_reason = termination_reason
             run_record.completed_at = datetime.now(timezone.utc)
+            run_record.iterations_completed = iterations_completed
+            run_record.total_tool_calls = response.total_tool_calls
             run_record.eligible_count = eligible_count
             run_record.uncertain_count = uncertain_count
             run_record.ineligible_count = ineligible_count
             run_record.rejections_by_code = response.rejections_by_code
             run_record.sources_queried = response.sources_queried
+            run_record.search_calls_by_source = response.search_calls_by_source
+            run_record.search_outcomes = response.search_outcomes
             run_record.verified_opportunity_count = response.verified_opportunity_count
             run_record.canonical_opportunity_ids = [
                 o.opportunity_id for o in canonical_opportunities

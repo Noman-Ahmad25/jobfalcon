@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 from typing import Any, Optional
 from pydantic import BaseModel, Field
 
@@ -57,6 +58,109 @@ class LLMGapAnalysisOutput(BaseModel):
     expanded_keywords: list[str] = Field(default_factory=list, description="Refined keyword terms.")
 
 
+INDIAN_CITIES_TO_REGIONS: dict[str, str] = {
+    "satna": "Madhya Pradesh",
+    "rewa": "Madhya Pradesh",
+    "bhopal": "Madhya Pradesh",
+    "indore": "Madhya Pradesh",
+    "jabalpur": "Madhya Pradesh",
+    "gwalior": "Madhya Pradesh",
+    "ujjain": "Madhya Pradesh",
+    "bengaluru": "Karnataka",
+    "bangalore": "Karnataka",
+    "mysuru": "Karnataka",
+    "hyderabad": "Telangana",
+    "pune": "Maharashtra",
+    "mumbai": "Maharashtra",
+    "nagpur": "Maharashtra",
+    "delhi": "Delhi NCR",
+    "new delhi": "Delhi NCR",
+    "noida": "Uttar Pradesh",
+    "gurgaon": "Haryana",
+    "gurugram": "Haryana",
+    "chennai": "Tamil Nadu",
+    "coimbatore": "Tamil Nadu",
+    "kolkata": "West Bengal",
+    "ahmedabad": "Gujarat",
+    "jaipur": "Rajasthan",
+}
+
+
+def resolve_geographic_expansion(
+    preferred_locations: list[str],
+    allowed_work_modes: list[WorkMode],
+    authorized_country_codes: list[str],
+    step: int,
+) -> tuple[list[str], str]:
+    """Expands geographic search scope while honoring candidate constraints.
+
+    Step 0: Exact preferred location (e.g. Satna)
+    Step 1: State/region (e.g. Madhya Pradesh, India)
+    Step 2+: Country-wide remote if permitted by candidate (e.g. Remote, India)
+    """
+    country_name = "India" if "IN" in authorized_country_codes else (authorized_country_codes[0] if authorized_country_codes else "")
+    has_remote = WorkMode.REMOTE in allowed_work_modes
+
+    if not preferred_locations:
+        return (["Remote"] if has_remote else ([country_name] if country_name else [])), "remote"
+
+    primary = preferred_locations[0].strip()
+    primary_lower = primary.lower()
+
+    if step == 0:
+        return [primary], primary
+
+    if step == 1:
+        for city_k, state_name in INDIAN_CITIES_TO_REGIONS.items():
+            if city_k in primary_lower:
+                expanded_state = f"{state_name}, {country_name}".strip(", ")
+                return [expanded_state], expanded_state
+        return [f"{primary}, {country_name}".strip(", ")], primary
+
+    if step >= 2:
+        if has_remote:
+            return ["Remote"], "remote"
+        return [country_name] if country_name else [primary], country_name or primary
+
+    return [primary], primary
+
+
+def resolve_role_expansion(
+    target_role: str,
+    seniority: str,
+    skills: list[str],
+    step: int,
+) -> tuple[str, list[str]]:
+    """Progressively broadens role title and keywords.
+
+    Step 0: Exact role (e.g. Junior Backend Software Engineer)
+    Step 1: Broader role (e.g. Backend Developer / Junior Backend Developer)
+    Step 2: Core skill title (e.g. Python Developer)
+    Step 3+: General title (e.g. Software Engineer / Graduate Software Engineer)
+    """
+    clean_target = re.sub(r"^(Junior|Senior|Lead|Staff|Principal)\s+", "", target_role, flags=re.IGNORECASE).strip()
+    primary_tech = skills[0] if skills else "Python"
+
+    if step == 0:
+        return target_role, [primary_tech, target_role]
+
+    if step == 1:
+        broader = "Backend Developer" if "backend" in target_role.lower() else clean_target
+        if "junior" in target_role.lower() or seniority in ("ENTRY_LEVEL", "INTERN"):
+            broader = f"Junior {broader}"
+        return broader, [primary_tech, "Backend", broader]
+
+    if step == 2:
+        return f"{primary_tech} Developer", [primary_tech, "Software", "Backend"]
+
+    if step >= 3:
+        if seniority in ("ENTRY_LEVEL", "INTERN"):
+            return "Graduate Software Engineer", [primary_tech, "Software Engineer"]
+        return "Software Developer", [primary_tech, "Software Developer"]
+
+    return target_role, [primary_tech, target_role]
+
+
 class DiscoveryAgentDecisionMaker:
     """LLM-driven agent decision engine with robust deterministic fallback heuristics.
 
@@ -89,17 +193,11 @@ class DiscoveryAgentDecisionMaker:
             c.connector_id: c for c in available_connectors if c.status != ConnectorStatus.ERROR
         }
 
-        # India Jobs MCP only if candidate is authorized in IN
-        if "IN" in auth_countries and "india_jobs_mcp" in healthy_connectors:
-            selected_connectors.append("india_jobs_mcp")
-
-        # JobSpy & ATS Direct for general global / US discovery
-        if "jobspy_mcp" in healthy_connectors:
-            selected_connectors.append("jobspy_mcp")
-        if "ats_career_pages" in healthy_connectors:
-            selected_connectors.append("ats_career_pages")
-        if "web_search" in healthy_connectors:
-            selected_connectors.append("web_search")
+        # Include healthy connectors (filtering region-specific connectors if needed)
+        for cid in healthy_connectors:
+            if cid == "india_jobs_mcp" and "IN" not in auth_countries:
+                continue
+            selected_connectors.append(cid)
 
         # If a failure simulation was explicitly requested, ensure that connector is attempted
         # so the agent workflow exercises runtime error shielding
@@ -107,7 +205,7 @@ class DiscoveryAgentDecisionMaker:
             selected_connectors.append(simulate_failure_connector)
 
         if not selected_connectors:
-            selected_connectors = ["web_search"]
+            selected_connectors = list(healthy_connectors.keys()) or ["web_search"]
 
         # Collect initial queries from primary TARGET roles
         initial_queries: list[DiscoverySearchQuery] = []
@@ -235,85 +333,193 @@ class DiscoveryAgentDecisionMaker:
         else:
             identified_gaps.append(f"Total eligible listings ({total_eligible}) below target goal ({coverage_goal}).")
 
-        # Adaptive strategy selection based on iteration count
+        # Adaptive strategy selection based on results and iteration count
         target_role = deficit_roles[0] if deficit_roles else strategy.target_role_priorities[0]
         summary = ""
         new_query: Optional[DiscoverySearchQuery] = None
         target_connectors = list(strategy.selected_connector_ids)
 
         is_early_career = profile.eligibility_constraints.total_full_time_experience_months <= 12
+        seniority = "ENTRY_LEVEL" if is_early_career else "MID_LEVEL"
+        candidate_skills = [
+            s.skill_name for s in profile.assessed_skills[:5]
+        ] or ["Python", "FastAPI"]
+        primary_tech = candidate_skills[0] if candidate_skills else "Python"
+        preferred_locs = profile.eligibility_constraints.preferred_locations or []
+        allowed_modes = profile.eligibility_constraints.allowed_work_modes or [WorkMode.REMOTE]
+        country_codes = profile.eligibility_constraints.authorized_country_codes or ["IN"]
 
-        if iteration == 1:
-            # Level 1: Query Keyword Relaxation (preserve seniority and target direct ATS sources)
+        # ZERO-RESULT RECOVERY: If initial or previous search yielded 0 leads across all sources
+        if total_canonical == 0:
             adaptation_type = "QUERY_RELAXATION"
-            clean_role = target_role.replace("Senior ", "")
-            if is_early_career and "junior" not in clean_role.lower():
-                query_str = f'"{clean_role}" (entry level OR junior) (site:greenhouse.io OR site:lever.co OR site:ashbyhq.com)'
+            if iteration == 1:
+                # Level 1: Expand city to state/region and broaden specific role title
+                exp_locs, loc_str = resolve_geographic_expansion(preferred_locs, allowed_modes, country_codes, step=1)
+                exp_role, exp_kws = resolve_role_expansion(target_role, seniority, candidate_skills, step=1)
+                
+                first_pref = preferred_locs[0] if preferred_locs else "local"
+                summary = (
+                    f"Zero results returned from initial search in '{first_pref}'. "
+                    f"Broadened search scope to regional area ('{loc_str}') and role to '{exp_role}'."
+                )
+                query_str = f'"{exp_role}" {primary_tech} {loc_str}'
+                new_query = DiscoverySearchQuery(
+                    query_id=f"adapt_zero_iter_{iteration}_{exp_role[:8].lower()}",
+                    role_title=exp_role,
+                    query_string=query_str,
+                    expanded_keywords=exp_kws,
+                    category=profile.eligibility_constraints.allowed_opportunity_categories[0],
+                    work_modes=allowed_modes,
+                    target_locations=exp_locs,
+                    target_country_codes=country_codes,
+                    seniority_level=seniority,
+                    relationship_type=CareerPathRelationship.TARGET,
+                )
+            elif iteration == 2 and WorkMode.REMOTE in allowed_modes:
+                # Level 2: Expand to country-wide Remote opportunities
+                exp_locs, loc_str = resolve_geographic_expansion(preferred_locs, allowed_modes, country_codes, step=2)
+                exp_role, exp_kws = resolve_role_expansion(target_role, seniority, candidate_skills, step=2)
+                country_name = "India" if "IN" in country_codes else (country_codes[0] if country_codes else "")
+                
+                summary = (
+                    f"Expanded discovery to country-wide remote opportunities across {country_name} "
+                    f"in alignment with candidate's remote work preference ('{exp_role}')."
+                )
+                query_str = f'"{exp_role}" remote {country_name}'.strip()
+                new_query = DiscoverySearchQuery(
+                    query_id=f"adapt_zero_remote_{iteration}_{exp_role[:8].lower()}",
+                    role_title=exp_role,
+                    query_string=query_str,
+                    expanded_keywords=exp_kws + ["Remote"],
+                    category=profile.eligibility_constraints.allowed_opportunity_categories[0],
+                    work_modes=[WorkMode.REMOTE],
+                    target_locations=exp_locs,
+                    target_country_codes=country_codes,
+                    seniority_level=seniority,
+                    relationship_type=CareerPathRelationship.TARGET,
+                )
+            elif iteration >= 3 and adjacent_roles:
+                # Level 3: Taxonomic Adjacent Role Expansion
+                adaptation_type = "ADJACENT_EXPANSION"
+                adj = adjacent_roles[0]
+                target_role = adj.role_title
+                exp_locs, _ = resolve_geographic_expansion(preferred_locs, allowed_modes, country_codes, step=2)
+                summary = (
+                    f"Expanded discovery to taxonomic adjacent role '{adj.role_title}' "
+                    f"(Similarity: {int(adj.confidence_score * 100)}%) due to low primary target role yield."
+                )
+                query_str = f'"{adj.role_title}" {country_codes[0]}'
+                new_query = DiscoverySearchQuery(
+                    query_id=f"adapt_adj_{iteration}_{adj.canonical_occupation_code}",
+                    role_title=adj.role_title,
+                    query_string=query_str,
+                    expanded_keywords=adj.matched_skill_names[:3] + [adj.role_title],
+                    category=profile.eligibility_constraints.allowed_opportunity_categories[0],
+                    work_modes=allowed_modes,
+                    target_locations=exp_locs,
+                    target_country_codes=country_codes,
+                    seniority_level=seniority,
+                    relationship_type=CareerPathRelationship.ADJACENT,
+                )
             else:
-                query_str = f'"{clean_role}" hiring (site:greenhouse.io OR site:lever.co OR site:ashbyhq.com)'
-
-            summary = (
-                f"Refined search query for '{clean_role}' targeting direct ATS job postings "
-                f"to optimize authentic individual vacancy precision."
-            )
-            new_query = DiscoverySearchQuery(
-                query_id=f"adapt_iter_{iteration}_{target_role[:10].lower()}",
-                role_title=clean_role,
-                query_string=query_str,
-                expanded_keywords=["Python", "SQL", clean_role],
-                category=profile.eligibility_constraints.allowed_opportunity_categories[0],
-                work_modes=profile.eligibility_constraints.allowed_work_modes,
-                target_locations=profile.eligibility_constraints.preferred_locations,
-                target_country_codes=profile.eligibility_constraints.authorized_country_codes,
-                seniority_level="ENTRY_LEVEL" if is_early_career else "MID_LEVEL",
-                relationship_type=CareerPathRelationship.TARGET,
-            )
-        elif iteration >= 2 and adjacent_roles:
-            # Level 2: Adjacent Role Expansion
-            adaptation_type = "ADJACENT_EXPANSION"
-            adj = adjacent_roles[0]
-            target_role = adj.role_title
-            query_str = f'"{adj.role_title}" {profile.eligibility_constraints.authorized_country_codes[0]}'
-            summary = (
-                f"Expanded discovery to taxonomic adjacent role '{adj.role_title}' "
-                f"(Similarity: {int(adj.confidence_score * 100)}%) due to low primary target role yield."
-            )
-            new_query = DiscoverySearchQuery(
-                query_id=f"adapt_adj_{iteration}_{adj.canonical_occupation_code}",
-                role_title=adj.role_title,
-                query_string=query_str,
-                expanded_keywords=adj.matched_skill_names[:3] + [adj.role_title],
-                category=profile.eligibility_constraints.allowed_opportunity_categories[0],
-                work_modes=profile.eligibility_constraints.allowed_work_modes,
-                target_locations=profile.eligibility_constraints.preferred_locations,
-                target_country_codes=profile.eligibility_constraints.authorized_country_codes,
-                seniority_level="MID_LEVEL",
-                relationship_type=CareerPathRelationship.ADJACENT,
-            )
+                # Level 4: General software engineer search with candidate skills
+                exp_locs, _ = resolve_geographic_expansion(preferred_locs, allowed_modes, country_codes, step=2)
+                exp_role, exp_kws = resolve_role_expansion(target_role, seniority, candidate_skills, step=3)
+                summary = f"Broadened query to early-career '{exp_role}' opportunities with '{primary_tech}'."
+                query_str = f'"{exp_role}" {primary_tech}'
+                new_query = DiscoverySearchQuery(
+                    query_id=f"adapt_gen_{iteration}_{exp_role[:8].lower()}",
+                    role_title=exp_role,
+                    query_string=query_str,
+                    expanded_keywords=exp_kws,
+                    category=profile.eligibility_constraints.allowed_opportunity_categories[0],
+                    work_modes=allowed_modes,
+                    target_locations=exp_locs,
+                    target_country_codes=country_codes,
+                    seniority_level=seniority,
+                    relationship_type=CareerPathRelationship.TARGET,
+                )
         else:
-            # Level 3: Connector Focus / Direct ATS Fallback
-            adaptation_type = "CONNECTOR_REPLACEMENT"
-            target_connectors = ["ats_career_pages", "web_search"]
-            query_str = f"{target_role} hiring"
-            summary = f"Routing targeted search to direct ATS and Web Search feeds for '{target_role}'."
-            new_query = DiscoverySearchQuery(
-                query_id=f"adapt_conn_{iteration}_{target_role[:8].lower()}",
-                role_title=target_role,
-                query_string=query_str,
-                expanded_keywords=["Software", "Engineer", "Remote"],
-                category=profile.eligibility_constraints.allowed_opportunity_categories[0],
-                work_modes=profile.eligibility_constraints.allowed_work_modes,
-                target_locations=profile.eligibility_constraints.preferred_locations,
-                target_country_codes=profile.eligibility_constraints.authorized_country_codes,
-                seniority_level="MID_LEVEL",
-                relationship_type=CareerPathRelationship.TARGET,
-            )
+            # PARTIAL COVERAGE ADAPTATION: Some opportunities found, but target role coverage deficient
+            if iteration == 1:
+                adaptation_type = "QUERY_RELAXATION"
+                clean_role = target_role.replace("Senior ", "")
+                if is_early_career and "junior" not in clean_role.lower():
+                    query_str = f'"{clean_role}" (entry level OR junior) (site:greenhouse.io OR site:lever.co OR site:ashbyhq.com)'
+                else:
+                    query_str = f'"{clean_role}" hiring (site:greenhouse.io OR site:lever.co OR site:ashbyhq.com)'
 
-        # Check duplicate hash avoidance
+                summary = (
+                    f"Refined search query for '{clean_role}' targeting direct ATS job postings "
+                    f"to optimize authentic individual vacancy precision."
+                )
+                new_query = DiscoverySearchQuery(
+                    query_id=f"adapt_iter_{iteration}_{target_role[:10].lower()}",
+                    role_title=clean_role,
+                    query_string=query_str,
+                    expanded_keywords=[primary_tech, "SQL", clean_role],
+                    category=profile.eligibility_constraints.allowed_opportunity_categories[0],
+                    work_modes=profile.eligibility_constraints.allowed_work_modes,
+                    target_locations=profile.eligibility_constraints.preferred_locations,
+                    target_country_codes=profile.eligibility_constraints.authorized_country_codes,
+                    seniority_level="ENTRY_LEVEL" if is_early_career else "MID_LEVEL",
+                    relationship_type=CareerPathRelationship.TARGET,
+                )
+            elif iteration >= 2 and adjacent_roles:
+                adaptation_type = "ADJACENT_EXPANSION"
+                adj = adjacent_roles[0]
+                target_role = adj.role_title
+                query_str = f'"{adj.role_title}" {profile.eligibility_constraints.authorized_country_codes[0]}'
+                summary = (
+                    f"Expanded discovery to taxonomic adjacent role '{adj.role_title}' "
+                    f"(Similarity: {int(adj.confidence_score * 100)}%) due to low primary target role yield."
+                )
+                new_query = DiscoverySearchQuery(
+                    query_id=f"adapt_adj_{iteration}_{adj.canonical_occupation_code}",
+                    role_title=adj.role_title,
+                    query_string=query_str,
+                    expanded_keywords=adj.matched_skill_names[:3] + [adj.role_title],
+                    category=profile.eligibility_constraints.allowed_opportunity_categories[0],
+                    work_modes=profile.eligibility_constraints.allowed_work_modes,
+                    target_locations=profile.eligibility_constraints.preferred_locations,
+                    target_country_codes=profile.eligibility_constraints.authorized_country_codes,
+                    seniority_level="MID_LEVEL",
+                    relationship_type=CareerPathRelationship.ADJACENT,
+                )
+            else:
+                adaptation_type = "CONNECTOR_REPLACEMENT"
+                target_connectors = ["ats_career_pages", "web_search"]
+                query_str = f"{target_role} hiring"
+                summary = f"Routing targeted search to direct ATS and Web Search feeds for '{target_role}'."
+                new_query = DiscoverySearchQuery(
+                    query_id=f"adapt_conn_{iteration}_{target_role[:8].lower()}",
+                    role_title=target_role,
+                    query_string=query_str,
+                    expanded_keywords=["Software", "Engineer", "Remote"],
+                    category=profile.eligibility_constraints.allowed_opportunity_categories[0],
+                    work_modes=profile.eligibility_constraints.allowed_work_modes,
+                    target_locations=profile.eligibility_constraints.preferred_locations,
+                    target_country_codes=profile.eligibility_constraints.authorized_country_codes,
+                    seniority_level="MID_LEVEL",
+                    relationship_type=CareerPathRelationship.TARGET,
+                )
+
+        # Check duplicate hash avoidance: ensure new query isn't identical to an already executed query
         q_hash = compute_query_hash(new_query.query_string, target_connectors[0] if target_connectors else "all")
         if q_hash in executed_query_hashes:
-            # Modify query string slightly to break loop
-            new_query.query_string = f"{new_query.query_string} 2026"
+            # Vary by technology or year to prevent deadloop
+            new_query.query_string = f"{new_query.query_string} {primary_tech}"
+            q_hash2 = compute_query_hash(new_query.query_string, target_connectors[0] if target_connectors else "all")
+            if q_hash2 in executed_query_hashes:
+                # All query variants for this connector have been exhausted
+                assessment = CoverageAssessment(
+                    is_coverage_sufficient=False,
+                    total_eligible_canonical=total_eligible,
+                    target_role_coverage=target_role_coverage,
+                    identified_gaps=identified_gaps + ["All query variations and sources have been explored."],
+                    recommended_action="STOP",
+                )
+                return assessment, None
 
         assessment = CoverageAssessment(
             is_coverage_sufficient=False,

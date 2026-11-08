@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from datetime import datetime, timezone
 from typing import Any, Generic, Optional, Sequence, TypeVar
 from pydantic import BaseModel, Field
 
+from app.core.config import get_settings
 from app.core.sanitization import sanitize_untrusted_text
 from app.db.repositories.interfaces import (
     CandidateProfileRepository,
@@ -197,8 +199,14 @@ class OpportunitySearchTool:
             )
 
         connector = self._connector_map[cid]
+        settings = get_settings()
+        timeout = settings.DISCOVERY_PER_TOOL_TIMEOUT_SECONDS
         try:
-            result = await connector.search(args.query, limit=args.limit)
+            if timeout and timeout > 0:
+                async with asyncio.timeout(timeout):
+                    result = await connector.search(args.query, limit=args.limit)
+            else:
+                result = await connector.search(args.query, limit=args.limit)
             elapsed = round((time.perf_counter() - t0) * 1000, 2)
             success = result.status != ConnectorStatus.ERROR
             return ToolResult(
@@ -213,6 +221,17 @@ class OpportunitySearchTool:
                     "raw_count": result.raw_count,
                     "query_id": args.query.query_id,
                 },
+            )
+        except TimeoutError:
+            elapsed = round((time.perf_counter() - t0) * 1000, 2)
+            logger.warning("OpportunitySearchTool timeout on %s after %ss", cid, timeout)
+            return ToolResult(
+                tool_name=self.tool_name,
+                success=False,
+                data=None,
+                error_message=f"Connector '{cid}' timed out after {timeout}s limit.",
+                latency_ms=elapsed,
+                provenance={"connector_id": cid, "status": "TIMEOUT"},
             )
         except Exception as exc:
             elapsed = round((time.perf_counter() - t0) * 1000, 2)
