@@ -7,6 +7,8 @@ import { CandidateCareerProfile, CandidateProfileSummary } from '@/types/domain'
 import { getBackendHealth, listProfiles, getCandidateProfile } from '@/lib/api';
 import { DiscoveryWorkspace } from '@/components/workspaces/DiscoveryWorkspace';
 import { ProfileWorkspace } from '@/components/workspaces/ProfileWorkspace';
+import { MarketIntelligenceWorkspace } from '@/components/workspaces/MarketIntelligenceWorkspace';
+import { ActivityWorkspace } from '@/components/workspaces/ActivityWorkspace';
 import { OnboardingScreen } from '@/components/onboarding/OnboardingScreen';
 import { applyTheme, ThemeMode, useIsDarkMode } from '@/lib/theme';
 import { Loader2 } from 'lucide-react';
@@ -223,7 +225,7 @@ export default function Home() {
           />
         ) : (
           <>
-            {/* Active Workspace View: Strictly Two Main Areas */}
+            {/* Active Workspace View: Four Integrated Primary Product Destinations */}
             {activeTab === 'discover' && (
               <DiscoveryWorkspace
                 candidateProfile={candidateProfile}
@@ -232,7 +234,7 @@ export default function Home() {
               />
             )}
 
-            {activeTab === 'profile' && (
+            {(activeTab === 'career' || activeTab === 'profile') && (
               <ProfileWorkspace
                 key={selectedCandidateId + '_' + (candidateProfile.profile_version || 0)}
                 candidateProfile={candidateProfile}
@@ -243,6 +245,22 @@ export default function Home() {
                   setCandidateName(updated.display_name || updated.user_id);
                   listProfiles().then(setCandidateSummaries).catch(() => {});
                 }}
+              />
+            )}
+
+            {activeTab === 'market' && (
+              <MarketIntelligenceWorkspace
+                candidateProfile={candidateProfile}
+                candidateName={candidateName}
+                onNavigateTab={handleNavigateTab}
+              />
+            )}
+
+            {activeTab === 'activity' && (
+              <ActivityWorkspace
+                candidateProfile={candidateProfile}
+                candidateName={candidateName}
+                onNavigateTab={handleNavigateTab}
               />
             )}
           </>

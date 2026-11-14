@@ -1,10 +1,22 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from enum import Enum
 from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 from app.schemas.common import OpportunityCategory, WorkMode
 from app.schemas.opportunity import PolymorphicOpportunity
+
+
+class SampleConfidenceTier(str, Enum):
+    """Statistical and confidence tiers for empirical market datasets."""
+
+    HIGH = "HIGH"                  # N >= 30: Strong statistical significance
+    MODERATE = "MODERATE"          # 15 <= N < 30: Reliable directional signal
+    DIRECTIONAL = "DIRECTIONAL"    # 5 <= N < 15: Indicative early market indicators
+    EMERGING = "EMERGING"          # 1 <= N < 5: Limited observation sample
+    EMPTY = "EMPTY"                # N == 0: No listings found
 
 
 class OpportunitySearchRequest(BaseModel):
@@ -107,6 +119,10 @@ class MarketIntelligenceResponse(BaseModel):
         ge=0,
         description="Number of distinct employers represented in the dataset.",
     )
+    sample_confidence_tier: SampleConfidenceTier = Field(
+        default=SampleConfidenceTier.EMPTY,
+        description="Empirical sample confidence tier (HIGH, MODERATE, DIRECTIONAL, EMERGING, EMPTY).",
+    )
     analysis_scope_summary: str = Field(
         ...,
         description="Honest description of data scope, date window, and source diversity.",
@@ -138,3 +154,46 @@ class MarketIntelligenceResponse(BaseModel):
         ),
         description="Truthfulness and provenance guarantee.",
     )
+
+
+class SalaryDistributionMetrics(BaseModel):
+    """Empirical compensation percentiles for analyzed opportunities."""
+
+    sample_size: int = 0
+    currency: Optional[str] = None
+    min: Optional[float] = None
+    p25: Optional[float] = None
+    median: Optional[float] = None
+    p75: Optional[float] = None
+    max: Optional[float] = None
+
+
+class MarketResearchReportRecord(BaseModel):
+    """Full comprehensive market research report for a role and geographic scope."""
+
+    report_id: str
+    role_title: str
+    country_code: str
+    mapped_occupation_code: Optional[str] = None
+    career_track: str = "TECHNICAL"
+    sample_size: int = 0
+    confidence_score: float = 1.0
+    sample_confidence_tier: SampleConfidenceTier = SampleConfidenceTier.EMPTY
+    core_skills: list[MarketSkillDemand] = Field(default_factory=list)
+    preferred_skills: list[MarketSkillDemand] = Field(default_factory=list)
+    top_skill_combinations: list[MarketSkillCombination] = Field(default_factory=list)
+    salary_distribution: Optional[SalaryDistributionMetrics] = None
+    work_mode_distribution: dict[str, int] = Field(default_factory=dict)
+    experience_distribution: dict[str, int] = Field(default_factory=dict)
+    top_role_families: list[dict[str, Any]] = Field(default_factory=list)
+    unique_employers_count: int = 0
+    top_employers: list[str] = Field(default_factory=list)
+    adjacent_career_paths: list[dict[str, Any]] = Field(default_factory=list)
+    synthesis_markdown: str = ""
+    data_integrity_notice: str = (
+        "Zero speculative trends: metrics reflect pure empirical distributions "
+        "extracted from verified opportunities in this workspace."
+    )
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    expires_at: Optional[datetime] = None
+

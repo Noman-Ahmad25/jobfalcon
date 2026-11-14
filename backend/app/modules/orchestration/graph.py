@@ -8,12 +8,18 @@ from langgraph.graph import END, START, StateGraph
 
 from app.core.config import get_settings
 from app.db.repositories.interfaces import (
+    CandidateActionRepository,
     CandidateProfileRepository,
     DuplicateClusterRepository,
+    MarketReportRepository,
     OpportunityRepository,
     RecommendationRepository,
 )
 from app.modules.discovery.connectors import BaseDiscoveryConnector
+from app.modules.market.aggregator import (
+    filter_opportunities_for_market_scope,
+    synthesize_market_report,
+)
 from app.modules.orchestration.agent import (
     DiscoveryAgentDecisionMaker,
     compute_query_hash,
@@ -114,11 +120,15 @@ class AdaptiveDiscoveryGraphBuilder:
         rec_repo: Optional[RecommendationRepository] = None,
         connectors: Optional[list[BaseDiscoveryConnector]] = None,
         llm_client: Optional[BaseLLMClient] = None,
+        action_repo: Optional[CandidateActionRepository] = None,
+        market_report_repo: Optional[MarketReportRepository] = None,
     ) -> None:
         self.opp_repo = opp_repo
         self.cluster_repo = cluster_repo
         self.profile_repo = profile_repo
         self.rec_repo = rec_repo
+        self.action_repo = action_repo
+        self.market_report_repo = market_report_repo
         self.connectors = connectors or []
         self.llm_client = llm_client
 
@@ -560,6 +570,66 @@ class AdaptiveDiscoveryGraphBuilder:
             "timeline_events": events,
         }
 
+    async def market_intelligence_node(
+        self, state: AdaptiveDiscoveryGraphState
+    ) -> dict[str, Any]:
+        """Market Intelligence Worker: Synthesizes empirical market demand distributions."""
+        events: list[WorkflowTimelineEvent] = []
+        canonical_opps = state.get("canonical_opportunities", [])
+        profile = state.get("candidate_profile")
+
+        role_title = "Software Engineer"
+        country_code = "US"
+        career_track = "TECHNICAL"
+
+        if profile:
+            if getattr(profile, "target_career_paths", None):
+                role_title = profile.target_career_paths[0].title
+            elif getattr(profile, "headline", None):
+                role_title = profile.headline
+            elif getattr(profile, "target_roles", None):
+                role_title = profile.target_roles[0]
+
+            if getattr(profile, "eligibility_constraints", None) and profile.eligibility_constraints.authorized_country_codes:
+                country_code = profile.eligibility_constraints.authorized_country_codes[0]
+
+        matched = filter_opportunities_for_market_scope(
+            canonical_opps, role_title=role_title, country_code=country_code, career_track=career_track
+        )
+        if not matched and canonical_opps:
+            matched = canonical_opps
+
+        report = synthesize_market_report(
+            opportunities=matched,
+            role_title=role_title,
+            country_code=country_code,
+            career_track=career_track,
+        )
+
+        if self.market_report_repo and report.sample_size > 0:
+            try:
+                self.market_report_repo.save_report(report)
+            except Exception as exc:
+                logger.warning("Failed to cache market report: %s", exc)
+
+        await self._emit(
+            state,
+            events,
+            WorkflowStage.EVALUATING,
+            "MARKET_INTELLIGENCE_SYNTHESIZED",
+            f"Market Intelligence: Empirical analysis across {report.sample_size} opportunities ({report.sample_confidence_tier.value} tier).",
+            {
+                "sample_size": report.sample_size,
+                "confidence_tier": report.sample_confidence_tier.value,
+                "core_skills": [s.skill_name for s in report.core_skills[:5]],
+            },
+        )
+
+        return {
+            "market_report": report,
+            "timeline_events": events,
+        }
+
     async def coverage_decision_node(
         self, state: AdaptiveDiscoveryGraphState
     ) -> dict[str, Any]:
@@ -735,12 +805,20 @@ class AdaptiveDiscoveryGraphBuilder:
                     "candidates_to_rank": len(canonical_opportunities),
                 },
             )
+            overridden_ids: list[str] = []
+            if self.action_repo and profile:
+                try:
+                    overridden_ids = self.action_repo.get_overridden_opportunity_ids(profile.user_id)
+                except Exception as act_err:
+                    logger.debug("Failed to fetch overridden opportunity IDs: %s", act_err)
+
             rank_tool_res = self.ranking_tool.execute(
                 RankingArgs(
                     candidate_profile=profile,
                     opportunities=canonical_opportunities,
                     eligibility_results=eligibility_results,
                     weight_profile_name=weight_profile,
+                    soft_overridden_opportunity_ids=overridden_ids,
                 )
             )
             if rank_tool_res.success and rank_tool_res.data:
@@ -881,6 +959,7 @@ class AdaptiveDiscoveryGraphBuilder:
         graph.add_node("supervisor", self.supervisor_node)
         graph.add_node("discovery_worker", self.discovery_worker_node)
         graph.add_node("evaluation_worker", self.evaluation_worker_node)
+        graph.add_node("market_intelligence", self.market_intelligence_node)
         graph.add_node("coverage_decision", self.coverage_decision_node)
         graph.add_node("ranking_worker", self.ranking_worker_node)
         graph.add_node("finalizing_worker", self.finalizing_worker_node)
@@ -898,7 +977,8 @@ class AdaptiveDiscoveryGraphBuilder:
         )
 
         graph.add_edge("discovery_worker", "evaluation_worker")
-        graph.add_edge("evaluation_worker", "coverage_decision")
+        graph.add_edge("evaluation_worker", "market_intelligence")
+        graph.add_edge("market_intelligence", "coverage_decision")
 
         # Bounded adaptive cycle or exit to ranking
         graph.add_conditional_edges(

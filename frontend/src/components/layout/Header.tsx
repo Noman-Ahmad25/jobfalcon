@@ -11,11 +11,13 @@ import {
   Users,
   PlusCircle,
   Check,
+  TrendingUp,
+  History,
 } from 'lucide-react';
 import { useIsMounted } from '@/lib/theme';
 import { CandidateProfileSummary } from '@/types/domain';
 
-export type WorkspaceTab = 'profile' | 'discover';
+export type WorkspaceTab = 'discover' | 'career' | 'market' | 'activity' | 'profile';
 
 interface HeaderProps {
   activeTab: WorkspaceTab;
@@ -96,28 +98,55 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             </div>
 
-            {/* Primary Navigation Focus: Discovery */}
-            <nav className="flex items-center gap-2">
+            {/* Primary Four Product Destinations */}
+            <nav className="flex items-center gap-1 sm:gap-1.5">
               <button
                 onClick={() => onTabChange('discover')}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
                   activeTab === 'discover'
                     ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs border border-zinc-200/90 dark:border-zinc-700'
                     : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
                 }`}
               >
-                <Compass className={`w-4 h-4 ${activeTab === 'discover' ? 'text-teal-600 dark:text-teal-400' : ''}`} />
+                <Compass className={`w-3.5 h-3.5 ${activeTab === 'discover' ? 'text-teal-600 dark:text-teal-400' : ''}`} />
                 <span>Discovery</span>
               </button>
 
-              {activeTab === 'profile' && (
-                <div className="flex items-center gap-1.5 text-xs text-zinc-400 pl-1">
-                  <span>/</span>
-                  <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-                    Profile & Preferences
-                  </span>
-                </div>
-              )}
+              <button
+                onClick={() => onTabChange('career')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                  activeTab === 'career' || activeTab === 'profile'
+                    ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs border border-zinc-200/90 dark:border-zinc-700'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+                }`}
+              >
+                <User className={`w-3.5 h-3.5 ${activeTab === 'career' || activeTab === 'profile' ? 'text-teal-600 dark:text-teal-400' : ''}`} />
+                <span>My Career</span>
+              </button>
+
+              <button
+                onClick={() => onTabChange('market')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                  activeTab === 'market'
+                    ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs border border-zinc-200/90 dark:border-zinc-700'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+                }`}
+              >
+                <TrendingUp className={`w-3.5 h-3.5 ${activeTab === 'market' ? 'text-teal-600 dark:text-teal-400' : ''}`} />
+                <span>Market Intelligence</span>
+              </button>
+
+              <button
+                onClick={() => onTabChange('activity')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                  activeTab === 'activity'
+                    ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-2xs border border-zinc-200/90 dark:border-zinc-700'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+                }`}
+              >
+                <History className={`w-3.5 h-3.5 ${activeTab === 'activity' ? 'text-teal-600 dark:text-teal-400' : ''}`} />
+                <span>Activity & History</span>
+              </button>
             </nav>
           </div>
 
@@ -188,7 +217,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <div className="py-1">
                     <button
                       onClick={() => {
-                        onTabChange('profile');
+                        onTabChange('career');
                         setMenuOpen(false);
                       }}
                       className="w-full text-left px-4 py-2 text-xs text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center gap-2.5 transition-colors"

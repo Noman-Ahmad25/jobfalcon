@@ -178,40 +178,54 @@ class SearXNGSearchProvider(BaseSearchProvider):
             headers["Authorization"] = f"Bearer {self.api_key}"
 
         url = f"{self.base_url}/search"
-        params = {
+        params: dict[str, Any] = {
             "q": query,
             "format": "json",
             "categories": "general",
         }
 
+        results: list[RawSearchResult] = []
+        pages_needed = min(max(1, (limit + 9) // 10), 3)
+
         async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
-            resp = await client.get(url, params=params, headers=headers)
-            if resp.status_code != 200:
-                logger.warning("SearXNG search returned HTTP %d for query %s", resp.status_code, query)
-                return []
+            for pageno in range(1, pages_needed + 1):
+                params["pageno"] = pageno
+                try:
+                    resp = await client.get(url, params=params, headers=headers)
+                    if resp.status_code != 200:
+                        logger.warning("SearXNG search returned HTTP %d for query %s (page %d)", resp.status_code, query, pageno)
+                        break
 
-            data = resp.json()
-            raw_items = data.get("results", [])
-            results: list[RawSearchResult] = []
+                    data = resp.json()
+                    raw_items = data.get("results", [])
+                    if not raw_items:
+                        break
 
-            for item in raw_items[:limit]:
-                dest_url = item.get("url", "").strip()
-                title = item.get("title", "").strip()
-                content = item.get("content", "").strip()
-                engine = item.get("engine", "searxng")
+                    for item in raw_items:
+                        dest_url = item.get("url", "").strip()
+                        title = item.get("title", "").strip()
+                        content = item.get("content", "").strip()
+                        engine = item.get("engine", "searxng")
 
-                if dest_url and title:
-                    results.append(
-                        RawSearchResult(
-                            url=dest_url,
-                            title=title,
-                            snippet=content,
-                            engine=engine,
-                            metadata={"score": item.get("score")},
-                        )
-                    )
+                        if dest_url and title:
+                            results.append(
+                                RawSearchResult(
+                                    url=dest_url,
+                                    title=title,
+                                    snippet=content,
+                                    engine=engine,
+                                    metadata={"score": item.get("score")},
+                                )
+                            )
+                        if len(results) >= limit:
+                            break
+                    if len(results) >= limit:
+                        break
+                except Exception as p_err:
+                    logger.debug("SearXNG page %d retrieval failed: %s", pageno, p_err)
+                    break
 
-            return results
+            return results[:limit]
 
 
 # =============================================================================

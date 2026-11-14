@@ -22,7 +22,8 @@ DISQ_EXPERIENCE_BELOW_MINIMUM = "DISQ_EXPERIENCE_BELOW_MINIMUM"
 DISQ_EXPERIENCE_EXCEEDS_MAXIMUM = "DISQ_EXPERIENCE_EXCEEDS_MAXIMUM"
 DISQ_WORK_MODE_MISMATCH = "DISQ_WORK_MODE_MISMATCH"
 DISQ_LOCATION_MISMATCH = "DISQ_LOCATION_MISMATCH"
-DISQ_EXPIRED_DEADLINE = "DISQ_EXPIRED_DEADLINE"
+VACANCY_EXPIRED_UNAVAILABLE = "VACANCY_EXPIRED_UNAVAILABLE"
+DISQ_EXPIRED_DEADLINE = VACANCY_EXPIRED_UNAVAILABLE
 
 # Uncertainty Caveat Codes (Unstated / Missing Data Requiring Verification)
 UNCERT_NO_DEADLINE_SPECIFIED = "UNCERT_NO_DEADLINE_SPECIFIED"
@@ -72,6 +73,14 @@ class ConstraintCheckResult(BaseModel):
         default_factory=dict,
         description="Structured key-value context for verification and debugging.",
     )
+    is_soft_failure: bool = Field(
+        default=False,
+        description="True if constraint failure is soft/preference-based and candidate can override.",
+    )
+    is_vacancy_unavailable: bool = Field(
+        default=False,
+        description="True if constraint failure is due to vacancy closure/expiration rather than candidate ineligibility.",
+    )
 
 
 class EligibilityResult(BaseModel):
@@ -96,6 +105,22 @@ class EligibilityResult(BaseModel):
     disqualification_reasons: list[str] = Field(
         default_factory=list,
         description="List of rule codes for confirmed failures. Guaranteed empty if is_eligible is True.",
+    )
+    hard_disqualifications: list[str] = Field(
+        default_factory=list,
+        description="Rule codes for mandatory hard disqualifications (e.g., visa, degree).",
+    )
+    soft_disqualifications: list[str] = Field(
+        default_factory=list,
+        description="Rule codes for overridable soft preferences/mismatches (e.g., experience shortfall, commute).",
+    )
+    is_vacancy_expired: bool = Field(
+        default=False,
+        description="True if vacancy application deadline has expired.",
+    )
+    is_soft_ineligible: bool = Field(
+        default=False,
+        description="True if disqualified solely by soft constraints with no hard disqualifications.",
     )
     uncertainty_caveats: list[str] = Field(
         default_factory=list,

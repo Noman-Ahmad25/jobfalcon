@@ -9,77 +9,140 @@ import {
   RotateCw,
   MapPin,
   Briefcase,
+  TrendingUp,
+  CheckCircle2,
+  AlertCircle,
+  Building2,
+  Sparkles,
+  ChevronRight,
 } from 'lucide-react';
 import {
   CandidateCareerProfile,
-  MarketIntelligenceResponse,
+  MarketResearchReportRecord,
   MarketSkillDemand,
+  SampleConfidenceTier,
 } from '@/types/domain';
-import { getMarketIntelligence } from '@/lib/api';
+import { getMarketResearchReport } from '@/lib/api';
+import { Badge } from '@/components/ui/Badge';
+import { WorkspaceTab } from '@/components/layout/Header';
 
 interface MarketIntelligenceWorkspaceProps {
   candidateProfile: CandidateCareerProfile;
   candidateName: string;
+  onNavigateTab?: (tab: WorkspaceTab) => void;
 }
+
+const TIER_BADGES: Record<
+  SampleConfidenceTier,
+  { label: string; variant: 'teal' | 'verified' | 'caveat' | 'neutral' | 'outline'; hint: string }
+> = {
+  HIGH: {
+    label: 'HIGH CONFIDENCE (N ≥ 30)',
+    variant: 'verified',
+    hint: 'Statistically strong empirical sample providing reliable market signals.',
+  },
+  MODERATE: {
+    label: 'MODERATE CONFIDENCE (N ≥ 15)',
+    variant: 'teal',
+    hint: 'Substantial empirical sample providing dependable directional guidance.',
+  },
+  DIRECTIONAL: {
+    label: 'DIRECTIONAL SIGNAL (5 ≤ N < 15)',
+    variant: 'caveat',
+    hint: 'Early directional indicators. Valid empirical trends, limited volume.',
+  },
+  EMERGING: {
+    label: 'EMERGING SIGNAL (1 ≤ N < 5)',
+    variant: 'outline',
+    hint: 'Emerging observations. Limited opportunity count in this specific scope.',
+  },
+  EMPTY: {
+    label: 'NO POSTINGS (N = 0)',
+    variant: 'neutral',
+    hint: 'No verified opportunity listings found for this specific query scope.',
+  },
+};
 
 export function MarketIntelligenceWorkspace({
   candidateProfile,
   candidateName,
+  onNavigateTab,
 }: MarketIntelligenceWorkspaceProps) {
-  const targetRoleTitle = candidateProfile.target_career_paths[0]?.title || '';
-  const [scopeToTargetRole, setScopeToTargetRole] = useState<boolean>(false);
-  const [intelligence, setIntelligence] = useState<MarketIntelligenceResponse | null>(null);
+  const defaultRole =
+    candidateProfile.target_career_paths[0]?.title ||
+    candidateProfile.headline ||
+    'Software Engineer';
+
+  const defaultCountry =
+    candidateProfile.eligibility_constraints?.authorized_country_codes?.[0] || 'US';
+
+  const [roleTitle, setRoleTitle] = useState<string>(defaultRole);
+  const [countryCode, setCountryCode] = useState<string>(defaultCountry);
+  const [careerTrack, setCareerTrack] = useState<string>('TECHNICAL');
+  const [report, setReport] = useState<MarketResearchReportRecord | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchIntelligence = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const resp = await getMarketIntelligence({
-        target_role: scopeToTargetRole && targetRoleTitle ? targetRoleTitle : undefined,
-      });
-      setIntelligence(resp);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to fetch market intelligence';
-      setError(msg);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [scopeToTargetRole, targetRoleTitle]);
+  const candidateSkillsSet = new Set(
+    candidateProfile.assessed_skills.map((s) => s.skill_name.toLowerCase().trim())
+  );
+
+  const fetchReport = useCallback(
+    async (forceRefresh: boolean = false) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const resp = await getMarketResearchReport({
+          roleTitle: roleTitle.trim() || defaultRole,
+          countryCode: countryCode.trim() || defaultCountry,
+          careerTrack,
+          userId: candidateProfile.user_id,
+          forceRefresh,
+        });
+        setReport(resp);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Failed to fetch market report';
+        setError(msg);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [roleTitle, countryCode, careerTrack, candidateProfile.user_id, defaultRole, defaultCountry]
+  );
 
   useEffect(() => {
-    let isCancelled = false;
-    async function load() {
+    let ignore = false;
+    async function init() {
       try {
-        const resp = await getMarketIntelligence({
-          target_role: scopeToTargetRole && targetRoleTitle ? targetRoleTitle : undefined,
+        const resp = await getMarketResearchReport({
+          roleTitle: roleTitle.trim() || defaultRole,
+          countryCode: countryCode.trim() || defaultCountry,
+          careerTrack,
+          userId: candidateProfile.user_id,
+          forceRefresh: false,
         });
-        if (!isCancelled) {
-          setIntelligence(resp);
-          setIsLoading(false);
-        }
+        if (!ignore) setReport(resp);
       } catch (err: unknown) {
-        if (!isCancelled) {
-          const msg = err instanceof Error ? err.message : 'Failed to fetch market intelligence';
+        if (!ignore) {
+          const msg = err instanceof Error ? err.message : 'Failed to fetch market report';
           setError(msg);
-          setIsLoading(false);
         }
+      } finally {
+        if (!ignore) setIsLoading(false);
       }
     }
-    load();
+    init();
     return () => {
-      isCancelled = true;
+      ignore = true;
     };
-  }, [scopeToTargetRole, targetRoleTitle]);
+  }, [roleTitle, countryCode, careerTrack, candidateProfile.user_id, defaultRole, defaultCountry]);
 
-  const candidateSkillsSet = new Set(
-    candidateProfile.assessed_skills.map((s) => s.skill_name.toLowerCase())
-  );
+  const currentTier = report?.sample_confidence_tier || 'EMPTY';
+  const tierConfig = TIER_BADGES[currentTier] || TIER_BADGES.EMPTY;
 
   return (
     <div className="space-y-6">
-      {/* Header & Empirical Scope Banner */}
+      {/* 1. Header & Scope Selector */}
       <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
@@ -88,160 +151,277 @@ export function MarketIntelligenceWorkspace({
                 <BarChart3 className="w-4 h-4" />
               </span>
               <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-                Market Intelligence & Demand Analytics
+                Grounded Market Intelligence
               </h1>
             </div>
             <p className="text-xs text-zinc-600 dark:text-zinc-400 max-w-2xl">
-              Empirical market intelligence for {candidateName} grounded strictly in analyzed vacancies. Understand what skills and technologies employers are actually requesting right now.
+              Empirical market intelligence tailored to <span className="font-semibold text-zinc-800 dark:text-zinc-200">{candidateName}</span>&apos;s trajectory. Analyzes real vacancies across employers without speculative or hallucinated trends.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setScopeToTargetRole(!scopeToTargetRole)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                scopeToTargetRole
-                  ? 'bg-teal-50 dark:bg-teal-950/60 border-teal-300 dark:border-teal-700 text-teal-800 dark:text-teal-300'
-                  : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100'
-              }`}
-            >
-              {scopeToTargetRole ? `Scoped: ${targetRoleTitle}` : 'Scope: All Discovered Opportunities'}
-            </button>
-
-            <button
-              onClick={fetchIntelligence}
+              onClick={() => fetchReport(true)}
               disabled={isLoading}
-              className="p-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
-              title="Refresh intelligence"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
+              title="Re-aggregate market statistics"
             >
-              <RotateCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-teal-600' : ''}`} />
+              <span>Regenerate Report</span>
             </button>
           </div>
         </div>
 
-        {/* Dataset Scope Cards */}
-        {intelligence && (
-          <div className="pt-2 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-            <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/60 dark:border-zinc-700/60 space-y-1">
-              <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider">
-                Analyzed Opportunities
-              </span>
-              <div className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-                {intelligence.total_opportunities_analyzed}
-              </div>
-              <p className="text-[11px] text-zinc-500">Distinct canonical postings verified</p>
-            </div>
-
-            <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/60 dark:border-zinc-700/60 space-y-1">
-              <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider">
-                Unique Employers
-              </span>
-              <div className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-                {intelligence.unique_employers_count}
-              </div>
-              <p className="text-[11px] text-zinc-500">Hiring organizations represented</p>
-            </div>
-
-            <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/60 dark:border-zinc-700/60 space-y-1">
-              <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-teal-600" />
-                Data Integrity Guarantee
-              </span>
-              <div className="text-xs font-medium text-zinc-800 dark:text-zinc-200 leading-snug">
-                100% Empirical Distributions
-              </div>
-              <p className="text-[11px] text-zinc-500">Zero speculative trends or hallucinated arrows</p>
-            </div>
+        {/* Scope Controls Strip (Candidate-Specific Geography & Career Track) */}
+        <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800/80 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          {/* Target Role Input */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider block">
+              Role Focus
+            </label>
+            <input
+              type="text"
+              value={roleTitle}
+              onChange={(e) => setRoleTitle(e.target.value)}
+              placeholder="e.g. Backend Software Engineer"
+              className="w-full px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-teal-500"
+            />
           </div>
-        )}
+
+          {/* Country Scope (Candidate-Specific) */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider block">
+              Geographic Region (Country Code)
+            </label>
+            <input
+              type="text"
+              value={countryCode}
+              onChange={(e) => setCountryCode(e.target.value.toUpperCase())}
+              placeholder="e.g. IN, US, GB, DE, CA"
+              maxLength={4}
+              className="w-full px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-mono uppercase text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-teal-500"
+            />
+          </div>
+
+          {/* Career Track Type */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider block">
+              Career Track
+            </label>
+            <select
+              value={careerTrack}
+              onChange={(e) => setCareerTrack(e.target.value)}
+              className="w-full px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-hidden focus:ring-2 focus:ring-teal-500"
+            >
+              <option value="TECHNICAL">Technical & Engineering</option>
+              <option value="NON_TECHNICAL">Non-Technical & Operations</option>
+              <option value="HYBRID">Hybrid & Product</option>
+            </select>
+          </div>
+        </div>
       </div>
 
-      {isLoading ? (
-        <div className="p-16 text-center space-y-3">
-          <RotateCw className="w-6 h-6 animate-spin text-teal-600 mx-auto" />
-          <p className="text-xs text-zinc-500 font-mono">Aggregating market intelligence...</p>
-        </div>
-      ) : error ? (
-        <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs text-rose-800 dark:text-rose-300">
-          {error}
-        </div>
-      ) : !intelligence || intelligence.total_opportunities_analyzed === 0 ? (
-        <div className="p-12 text-center rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3">
-          <Briefcase className="w-8 h-8 text-zinc-400 mx-auto" />
-          <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-            No Opportunities Available for Analysis
-          </h3>
-          <p className="text-xs text-zinc-500 max-w-md mx-auto">
-            Run a Personalized Discovery session or Market Search to ingest and index authentic opportunities in this workspace.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {/* Top Requested Skills Section */}
-          <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-4">
+      {/* 2. Statistical Metric Strip & Confidence Tier */}
+      {report && (
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+          {/* Sample Size & Confidence Tier */}
+          <div className="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-1.5">
             <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider font-mono">
-                  Most Requested Skills & Competencies
-                </h2>
-                <p className="text-xs text-zinc-500">
-                  Exact frequency of technical and professional skills requested across {intelligence.total_opportunities_analyzed} analyzed opportunities.
-                </p>
+              <span className="text-[10px] font-mono text-zinc-400 uppercase">Sample Size</span>
+              <Badge variant={tierConfig.variant} size="sm">
+                {tierConfig.label}
+              </Badge>
+            </div>
+            <div className="text-2xl font-bold font-mono text-zinc-900 dark:text-zinc-100">
+              N = {report.sample_size}
+            </div>
+            <p className="text-[11px] text-zinc-500 leading-snug">{tierConfig.hint}</p>
+          </div>
+
+          {/* Unique Employers */}
+          <div className="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-1.5">
+            <span className="text-[10px] font-mono text-zinc-400 uppercase block">Employer Diversity</span>
+            <div className="text-2xl font-bold font-mono text-zinc-900 dark:text-zinc-100">
+              {report.unique_employers_count}
+            </div>
+            <p className="text-[11px] text-zinc-500 leading-snug">Hiring companies represented in dataset</p>
+          </div>
+
+          {/* Remote / Hybrid Share */}
+          <div className="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-1.5">
+            <span className="text-[10px] font-mono text-zinc-400 uppercase block">Remote / Hybrid Share</span>
+            <div className="text-2xl font-bold font-mono text-teal-600 dark:text-teal-400">
+              {report.sample_size > 0
+                ? `${Math.round(
+                    (((report.work_mode_distribution?.REMOTE || 0) +
+                      (report.work_mode_distribution?.HYBRID || 0)) /
+                      report.sample_size) *
+                      100
+                  )}%`
+                : '0%'}
+            </div>
+            <p className="text-[11px] text-zinc-500 leading-snug">Roles offering workplace flexibility</p>
+          </div>
+
+          {/* Core Competencies Identified */}
+          <div className="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-1.5">
+            <span className="text-[10px] font-mono text-zinc-400 uppercase block">Core Competencies</span>
+            <div className="text-2xl font-bold font-mono text-zinc-900 dark:text-zinc-100">
+              {report.core_skills?.length || 0}
+            </div>
+            <p className="text-[11px] text-zinc-500 leading-snug">Distinct mandatory technical requirements</p>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Core vs Preferred Skills Grid */}
+      {report && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Core Skills (Mandatory / Essential) */}
+          <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                  Core Technical Requirements
+                </h3>
               </div>
-              <span className="text-xs font-mono text-zinc-500 hidden sm:inline">
-                Highlighted = on your profile
+              <span className="text-[10px] font-mono text-zinc-400 uppercase">
+                {report.core_skills.length} skills identified
               </span>
             </div>
+            <p className="text-xs text-zinc-500">
+              Skills explicitly designated as mandatory requirements or present across ≥40% of postings.
+            </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-              {intelligence.top_skills.slice(0, 16).map((skill: MarketSkillDemand) => {
-                const isOnProfile = candidateSkillsSet.has(skill.skill_name.toLowerCase());
-
-                return (
-                  <div
-                    key={skill.skill_name}
-                    className={`p-3.5 rounded-xl border transition-all ${
-                      isOnProfile
-                        ? 'bg-teal-50/40 dark:bg-teal-950/20 border-teal-200 dark:border-teal-800/60'
-                        : 'bg-zinc-50/80 dark:bg-zinc-800/30 border-zinc-200/70 dark:border-zinc-700/60'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
-                          {skill.skill_name}
-                        </span>
-                        {isOnProfile && (
-                          <span className="text-[10px] font-mono text-teal-700 dark:text-teal-400 bg-teal-100 dark:bg-teal-900/60 px-1.5 py-0.2 rounded-md">
-                            Your Skill
+            {report.core_skills.length === 0 ? (
+              <div className="text-xs text-zinc-400 py-6 text-center">
+                No core requirements extracted for this sample scope.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {report.core_skills.slice(0, 10).map((skill) => {
+                  const hasSkill = candidateSkillsSet.has(skill.skill_name.toLowerCase().trim());
+                  return (
+                    <div key={skill.skill_name} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                            {skill.skill_name}
                           </span>
-                        )}
+                          {hasSkill ? (
+                            <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800 flex items-center gap-0.5">
+                              <CheckCircle2 className="w-2.5 h-2.5" />
+                              On Profile
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-mono text-zinc-400">
+                              (Skill Gap)
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 font-mono text-[11px] text-zinc-500">
+                          <span>{skill.count} postings</span>
+                          <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                            {skill.percentage}%
+                          </span>
+                        </div>
                       </div>
-
-                      <div className="text-right">
-                        <span className="text-xs font-bold font-mono text-zinc-900 dark:text-zinc-100">
-                          {skill.percentage}%
-                        </span>
-                        <span className="text-[11px] font-mono text-zinc-500 ml-1">
-                          ({skill.count} of {intelligence.total_opportunities_analyzed})
-                        </span>
+                      <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${
+                            hasSkill ? 'bg-teal-500' : 'bg-amber-500'
+                          }`}
+                          style={{ width: `${Math.min(100, skill.percentage)}%` }}
+                        />
                       </div>
                     </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
-                    {/* Frequency Progress Bar */}
-                    <div className="w-full h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${
-                          isOnProfile ? 'bg-teal-600 dark:bg-teal-400' : 'bg-zinc-500 dark:bg-zinc-400'
-                        }`}
-                        style={{ width: `${Math.min(100, skill.percentage)}%` }}
-                      />
+          {/* Preferred / Advantageous Skills */}
+          <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-500" />
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                  Preferred & Advantageous Competencies
+                </h3>
+              </div>
+              <span className="text-[10px] font-mono text-zinc-400 uppercase">
+                {report.preferred_skills.length} skills identified
+              </span>
+            </div>
+            <p className="text-xs text-zinc-500">
+              Frequently requested secondary technologies and differentiating qualifications.
+            </p>
+
+            {report.preferred_skills.length === 0 ? (
+              <div className="text-xs text-zinc-400 py-6 text-center">
+                No preferred skills extracted for this sample scope.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {report.preferred_skills.slice(0, 10).map((skill) => {
+                  const hasSkill = candidateSkillsSet.has(skill.skill_name.toLowerCase().trim());
+                  return (
+                    <div key={skill.skill_name} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                            {skill.skill_name}
+                          </span>
+                          {hasSkill && (
+                            <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800">
+                              ✓ Verified
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 font-mono text-[11px] text-zinc-500">
+                          <span>{skill.count} postings</span>
+                          <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                            {skill.percentage}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-blue-500 rounded-full"
+                          style={{ width: `${Math.min(100, skill.percentage)}%` }}
+                        />
+                      </div>
                     </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
-                    {/* Breakdown of Mandatory vs Preferred */}
-                    <div className="flex items-center justify-between pt-1.5 text-[10px] text-zinc-500 font-mono">
-                      <span>Mandatory in {skill.is_mandatory_count} listings</span>
-                      <span>Preferred in {skill.is_preferred_count} listings</span>
+      {/* 4. Co-occurring Stacks & Workplace Distributions */}
+      {report && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Workplace Arrangements */}
+          <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-3">
+            <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider block">
+              Workplace Arrangements
+            </span>
+            <div className="space-y-2 text-xs">
+              {['REMOTE', 'HYBRID', 'ON_SITE'].map((mode) => {
+                const count = report.work_mode_distribution?.[mode] || 0;
+                const pct = report.sample_size > 0 ? Math.round((count / report.sample_size) * 100) : 0;
+                return (
+                  <div key={mode} className="space-y-1">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-zinc-600 dark:text-zinc-300 font-medium">{mode}</span>
+                      <span className="font-mono text-zinc-500">{count} ({pct}%)</span>
+                    </div>
+                    <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-teal-500 rounded-full" style={{ width: `${pct}%` }} />
                     </div>
                   </div>
                 );
@@ -249,120 +429,72 @@ export function MarketIntelligenceWorkspace({
             </div>
           </div>
 
-          {/* Technology Stacks & Distributions Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Top Technology Stacks / Combinations */}
-            <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-4">
-              <div>
-                <h3 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                  <Layers className="w-3.5 h-3.5 text-zinc-500" />
-                  <span>Common Technology Combinations</span>
-                </h3>
-                <p className="text-xs text-zinc-500 pt-0.5">
-                  Technologies frequently requested together in the same opportunity listing.
-                </p>
-              </div>
-
-              {intelligence.top_skill_combinations.length === 0 ? (
-                <p className="text-xs text-zinc-400 italic">No multi-skill combinations observed yet.</p>
-              ) : (
-                <div className="space-y-2.5">
-                  {intelligence.top_skill_combinations.map((combo, idx) => (
-                    <div
-                      key={idx}
-                      className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/60 dark:border-zinc-700/60 flex items-center justify-between gap-3 text-xs"
-                    >
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {combo.skills.map((s) => (
-                          <span
-                            key={s}
-                            className="px-2 py-0.5 rounded-md bg-white dark:bg-zinc-700 font-medium text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-600 text-[11px]"
-                          >
-                            {s}
-                          </span>
-                        ))}
-                      </div>
-
-                      <div className="text-right shrink-0">
-                        <span className="font-mono font-semibold text-zinc-800 dark:text-zinc-200">
-                          {combo.co_occurrence_count} listings
-                        </span>
-                      </div>
+          {/* Experience Spread */}
+          <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-3">
+            <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider block">
+              Experience Expectations
+            </span>
+            <div className="space-y-2 text-xs">
+              {Object.entries(report.experience_distribution || {}).map(([tier, count]) => {
+                const pct = report.sample_size > 0 ? Math.round((count / report.sample_size) * 100) : 0;
+                return (
+                  <div key={tier} className="space-y-1">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-zinc-600 dark:text-zinc-300 font-medium truncate">{tier}</span>
+                      <span className="font-mono text-zinc-500">{count} ({pct}%)</span>
                     </div>
-                  ))}
-                </div>
-              )}
+                    <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
+          </div>
 
-            {/* Experience & Work Mode Distributions */}
-            <div className="space-y-6">
-              {/* Experience Distribution (Strict Unknown is not zero) */}
-              <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-4">
-                <div>
-                  <h3 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-zinc-500" />
-                    <span>Experience Expectations</span>
-                  </h3>
-                  <p className="text-[11px] text-zinc-500 pt-0.5">
-                    Truthful representation: unstated experience requirements are labeled explicitly as &quot;Not stated&quot;.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  {Object.entries(intelligence.experience_distribution).map(([tier, count]) => {
-                    const pct = intelligence.total_opportunities_analyzed > 0
-                      ? Math.round((count / intelligence.total_opportunities_analyzed) * 100)
-                      : 0;
-
-                    return (
-                      <div key={tier} className="space-y-1">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-zinc-700 dark:text-zinc-300 font-medium">{tier}</span>
-                          <span className="font-mono font-semibold text-zinc-900 dark:text-zinc-100">
-                            {count} ({pct}%)
-                          </span>
-                        </div>
-                        <div className="w-full h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-teal-500 rounded-full"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+          {/* Top Technology Combinations */}
+          <div className="p-5 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-3">
+            <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider block">
+              Frequently Paired Stacks
+            </span>
+            {report.top_skill_combinations?.length === 0 ? (
+              <p className="text-xs text-zinc-400 py-3">No pairwise co-occurrences found.</p>
+            ) : (
+              <div className="space-y-2 text-xs">
+                {report.top_skill_combinations.slice(0, 5).map((combo, idx) => (
+                  <div
+                    key={idx}
+                    className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/60 dark:border-zinc-700/60 flex items-center justify-between"
+                  >
+                    <span className="font-medium text-zinc-800 dark:text-zinc-200 truncate pr-2">
+                      {combo.skills.join(' + ')}
+                    </span>
+                    <span className="font-mono text-[11px] text-zinc-500 shrink-0">
+                      {combo.co_occurrence_count} jobs
+                    </span>
+                  </div>
+                ))}
               </div>
+            )}
+          </div>
+        </div>
+      )}
 
-              {/* Work Arrangement Distribution */}
-              <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-4">
-                <h3 className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-zinc-500" />
-                  <span>Work Arrangement Breakdown</span>
-                </h3>
-
-                <div className="grid grid-cols-3 gap-3 text-center">
-                  {Object.entries(intelligence.work_mode_distribution).map(([mode, count]) => {
-                    const pct = intelligence.total_opportunities_analyzed > 0
-                      ? Math.round((count / intelligence.total_opportunities_analyzed) * 100)
-                      : 0;
-
-                    return (
-                      <div
-                        key={mode}
-                        className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/60 dark:border-zinc-700/60 space-y-1"
-                      >
-                        <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider">
-                          {mode.replace('_', ' ')}
-                        </span>
-                        <div className="text-base font-bold text-zinc-900 dark:text-zinc-100">{pct}%</div>
-                        <span className="text-[10px] text-zinc-400 font-mono">{count} roles</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
+      {/* 5. Empirical Synthesis Narrative */}
+      {report && report.synthesis_markdown && (
+        <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-teal-600" />
+            <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+              Empirical Market Synthesis
+            </h3>
+          </div>
+          <div className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed font-sans prose prose-zinc dark:prose-invert max-w-none">
+            {report.synthesis_markdown.split('\n\n').map((para, i) => (
+              <p key={i} className="mb-2 last:mb-0">
+                {para}
+              </p>
+            ))}
           </div>
         </div>
       )}

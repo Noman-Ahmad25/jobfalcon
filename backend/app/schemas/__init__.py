@@ -26,6 +26,7 @@ from app.schemas.eligibility import (
     DISQ_STUDENT_STATUS_REQUIRED,
     DISQ_VISA_SPONSORSHIP_UNAVAILABLE,
     DISQ_WORK_MODE_MISMATCH,
+    VACANCY_EXPIRED_UNAVAILABLE,
     UNCERT_GRADUATION_DATE_MISSING,
     UNCERT_LOCATION_UNRESTRICTED,
     UNCERT_NO_DEADLINE_SPECIFIED,
@@ -128,10 +129,13 @@ from app.schemas.pipeline import (
 )
 from app.schemas.market import (
     MarketIntelligenceResponse,
+    MarketResearchReportRecord,
     MarketSkillCombination,
     MarketSkillDemand,
     OpportunitySearchRequest,
     OpportunitySearchResponse,
+    SalaryDistributionMetrics,
+    SampleConfidenceTier,
 )
 from app.schemas.profiling import (
     CandidateProfilingRequest,
@@ -184,6 +188,7 @@ __all__ = [
     "DISQ_WORK_MODE_MISMATCH",
     "DISQ_LOCATION_MISMATCH",
     "DISQ_EXPIRED_DEADLINE",
+    "VACANCY_EXPIRED_UNAVAILABLE",
     "UNCERT_NO_DEADLINE_SPECIFIED",
     "UNCERT_GRADUATION_DATE_MISSING",
     "UNCERT_LOCATION_UNRESTRICTED",
@@ -201,6 +206,9 @@ __all__ = [
     "MarketSkillDemand",
     "MarketSkillCombination",
     "MarketIntelligenceResponse",
+    "MarketResearchReportRecord",
+    "SalaryDistributionMetrics",
+    "SampleConfidenceTier",
     # Profiling
     "CandidateProfilingRequest",
     "CandidateProfilingResponse",

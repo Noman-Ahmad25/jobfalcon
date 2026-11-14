@@ -1,18 +1,33 @@
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from app.db.repositories.interfaces import (
+    CandidateActionRepository,
     CandidateProfileRepository,
+    CareerMemoryRepository,
     DiscoveryRunRepository,
     DuplicateClusterRepository,
     EligibilityAuditRepository,
+    MarketReportRepository,
     OpportunityRepository,
     RecommendationRepository,
 )
+from app.schemas.action import (
+    ActionType,
+    CandidateActionsSummary,
+    CandidateOpportunityActionRecord,
+)
 from app.schemas.deduplication import DuplicateRecord, OpportunityCluster
 from app.schemas.eligibility import EligibilityResult
+from app.schemas.market import MarketResearchReportRecord
+from app.schemas.memory import (
+    CandidateCareerMemoryItem,
+    MemoryType,
+    ProvenanceLevel,
+)
 from app.schemas.opportunity import PolymorphicOpportunity
 from app.schemas.orchestration import DiscoveryRun, DiscoveryRunStatus
 from app.schemas.profile import CandidateCareerProfile
@@ -294,5 +309,204 @@ class InMemoryDiscoveryRunRepository(DiscoveryRunRepository):
 
     def clear(self) -> None:
         self._runs.clear()
+
+
+class InMemoryCandidateActionRepository(CandidateActionRepository):
+    """In-memory event-sourced repository for candidate opportunity interaction transitions."""
+
+    def __init__(self) -> None:
+        self._actions: list[CandidateOpportunityActionRecord] = []
+
+    def record_action(self, action: CandidateOpportunityActionRecord) -> None:
+        self._actions.append(CandidateOpportunityActionRecord.model_validate(action.model_dump()))
+
+    def get_latest_actions(self, user_id: str) -> dict[str, CandidateOpportunityActionRecord]:
+        user_actions = [a for a in self._actions if a.user_id == user_id]
+        # Sort chronologically ascending so later ones override
+        user_actions.sort(key=lambda a: a.created_at)
+        latest: dict[str, CandidateOpportunityActionRecord] = {}
+        for a in user_actions:
+            latest[a.opportunity_id] = CandidateOpportunityActionRecord.model_validate(a.model_dump())
+        return latest
+
+    def get_actions_summary(self, user_id: str) -> CandidateActionsSummary:
+        latest = self.get_latest_actions(user_id)
+        saved = [opp_id for opp_id, r in latest.items() if r.action_type == ActionType.SAVED]
+        applied = [opp_id for opp_id, r in latest.items() if r.action_type == ActionType.APPLIED]
+        dismissed = [opp_id for opp_id, r in latest.items() if r.action_type == ActionType.DISMISSED]
+        overridden = [opp_id for opp_id, r in latest.items() if r.action_type == ActionType.SOFT_OVERRIDDEN]
+        user_total = sum(1 for a in self._actions if a.user_id == user_id)
+
+        return CandidateActionsSummary(
+            user_id=user_id,
+            saved_opportunity_ids=saved,
+            applied_opportunity_ids=applied,
+            dismissed_opportunity_ids=dismissed,
+            soft_overridden_opportunity_ids=overridden,
+            latest_actions_by_opp={opp_id: r.action_type for opp_id, r in latest.items()},
+            total_actions_recorded=user_total,
+        )
+
+    def get_action_history(
+        self, user_id: str, opportunity_id: Optional[str] = None, limit: int = 100
+    ) -> list[CandidateOpportunityActionRecord]:
+        matching = [
+            a for a in self._actions
+            if a.user_id == user_id and (opportunity_id is None or a.opportunity_id == opportunity_id)
+        ]
+        matching.sort(key=lambda a: a.created_at, reverse=True)
+        return [CandidateOpportunityActionRecord.model_validate(a.model_dump()) for a in matching[:limit]]
+
+    def get_overridden_opportunity_ids(self, user_id: str) -> list[str]:
+        latest = self.get_latest_actions(user_id)
+        return [opp_id for opp_id, r in latest.items() if r.action_type == ActionType.SOFT_OVERRIDDEN]
+
+    def clear(self) -> None:
+        self._actions.clear()
+
+
+class InMemoryCareerMemoryRepository(CareerMemoryRepository):
+    """In-memory repository preserving versioned candidate career understanding."""
+
+    def __init__(self) -> None:
+        self._memories: dict[str, CandidateCareerMemoryItem] = {}
+
+    def add_memory(self, memory: CandidateCareerMemoryItem) -> None:
+        self._memories[memory.memory_id] = CandidateCareerMemoryItem.model_validate(memory.model_dump())
+
+    def get_memory(self, memory_id: str) -> Optional[CandidateCareerMemoryItem]:
+        item = self._memories.get(memory_id)
+        if not item:
+            return None
+        return CandidateCareerMemoryItem.model_validate(item.model_dump())
+
+    def update_memory(
+        self,
+        user_id: str,
+        current_memory_id: str,
+        new_statement: str,
+        change_reason: str,
+        provenance_level: Optional[ProvenanceLevel] = None,
+        confidence_score: Optional[float] = None,
+    ) -> CandidateCareerMemoryItem:
+        current = self._memories.get(current_memory_id)
+        if not current or current.user_id != user_id:
+            raise ValueError(f"Memory item '{current_memory_id}' not found for user '{user_id}'.")
+
+        now = datetime.now(timezone.utc)
+        new_id = f"mem_{uuid.uuid4().hex[:12]}"
+        new_version = current.version + 1
+        prov = provenance_level or current.provenance_level
+        conf = confidence_score if confidence_score is not None else current.confidence_score
+
+        # Supersede current
+        current_dump = current.model_dump()
+        current_dump["is_active"] = False
+        current_dump["superseded_by"] = new_id
+        current_dump["effective_to"] = now
+        self._memories[current_memory_id] = CandidateCareerMemoryItem.model_validate(current_dump)
+
+        # Create new version
+        new_item = CandidateCareerMemoryItem(
+            memory_id=new_id,
+            user_id=user_id,
+            memory_type=current.memory_type,
+            statement=new_statement,
+            provenance_level=prov,
+            source_context=current.source_context,
+            confidence_score=conf,
+            version=new_version,
+            superseded_by=None,
+            change_reason=change_reason,
+            is_active=True,
+            effective_from=now,
+            effective_to=None,
+            created_at=now,
+        )
+        self._memories[new_id] = new_item
+        return CandidateCareerMemoryItem.model_validate(new_item.model_dump())
+
+    def deactivate_memory(self, user_id: str, memory_id: str, reason: str) -> bool:
+        current = self._memories.get(memory_id)
+        if not current or current.user_id != user_id or not current.is_active:
+            return False
+
+        now = datetime.now(timezone.utc)
+        d = current.model_dump()
+        d["is_active"] = False
+        d["change_reason"] = reason
+        d["effective_to"] = now
+        self._memories[memory_id] = CandidateCareerMemoryItem.model_validate(d)
+        return True
+
+    def list_active_memories(
+        self, user_id: str, memory_type: Optional[MemoryType] = None
+    ) -> list[CandidateCareerMemoryItem]:
+        matching = [
+            m for m in self._memories.values()
+            if m.user_id == user_id and m.is_active and (memory_type is None or m.memory_type == memory_type)
+        ]
+        matching.sort(key=lambda m: m.created_at, reverse=True)
+        return [CandidateCareerMemoryItem.model_validate(m.model_dump()) for m in matching]
+
+    def get_memory_history(self, user_id: str, memory_id: str) -> list[CandidateCareerMemoryItem]:
+        target = self._memories.get(memory_id)
+        if not target or target.user_id != user_id:
+            return []
+
+        matching = [
+            m for m in self._memories.values()
+            if m.user_id == user_id and m.memory_type == target.memory_type
+        ]
+        matching.sort(key=lambda m: m.version)
+        return [CandidateCareerMemoryItem.model_validate(m.model_dump()) for m in matching]
+
+    def list_all_memories_for_candidate(
+        self, user_id: str, include_inactive: bool = False
+    ) -> list[CandidateCareerMemoryItem]:
+        matching = [
+            m for m in self._memories.values()
+            if m.user_id == user_id and (include_inactive or m.is_active)
+        ]
+        matching.sort(key=lambda m: (m.version, m.created_at), reverse=True)
+        return [CandidateCareerMemoryItem.model_validate(m.model_dump()) for m in matching]
+
+    def clear(self) -> None:
+        self._memories.clear()
+
+
+class InMemoryMarketReportRepository(MarketReportRepository):
+    """In-memory dictionary-backed repository for MarketResearchReportRecord."""
+
+    def __init__(self) -> None:
+        self._reports: dict[str, MarketResearchReportRecord] = {}
+
+    def save_report(self, report: MarketResearchReportRecord) -> None:
+        self._reports[report.report_id] = MarketResearchReportRecord.model_validate(report.model_dump())
+
+    def get_report(
+        self, role_title: str, country_code: str, max_age_hours: int = 48
+    ) -> Optional[MarketResearchReportRecord]:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+        matching = [
+            r for r in self._reports.values()
+            if r.role_title.strip().lower() == role_title.strip().lower()
+            and r.country_code.strip().lower() == country_code.strip().lower()
+            and r.generated_at >= cutoff
+        ]
+        if not matching:
+            return None
+        matching.sort(key=lambda r: r.generated_at, reverse=True)
+        return MarketResearchReportRecord.model_validate(matching[0].model_dump())
+
+    def list_reports(self, limit: int = 20) -> list[MarketResearchReportRecord]:
+        items = list(self._reports.values())
+        items.sort(key=lambda r: r.generated_at, reverse=True)
+        return [MarketResearchReportRecord.model_validate(r.model_dump()) for r in items[:limit]]
+
+    def clear(self) -> None:
+        self._reports.clear()
+
+
 
 

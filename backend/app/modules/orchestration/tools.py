@@ -424,6 +424,10 @@ class RankingArgs(BaseModel):
     weight_profile_name: str = Field(default="DEFAULT", description="Weight profile to apply.")
     custom_weights: Optional[dict[str, float]] = Field(default=None, description="Optional custom weights.")
     top_k: int = Field(default=10, description="Top-K recommendations cutoff.")
+    soft_overridden_opportunity_ids: Optional[list[str]] = Field(
+        default=None,
+        description="List of soft-rejected opportunity IDs overridden by candidate.",
+    )
 
 
 class RankingTool:
@@ -443,6 +447,7 @@ class RankingTool:
                 weight_profile_name=args.weight_profile_name,
                 custom_weights=args.custom_weights,
                 top_k=args.top_k,
+                soft_overridden_opportunity_ids=args.soft_overridden_opportunity_ids,
             )
             elapsed = round((time.perf_counter() - t0) * 1000, 2)
             return ToolResult(

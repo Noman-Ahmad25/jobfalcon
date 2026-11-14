@@ -53,13 +53,30 @@ def evaluate_eligibility(
     }
 
     disqualification_reasons: list[str] = []
+    hard_disqualifications: list[str] = []
+    soft_disqualifications: list[str] = []
     uncertainty_caveats: list[str] = []
+    is_vacancy_expired = False
 
     for check in checks.values():
-        if check.status == ConstraintStatus.FAILED:
+        if check.is_vacancy_unavailable:
+            is_vacancy_expired = True
             disqualification_reasons.append(check.rule_code)
+            hard_disqualifications.append(check.rule_code)
+        elif check.status == ConstraintStatus.FAILED:
+            disqualification_reasons.append(check.rule_code)
+            if check.is_soft_failure:
+                soft_disqualifications.append(check.rule_code)
+            else:
+                hard_disqualifications.append(check.rule_code)
         elif check.status == ConstraintStatus.UNCERTAIN:
             uncertainty_caveats.append(check.rule_code)
+
+    is_soft_ineligible = (
+        len(soft_disqualifications) > 0
+        and len(hard_disqualifications) == 0
+        and not is_vacancy_expired
+    )
 
     # Determine overall status
     if disqualification_reasons:
@@ -78,6 +95,10 @@ def evaluate_eligibility(
         status=status,
         is_eligible=is_eligible,
         disqualification_reasons=disqualification_reasons,
+        hard_disqualifications=hard_disqualifications,
+        soft_disqualifications=soft_disqualifications,
+        is_vacancy_expired=is_vacancy_expired,
+        is_soft_ineligible=is_soft_ineligible,
         uncertainty_caveats=uncertainty_caveats,
         constraint_checks=checks,
         evaluated_at=ref_time,

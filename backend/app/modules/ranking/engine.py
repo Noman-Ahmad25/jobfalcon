@@ -64,6 +64,7 @@ class CandidateJobRankingEngine:
         custom_weights: Optional[dict[str, float]] = None,
         top_k: int = 10,
         include_ineligible_in_audit: bool = True,
+        soft_overridden_opportunity_ids: Optional[list[str]] = None,
     ) -> RankingResponse:
         """Evaluates, scores, and ranks opportunities for a given candidate profile."""
         start_time = datetime.now(timezone.utc)
@@ -80,12 +81,13 @@ class CandidateJobRankingEngine:
 
         eligible_candidates: list[tuple[PolymorphicOpportunity, EligibilityResult]] = []
         ineligible_candidates: list[tuple[PolymorphicOpportunity, Optional[EligibilityResult]]] = []
+        overridden_set = set(soft_overridden_opportunity_ids or [])
 
         # 3. Segregate by deterministic eligibility invariant
         for opp in opportunities:
             er = elig_map.get(opp.opportunity_id)
             if er is not None:
-                if er.is_eligible:
+                if er.is_eligible or (opp.opportunity_id in overridden_set and er.is_soft_ineligible):
                     eligible_candidates.append((opp, er))
                 else:
                     ineligible_candidates.append((opp, er))

@@ -158,7 +158,7 @@ def test_controlled_agent_tools_execution() -> None:
 
     # 3. OpportunitySearchTool
     async def _test_search() -> None:
-        search_tool = OpportunitySearchTool()
+        search_tool = OpportunitySearchTool(mock_mode=True)
         q = rm_res.data[0].queries[0]
         s_res = await search_tool.execute(OpportunitySearchArgs(connector_id="web_search", query=q, limit=2))
         assert s_res.success is True

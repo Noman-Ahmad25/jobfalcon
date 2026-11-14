@@ -17,6 +17,7 @@ from app.schemas.eligibility import (
     DISQ_STUDENT_STATUS_REQUIRED,
     DISQ_VISA_SPONSORSHIP_UNAVAILABLE,
     DISQ_WORK_MODE_MISMATCH,
+    VACANCY_EXPIRED_UNAVAILABLE,
     UNCERT_GRADUATION_DATE_MISSING,
     UNCERT_LOCATION_UNRESTRICTED,
     UNCERT_NO_DEADLINE_SPECIFIED,
@@ -229,6 +230,7 @@ def check_experience_duration(
             rule_code=DISQ_EXPERIENCE_BELOW_MINIMUM,
             message=f"Candidate full-time experience ({cand_exp} months) is below minimum requirement ({min_exp} months).",
             details={"candidate_months": cand_exp, "min_experience_months": min_exp},
+            is_soft_failure=True,
         )
 
     if max_exp is not None and cand_exp > max_exp:
@@ -238,6 +240,7 @@ def check_experience_duration(
             rule_code=DISQ_EXPERIENCE_EXCEEDS_MAXIMUM,
             message=f"Candidate full-time experience ({cand_exp} months) exceeds maximum allowable limit ({max_exp} months).",
             details={"candidate_months": cand_exp, "max_experience_months": max_exp},
+            is_soft_failure=True,
         )
 
     return ConstraintCheckResult(
@@ -263,6 +266,7 @@ def check_work_mode(
             rule_code=DISQ_WORK_MODE_MISMATCH,
             message=f"Opportunity work mode '{opp_mode.value}' is not acceptable to candidate (allowed: {[m.value for m in allowed_modes]}).",
             details={"opportunity_work_mode": opp_mode.value, "allowed_work_modes": [m.value for m in allowed_modes]},
+            is_soft_failure=True,
         )
 
     return ConstraintCheckResult(
@@ -338,6 +342,7 @@ def check_location(
         rule_code=DISQ_LOCATION_MISMATCH,
         message=f"Candidate preferred locations {cand_locations} do not match opportunity locations {opp_locations}.",
         details={"candidate_preferred_locations": cand_locations, "opportunity_locations": opp_locations},
+        is_soft_failure=True,
     )
 
 
@@ -366,9 +371,10 @@ def check_application_deadline(
         return ConstraintCheckResult(
             constraint_name="application_deadline",
             status=ConstraintStatus.FAILED,
-            rule_code=DISQ_EXPIRED_DEADLINE,
-            message=f"Application deadline ({deadline.isoformat()}) has expired relative to reference time ({ref.isoformat()}).",
+            rule_code=VACANCY_EXPIRED_UNAVAILABLE,
+            message=f"Vacancy is closed/unavailable: application deadline ({deadline.isoformat()}) has expired relative to reference time ({ref.isoformat()}).",
             details={"deadline": deadline.isoformat(), "reference_time": ref.isoformat()},
+            is_vacancy_unavailable=True,
         )
 
     return ConstraintCheckResult(

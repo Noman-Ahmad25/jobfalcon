@@ -1,18 +1,33 @@
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 
 from app.db.connection import DatabaseManager, db_manager
 from app.db.repositories.interfaces import (
+    CandidateActionRepository,
     CandidateProfileRepository,
+    CareerMemoryRepository,
     CareerPathRepository,
     DiscoveryRunRepository,
     DuplicateClusterRepository,
     EligibilityAuditRepository,
+    MarketReportRepository,
     OpportunityRepository,
     RecommendationRepository,
+)
+from app.schemas.action import (
+    ActionReasonCategory,
+    ActionType,
+    CandidateActionsSummary,
+    CandidateOpportunityActionRecord,
+)
+from app.schemas.memory import (
+    CandidateCareerMemoryItem,
+    MemoryType,
+    ProvenanceLevel,
 )
 from app.schemas.career_path import (
     ActionProgressStatus,
@@ -23,10 +38,12 @@ from app.schemas.career_path import (
 from app.schemas.deduplication import DuplicateRecord, OpportunityCluster
 from app.schemas.eligibility import (
     ConstraintCheckResult,
+    ConstraintStatus,
     EligibilityResult,
     EligibilityStatus,
 )
 from app.schemas.evidence import EvidenceRecord
+from app.schemas.market import MarketResearchReportRecord
 from app.schemas.opportunity import (
     OpportunityEligibilityRules,
     OpportunitySkillRequirement,
@@ -654,6 +671,10 @@ class SQLiteEligibilityAuditRepository(EligibilityAuditRepository):
             checks = {
                 k: ConstraintCheckResult.model_validate(v) for k, v in raw_checks.items()
             }
+            hard_disqs = [c.rule_code for c in checks.values() if (c.status == ConstraintStatus.FAILED and not c.is_soft_failure) or c.is_vacancy_unavailable]
+            soft_disqs = [c.rule_code for c in checks.values() if c.status == ConstraintStatus.FAILED and c.is_soft_failure]
+            is_vac_exp = any(c.is_vacancy_unavailable for c in checks.values())
+            is_soft_inel = len(soft_disqs) > 0 and len(hard_disqs) == 0 and not is_vac_exp
 
             return EligibilityResult(
                 opportunity_id=row["opportunity_id"],
@@ -661,6 +682,10 @@ class SQLiteEligibilityAuditRepository(EligibilityAuditRepository):
                 status=EligibilityStatus(row["status"]),
                 is_eligible=bool(row["is_eligible"]),
                 disqualification_reasons=json.loads(row["disqualification_reasons_json"]),
+                hard_disqualifications=hard_disqs,
+                soft_disqualifications=soft_disqs,
+                is_vacancy_expired=is_vac_exp,
+                is_soft_ineligible=is_soft_inel,
                 uncertainty_caveats=json.loads(row["uncertainty_caveats_json"]),
                 constraint_checks=checks,
                 evaluated_at=datetime.fromisoformat(row["evaluated_at"]),
@@ -683,6 +708,11 @@ class SQLiteEligibilityAuditRepository(EligibilityAuditRepository):
                 checks = {
                     k: ConstraintCheckResult.model_validate(v) for k, v in raw_checks.items()
                 }
+                hard_disqs = [c.rule_code for c in checks.values() if (c.status == ConstraintStatus.FAILED and not c.is_soft_failure) or c.is_vacancy_unavailable]
+                soft_disqs = [c.rule_code for c in checks.values() if c.status == ConstraintStatus.FAILED and c.is_soft_failure]
+                is_vac_exp = any(c.is_vacancy_unavailable for c in checks.values())
+                is_soft_inel = len(soft_disqs) > 0 and len(hard_disqs) == 0 and not is_vac_exp
+
                 results.append(
                     EligibilityResult(
                         opportunity_id=row["opportunity_id"],
@@ -690,6 +720,10 @@ class SQLiteEligibilityAuditRepository(EligibilityAuditRepository):
                         status=EligibilityStatus(row["status"]),
                         is_eligible=bool(row["is_eligible"]),
                         disqualification_reasons=json.loads(row["disqualification_reasons_json"]),
+                        hard_disqualifications=hard_disqs,
+                        soft_disqualifications=soft_disqs,
+                        is_vacancy_expired=is_vac_exp,
+                        is_soft_ineligible=is_soft_inel,
                         uncertainty_caveats=json.loads(row["uncertainty_caveats_json"]),
                         constraint_checks=checks,
                         evaluated_at=datetime.fromisoformat(row["evaluated_at"]),
@@ -1160,6 +1194,436 @@ class SQLiteDiscoveryRunRepository(DiscoveryRunRepository):
             if not row:
                 return None
             return self._row_to_run(row)
+
+
+class SQLiteCandidateActionRepository(CandidateActionRepository):
+    """SQLite implementation of CandidateActionRepository tracking immutable interaction transitions."""
+
+    def __init__(self, manager: Optional[DatabaseManager] = None) -> None:
+        self.manager = manager or db_manager
+
+    def record_action(self, action: CandidateOpportunityActionRecord) -> None:
+        with self.manager.transaction() as conn:
+            conn.execute(
+                """
+                INSERT INTO candidate_opportunity_actions (
+                    id, user_id, opportunity_id, action_type, previous_state,
+                    reason_category, user_notes, soft_override_rationale, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    action.id,
+                    action.user_id,
+                    action.opportunity_id,
+                    action.action_type.value,
+                    action.previous_state,
+                    action.reason_category.value if action.reason_category else None,
+                    action.user_notes,
+                    action.soft_override_rationale,
+                    action.created_at.isoformat(),
+                ),
+            )
+
+    def get_latest_actions(self, user_id: str) -> dict[str, CandidateOpportunityActionRecord]:
+        """Returns map of opportunity_id to latest action record for user."""
+        query = """
+            SELECT a.* FROM candidate_opportunity_actions a
+            INNER JOIN (
+                SELECT opportunity_id, MAX(created_at) as max_created
+                FROM candidate_opportunity_actions
+                WHERE user_id = ?
+                GROUP BY opportunity_id
+            ) latest ON a.opportunity_id = latest.opportunity_id AND a.created_at = latest.max_created
+            WHERE a.user_id = ?;
+        """
+        with self.manager.read_connection() as conn:
+            rows = conn.execute(query, (user_id, user_id)).fetchall()
+            result: dict[str, CandidateOpportunityActionRecord] = {}
+            for r in rows:
+                rec = self._row_to_record(r)
+                result[rec.opportunity_id] = rec
+            return result
+
+    def get_actions_summary(self, user_id: str) -> CandidateActionsSummary:
+        latest = self.get_latest_actions(user_id)
+        saved = [opp_id for opp_id, r in latest.items() if r.action_type == ActionType.SAVED]
+        applied = [opp_id for opp_id, r in latest.items() if r.action_type == ActionType.APPLIED]
+        dismissed = [opp_id for opp_id, r in latest.items() if r.action_type == ActionType.DISMISSED]
+        overridden = [opp_id for opp_id, r in latest.items() if r.action_type == ActionType.SOFT_OVERRIDDEN]
+
+        with self.manager.read_connection() as conn:
+            cnt_row = conn.execute(
+                "SELECT COUNT(*) as cnt FROM candidate_opportunity_actions WHERE user_id = ?;", (user_id,)
+            ).fetchone()
+            total_count = cnt_row["cnt"] if cnt_row else 0
+
+        return CandidateActionsSummary(
+            user_id=user_id,
+            saved_opportunity_ids=saved,
+            applied_opportunity_ids=applied,
+            dismissed_opportunity_ids=dismissed,
+            soft_overridden_opportunity_ids=overridden,
+            latest_actions_by_opp={opp_id: r.action_type for opp_id, r in latest.items()},
+            total_actions_recorded=total_count,
+        )
+
+    def get_action_history(
+        self, user_id: str, opportunity_id: Optional[str] = None, limit: int = 100
+    ) -> list[CandidateOpportunityActionRecord]:
+        with self.manager.read_connection() as conn:
+            if opportunity_id:
+                rows = conn.execute(
+                    """
+                    SELECT * FROM candidate_opportunity_actions
+                    WHERE user_id = ? AND opportunity_id = ?
+                    ORDER BY created_at DESC LIMIT ?;
+                    """,
+                    (user_id, opportunity_id, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT * FROM candidate_opportunity_actions
+                    WHERE user_id = ?
+                    ORDER BY created_at DESC LIMIT ?;
+                    """,
+                    (user_id, limit),
+                ).fetchall()
+            return [self._row_to_record(r) for r in rows]
+
+    def get_overridden_opportunity_ids(self, user_id: str) -> list[str]:
+        latest = self.get_latest_actions(user_id)
+        return [opp_id for opp_id, r in latest.items() if r.action_type == ActionType.SOFT_OVERRIDDEN]
+
+    @staticmethod
+    def _row_to_record(row: Any) -> CandidateOpportunityActionRecord:
+        created_at = row["created_at"]
+        if isinstance(created_at, str):
+            dt = datetime.fromisoformat(created_at)
+            if not dt.tzinfo:
+                dt = dt.replace(tzinfo=timezone.utc)
+        else:
+            dt = datetime.now(timezone.utc)
+
+        reason_val = row["reason_category"]
+        reason_cat = ActionReasonCategory(reason_val) if reason_val else None
+
+        return CandidateOpportunityActionRecord(
+            id=row["id"],
+            user_id=row["user_id"],
+            opportunity_id=row["opportunity_id"],
+            action_type=ActionType(row["action_type"]),
+            previous_state=row["previous_state"],
+            reason_category=reason_cat,
+            user_notes=row["user_notes"],
+            soft_override_rationale=row["soft_override_rationale"],
+            created_at=dt,
+        )
+
+
+class SQLiteCareerMemoryRepository(CareerMemoryRepository):
+    """SQLite implementation of CareerMemoryRepository preserving versioned candidate understanding."""
+
+    def __init__(self, manager: Optional[DatabaseManager] = None) -> None:
+        self.manager = manager or db_manager
+
+    def add_memory(self, memory: CandidateCareerMemoryItem) -> None:
+        with self.manager.transaction() as conn:
+            conn.execute(
+                """
+                INSERT INTO candidate_career_memory (
+                    memory_id, user_id, memory_type, statement, provenance_level,
+                    source_context, confidence_score, version, superseded_by,
+                    change_reason, is_active, effective_from, effective_to, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    memory.memory_id,
+                    memory.user_id,
+                    memory.memory_type.value,
+                    memory.statement,
+                    memory.provenance_level.value,
+                    memory.source_context,
+                    memory.confidence_score,
+                    memory.version,
+                    memory.superseded_by,
+                    memory.change_reason,
+                    1 if memory.is_active else 0,
+                    memory.effective_from.isoformat(),
+                    memory.effective_to.isoformat() if memory.effective_to else None,
+                    memory.created_at.isoformat(),
+                ),
+            )
+
+    def get_memory(self, memory_id: str) -> Optional[CandidateCareerMemoryItem]:
+        with self.manager.read_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM candidate_career_memory WHERE memory_id = ?;", (memory_id,)
+            ).fetchone()
+            if not row:
+                return None
+            return self._row_to_item(row)
+
+    def update_memory(
+        self,
+        user_id: str,
+        current_memory_id: str,
+        new_statement: str,
+        change_reason: str,
+        provenance_level: Optional[ProvenanceLevel] = None,
+        confidence_score: Optional[float] = None,
+    ) -> CandidateCareerMemoryItem:
+        now = datetime.now(timezone.utc)
+        with self.manager.transaction() as conn:
+            current_row = conn.execute(
+                "SELECT * FROM candidate_career_memory WHERE memory_id = ? AND user_id = ?;",
+                (current_memory_id, user_id),
+            ).fetchone()
+            if not current_row:
+                raise ValueError(f"Memory item '{current_memory_id}' not found for user '{user_id}'.")
+
+            current_item = self._row_to_item(current_row)
+            new_id = f"mem_{uuid.uuid4().hex[:12]}"
+            new_version = current_item.version + 1
+            prov = provenance_level or current_item.provenance_level
+            conf = confidence_score if confidence_score is not None else current_item.confidence_score
+
+            # 1. Insert new version first so foreign key check for superseded_by succeeds
+            new_item = CandidateCareerMemoryItem(
+                memory_id=new_id,
+                user_id=user_id,
+                memory_type=current_item.memory_type,
+                statement=new_statement,
+                provenance_level=prov,
+                source_context=current_item.source_context,
+                confidence_score=conf,
+                version=new_version,
+                superseded_by=None,
+                change_reason=change_reason,
+                is_active=True,
+                effective_from=now,
+                effective_to=None,
+                created_at=now,
+            )
+
+            conn.execute(
+                """
+                INSERT INTO candidate_career_memory (
+                    memory_id, user_id, memory_type, statement, provenance_level,
+                    source_context, confidence_score, version, superseded_by,
+                    change_reason, is_active, effective_from, effective_to, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    new_item.memory_id,
+                    new_item.user_id,
+                    new_item.memory_type.value,
+                    new_item.statement,
+                    new_item.provenance_level.value,
+                    new_item.source_context,
+                    new_item.confidence_score,
+                    new_item.version,
+                    new_item.superseded_by,
+                    new_item.change_reason,
+                    1,
+                    new_item.effective_from.isoformat(),
+                    None,
+                    new_item.created_at.isoformat(),
+                ),
+            )
+
+            # 2. Supersede and archive previous version referencing newly inserted version
+            conn.execute(
+                """
+                UPDATE candidate_career_memory
+                SET is_active = 0, superseded_by = ?, effective_to = ?
+                WHERE memory_id = ?;
+                """,
+                (new_id, now.isoformat(), current_memory_id),
+            )
+
+            return new_item
+
+    def deactivate_memory(self, user_id: str, memory_id: str, reason: str) -> bool:
+        now = datetime.now(timezone.utc)
+        with self.manager.transaction() as conn:
+            res = conn.execute(
+                """
+                UPDATE candidate_career_memory
+                SET is_active = 0, change_reason = ?, effective_to = ?
+                WHERE memory_id = ? AND user_id = ? AND is_active = 1;
+                """,
+                (reason, now.isoformat(), memory_id, user_id),
+            )
+            return res.rowcount > 0
+
+    def list_active_memories(
+        self, user_id: str, memory_type: Optional[MemoryType] = None
+    ) -> list[CandidateCareerMemoryItem]:
+        with self.manager.read_connection() as conn:
+            if memory_type:
+                rows = conn.execute(
+                    """
+                    SELECT * FROM candidate_career_memory
+                    WHERE user_id = ? AND is_active = 1 AND memory_type = ?
+                    ORDER BY created_at DESC;
+                    """,
+                    (user_id, memory_type.value),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT * FROM candidate_career_memory
+                    WHERE user_id = ? AND is_active = 1
+                    ORDER BY created_at DESC;
+                    """,
+                    (user_id,),
+                ).fetchall()
+            return [self._row_to_item(r) for r in rows]
+
+    def get_memory_history(self, user_id: str, memory_id: str) -> list[CandidateCareerMemoryItem]:
+        with self.manager.read_connection() as conn:
+            target = conn.execute(
+                "SELECT * FROM candidate_career_memory WHERE memory_id = ? AND user_id = ?;",
+                (memory_id, user_id),
+            ).fetchone()
+            if not target:
+                return []
+
+            rows = conn.execute(
+                "SELECT * FROM candidate_career_memory WHERE user_id = ? AND memory_type = ? ORDER BY version ASC;",
+                (user_id, target["memory_type"]),
+            ).fetchall()
+            return [self._row_to_item(r) for r in rows]
+
+    def list_all_memories_for_candidate(
+        self, user_id: str, include_inactive: bool = False
+    ) -> list[CandidateCareerMemoryItem]:
+        with self.manager.read_connection() as conn:
+            if include_inactive:
+                rows = conn.execute(
+                    "SELECT * FROM candidate_career_memory WHERE user_id = ? ORDER BY version DESC, created_at DESC;",
+                    (user_id,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM candidate_career_memory WHERE user_id = ? AND is_active = 1 ORDER BY created_at DESC;",
+                    (user_id,),
+                ).fetchall()
+            return [self._row_to_item(r) for r in rows]
+
+    @staticmethod
+    def _row_to_item(row: Any) -> CandidateCareerMemoryItem:
+        def _parse_dt(v: Any) -> Optional[datetime]:
+            if not v:
+                return None
+            if isinstance(v, str):
+                dt = datetime.fromisoformat(v)
+                if not dt.tzinfo:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return dt
+            return None
+
+        eff_from = _parse_dt(row["effective_from"]) or datetime.now(timezone.utc)
+        eff_to = _parse_dt(row["effective_to"])
+        created_at = _parse_dt(row["created_at"]) or datetime.now(timezone.utc)
+
+        return CandidateCareerMemoryItem(
+            memory_id=row["memory_id"],
+            user_id=row["user_id"],
+            memory_type=MemoryType(row["memory_type"]),
+            statement=row["statement"],
+            provenance_level=ProvenanceLevel(row["provenance_level"]),
+            source_context=row["source_context"],
+            confidence_score=float(row["confidence_score"]),
+            version=int(row["version"]),
+            superseded_by=row["superseded_by"],
+            change_reason=row["change_reason"],
+            is_active=bool(row["is_active"]),
+            effective_from=eff_from,
+            effective_to=eff_to,
+            created_at=created_at,
+        )
+
+
+class SQLiteMarketReportRepository(MarketReportRepository):
+    """SQLite implementation of MarketReportRepository for grounded intelligence caching."""
+
+    def __init__(self, manager: Optional[DatabaseManager] = None) -> None:
+        self.manager = manager or db_manager
+
+    def save_report(self, report: MarketResearchReportRecord) -> None:
+        now = datetime.now(timezone.utc)
+        expires_at = report.expires_at or (now + timedelta(hours=48))
+        with self.manager.transaction() as conn:
+            conn.execute(
+                """
+                INSERT INTO market_research_reports (
+                    report_id, role_title, country_code, mapped_occupation_code,
+                    career_track, sample_size, confidence_score, sample_confidence_tier,
+                    report_data_json, llm_synthesis_json, generated_at, expires_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(report_id) DO UPDATE SET
+                    sample_size = excluded.sample_size,
+                    confidence_score = excluded.confidence_score,
+                    sample_confidence_tier = excluded.sample_confidence_tier,
+                    report_data_json = excluded.report_data_json,
+                    llm_synthesis_json = excluded.llm_synthesis_json,
+                    generated_at = excluded.generated_at,
+                    expires_at = excluded.expires_at;
+                """,
+                (
+                    report.report_id,
+                    report.role_title,
+                    report.country_code,
+                    report.mapped_occupation_code or "",
+                    report.career_track,
+                    report.sample_size,
+                    report.confidence_score,
+                    report.sample_confidence_tier.value,
+                    report.model_dump_json(),
+                    report.synthesis_markdown,
+                    report.generated_at.isoformat(),
+                    expires_at.isoformat(),
+                ),
+            )
+
+    def get_report(
+        self, role_title: str, country_code: str, max_age_hours: int = 48
+    ) -> Optional[MarketResearchReportRecord]:
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=max_age_hours)).isoformat()
+        with self.manager.read_connection() as conn:
+            row = conn.execute(
+                """
+                SELECT report_data_json FROM market_research_reports
+                WHERE LOWER(role_title) = LOWER(?)
+                  AND LOWER(country_code) = LOWER(?)
+                  AND generated_at >= ?
+                ORDER BY generated_at DESC
+                LIMIT 1;
+                """,
+                (role_title.strip(), country_code.strip(), cutoff),
+            ).fetchone()
+
+            if not row:
+                return None
+            return MarketResearchReportRecord.model_validate_json(row["report_data_json"])
+
+    def list_reports(self, limit: int = 20) -> list[MarketResearchReportRecord]:
+        with self.manager.read_connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT report_data_json FROM market_research_reports
+                ORDER BY generated_at DESC
+                LIMIT ?;
+                """,
+                (limit,),
+            ).fetchall()
+            return [
+                MarketResearchReportRecord.model_validate_json(r["report_data_json"])
+                for r in rows
+            ]
+
 
 
 

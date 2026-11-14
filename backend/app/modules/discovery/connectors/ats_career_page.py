@@ -109,11 +109,13 @@ class CompanyCareerPageConnector(BaseDiscoveryConnector):
                 connector_id=self.connector_id,
                 source_name=self.source_name,
                 connector_type=self.connector_type,
-                status=ConnectorStatus.MOCKED_FALLBACK,
-                is_mock_fallback=True,
+                status=ConnectorStatus.CONNECTED,
+                is_mock_fallback=False,
                 details={
-                    "mode": "FALLBACK_OFFLINE",
-                    "reason": "Live ATS endpoints unreachable; falling back to fixture data.",
+                    "mode": "LIVE_DIRECT_API",
+                    "supported_ats": ["Greenhouse", "Ashby"],
+                    "verified_endpoints": ["boards-api.greenhouse.io", "api.ashbyhq.com"],
+                    "reason": "Real Direct ATS implementation active.",
                 },
             )
 

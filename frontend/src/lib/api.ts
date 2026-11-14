@@ -28,6 +28,14 @@ import {
   OpportunitySearchResponse,
   MarketIntelligenceResponse,
   PolymorphicOpportunity,
+  CandidateActionsSummary,
+  CandidateOpportunityActionRecord,
+  RecordActionRequest,
+  CandidateCareerMemoryItem,
+  CreateMemoryRequest,
+  UpdateMemoryRequest,
+  MemoryHistoryResponse,
+  MarketResearchReportRecord,
 } from '@/types/domain';
 
 const DEFAULT_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -495,6 +503,191 @@ export async function getOpportunityById(
     }
   );
 }
+
+// =============================================================================
+// Opportunity Actions & Interaction Tracking
+// =============================================================================
+
+/** Record a candidate interaction transition (SAVED, APPLIED, DISMISSED, SOFT_OVERRIDDEN). */
+export async function recordOpportunityAction(
+  opportunityId: string,
+  payload: RecordActionRequest,
+  userId?: string
+): Promise<CandidateOpportunityActionRecord> {
+  const query = userId ? `?user_id=${encodeURIComponent(userId)}` : '';
+  return fetchFromApi<CandidateOpportunityActionRecord>(
+    `/api/v1/actions/opportunities/${encodeURIComponent(opportunityId)}${query}`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      timeoutMs: 6000,
+    }
+  );
+}
+
+/** Get consolidated actions summary (saved, applied, dismissed, overridden IDs). */
+export async function getCandidateActionsSummary(
+  userId: string
+): Promise<CandidateActionsSummary> {
+  return fetchFromApi<CandidateActionsSummary>(
+    `/api/v1/actions/candidate/${encodeURIComponent(userId)}`,
+    {
+      method: 'GET',
+      timeoutMs: 6000,
+    }
+  );
+}
+
+/** Get full transition event history for candidate. */
+export async function getCandidateActionHistory(
+  userId: string,
+  opportunityId?: string,
+  limit: number = 100
+): Promise<CandidateOpportunityActionRecord[]> {
+  const query = new URLSearchParams({ limit: String(limit) });
+  if (opportunityId) query.set('opportunity_id', opportunityId);
+  return fetchFromApi<CandidateOpportunityActionRecord[]>(
+    `/api/v1/actions/candidate/${encodeURIComponent(userId)}/history?${query.toString()}`,
+    {
+      method: 'GET',
+      timeoutMs: 6000,
+    }
+  );
+}
+
+/** Get IDs of soft-rejections overridden by candidate. */
+export async function getOverriddenOpportunityIds(
+  userId: string
+): Promise<string[]> {
+  return fetchFromApi<string[]>(
+    `/api/v1/actions/candidate/${encodeURIComponent(userId)}/overridden`,
+    {
+      method: 'GET',
+      timeoutMs: 6000,
+    }
+  );
+}
+
+// =============================================================================
+// Versioned Career Memory
+// =============================================================================
+
+/** List candidate active career memories. */
+export async function getCandidateMemories(
+  userId: string,
+  memoryType?: string,
+  includeInactive: boolean = false
+): Promise<CandidateCareerMemoryItem[]> {
+  const query = new URLSearchParams({ include_inactive: String(includeInactive) });
+  if (memoryType) query.set('memory_type', memoryType);
+  return fetchFromApi<CandidateCareerMemoryItem[]>(
+    `/api/v1/memory/candidate/${encodeURIComponent(userId)}?${query.toString()}`,
+    {
+      method: 'GET',
+      timeoutMs: 6000,
+    }
+  );
+}
+
+/** Record a new versioned career memory statement. */
+export async function createCandidateMemory(
+  userId: string,
+  payload: CreateMemoryRequest
+): Promise<CandidateCareerMemoryItem> {
+  return fetchFromApi<CandidateCareerMemoryItem>(
+    `/api/v1/memory/candidate/${encodeURIComponent(userId)}`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      timeoutMs: 6000,
+    }
+  );
+}
+
+/** Update existing memory fact, archiving previous version and linking lineage. */
+export async function updateCandidateMemory(
+  userId: string,
+  memoryId: string,
+  payload: UpdateMemoryRequest
+): Promise<CandidateCareerMemoryItem> {
+  return fetchFromApi<CandidateCareerMemoryItem>(
+    `/api/v1/memory/candidate/${encodeURIComponent(userId)}/${encodeURIComponent(memoryId)}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+      timeoutMs: 6000,
+    }
+  );
+}
+
+/** Deactivate/archive a career memory item. */
+export async function deactivateCandidateMemory(
+  userId: string,
+  memoryId: string,
+  reason: string = 'User removed'
+): Promise<{ status: string; memory_id: string }> {
+  return fetchFromApi<{ status: string; memory_id: string }>(
+    `/api/v1/memory/candidate/${encodeURIComponent(userId)}/${encodeURIComponent(memoryId)}?reason=${encodeURIComponent(reason)}`,
+    {
+      method: 'DELETE',
+      timeoutMs: 6000,
+    }
+  );
+}
+
+/** Get version audit history and superseded lineage for a memory statement. */
+export async function getMemoryLineage(
+  userId: string,
+  memoryId: string
+): Promise<MemoryHistoryResponse> {
+  return fetchFromApi<MemoryHistoryResponse>(
+    `/api/v1/memory/candidate/${encodeURIComponent(userId)}/lineage/${encodeURIComponent(memoryId)}`,
+    {
+      method: 'GET',
+      timeoutMs: 6000,
+    }
+  );
+}
+
+// =============================================================================
+// Grounded Market Intelligence Reports
+// =============================================================================
+
+/** Generate or retrieve cached empirical market research report. */
+export async function getMarketResearchReport(params?: {
+  roleTitle?: string;
+  countryCode?: string;
+  careerTrack?: string;
+  userId?: string;
+  forceRefresh?: boolean;
+}): Promise<MarketResearchReportRecord> {
+  const query = new URLSearchParams();
+  if (params?.roleTitle) query.set('role_title', params.roleTitle);
+  if (params?.countryCode) query.set('country_code', params.countryCode);
+  if (params?.careerTrack) query.set('career_track', params.careerTrack);
+  if (params?.userId) query.set('user_id', params.userId);
+  if (params?.forceRefresh) query.set('force_refresh', 'true');
+  const qStr = query.toString();
+  return fetchFromApi<MarketResearchReportRecord>(
+    `/api/v1/market/report${qStr ? `?${qStr}` : ''}`,
+    {
+      method: 'GET',
+      timeoutMs: 10000,
+    }
+  );
+}
+
+/** List recently cached market research reports. */
+export async function listMarketReports(limit: number = 20): Promise<MarketResearchReportRecord[]> {
+  return fetchFromApi<MarketResearchReportRecord[]>(
+    `/api/v1/market/reports?limit=${limit}`,
+    {
+      method: 'GET',
+      timeoutMs: 6000,
+    }
+  );
+}
+
 
 
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Compass,
   RotateCw,
@@ -16,23 +16,43 @@ import {
   MapPin,
   Building2,
   Eye,
+  Bookmark,
+  XCircle,
+  Check,
+  Undo2,
+  Filter,
+  Sparkles,
+  AlertCircle,
+  Info,
+  X,
+  Layers,
+  ThumbsDown,
 } from 'lucide-react';
 import {
+  ActionReasonCategory,
+  ActionType,
   AdaptiveDiscoveryRequest,
   AdaptiveDiscoveryResponse,
+  CandidateActionsSummary,
   CandidateCareerProfile,
   ConnectorHealthReport,
+  DimensionScoreBreakdown,
   DiscoveryRun,
   DiscoveryRunStreamEvent,
+  EligibilityResult,
+  PolymorphicOpportunity,
+  RankingDimension,
   RankedOpportunity,
   WorkflowStage,
   WorkflowTimelineEvent,
 } from '@/types/domain';
 import {
+  getCandidateActionsSummary,
   getDiscoveryConnectors,
   getDiscoveryRun,
   getDiscoveryRunStreamUrl,
   getLatestDiscoveryRunForCandidate,
+  recordOpportunityAction,
   startDiscoveryRun,
 } from '@/lib/api';
 import { formatOpportunityLocation } from '@/lib/location';
@@ -94,6 +114,55 @@ export function DiscoveryWorkspace({
   const [auditedOpportunity, setAuditedOpportunity] = useState<RankedOpportunity | null>(null);
   const [auditDrawerTab, setAuditDrawerTab] = useState<'fit' | 'evidence' | 'eligibility'>('fit');
   const [showTimeline, setShowTimeline] = useState<boolean>(true);
+
+  // 3 Primary Workstation Views
+  type DiscoveryView = 'recommended' | 'all' | 'rejected';
+  const [activeView, setActiveView] = useState<DiscoveryView>('recommended');
+
+  // Candidate Actions state
+  const [actionsSummary, setActionsSummary] = useState<CandidateActionsSummary | null>(null);
+
+  // Filters for All Discovered & Rejected views
+  const [allSearchQuery, setAllSearchQuery] = useState('');
+  const [allStatusFilter, setAllStatusFilter] = useState<'ALL' | 'ELIGIBLE' | 'INELIGIBLE'>('ALL');
+  const [rejectedSubFilter, setRejectedSubFilter] = useState<'ALL' | 'SOFT' | 'HARD' | 'EXPIRED'>('ALL');
+
+  // Action Dialog Modals
+  const [dismissTargetOpp, setDismissTargetOpp] = useState<PolymorphicOpportunity | null>(null);
+  const [dismissReasonCategory, setDismissReasonCategory] = useState<ActionReasonCategory>('SALARY');
+  const [dismissReasonNotes, setDismissReasonNotes] = useState('');
+  const [isSubmittingDismiss, setIsSubmittingDismiss] = useState(false);
+
+  const [overrideTargetOpp, setOverrideTargetOpp] = useState<PolymorphicOpportunity | null>(null);
+  const [overrideRationale, setOverrideRationale] = useState('');
+  const [overrideError, setOverrideError] = useState<string | null>(null);
+  const [isSubmittingOverride, setIsSubmittingOverride] = useState(false);
+
+  // Load Candidate Actions Summary
+  const loadActions = useCallback(async () => {
+    try {
+      const summary = await getCandidateActionsSummary(candidateProfile.user_id);
+      setActionsSummary(summary);
+    } catch (err) {
+      console.warn('Failed to load candidate actions summary:', err);
+    }
+  }, [candidateProfile.user_id]);
+
+  useEffect(() => {
+    let isMounted = true;
+    async function initActions() {
+      try {
+        const summary = await getCandidateActionsSummary(candidateProfile.user_id);
+        if (isMounted) setActionsSummary(summary);
+      } catch (err) {
+        console.warn('Failed to load candidate actions summary:', err);
+      }
+    }
+    initActions();
+    return () => {
+      isMounted = false;
+    };
+  }, [candidateProfile.user_id]);
 
   // Active event stream ref to clean up listeners
   const activeEventSourceRef = useRef<EventSource | null>(null);
@@ -352,12 +421,185 @@ export function DiscoveryWorkspace({
   }
 
   const recommendations = discoveryResponse?.recommendations?.ranked_recommendations || [];
+  const canonicalOpportunities = discoveryResponse?.canonical_opportunities || [];
   const adaptations = activeRun?.adaptation_history || discoveryResponse?.adaptation_history || [];
   const currentIteration = Math.max(
     1,
     liveEvents.filter((e) => e.event_type?.includes('ITERATION_') && e.event_type?.includes('_STARTED')).length
   );
   const rejectionsByCode = activeRun?.rejections_by_code || discoveryResponse?.rejections_by_code || {};
+
+  // Eligibility Map
+  const eligibilityMap = useMemo(() => {
+    const map = new Map<string, EligibilityResult>();
+    (discoveryResponse?.eligibility_results || []).forEach((el) => {
+      map.set(el.opportunity_id, el);
+    });
+    return map;
+  }, [discoveryResponse]);
+
+  // Derived Rejected Opportunities
+  const rejectedOpportunities = useMemo(() => {
+    if (!discoveryResponse?.canonical_opportunities) return [];
+    return discoveryResponse.canonical_opportunities.filter((opp) => {
+      const el = eligibilityMap.get(opp.opportunity_id);
+      return el && el.status === 'INELIGIBLE';
+    });
+  }, [discoveryResponse, eligibilityMap]);
+
+  // Sub-categorized rejected counts
+  const rejectedMetrics = useMemo(() => {
+    let softCount = 0;
+    let hardCount = 0;
+    let expiredCount = 0;
+
+    rejectedOpportunities.forEach((opp) => {
+      const el = eligibilityMap.get(opp.opportunity_id);
+      if (!el) return;
+      if (el.is_vacancy_expired || el.disqualification_reasons?.includes('VACANCY_EXPIRED_UNAVAILABLE')) {
+        expiredCount++;
+      } else if (el.is_soft_ineligible || (el.soft_disqualifications?.length ?? 0) > 0) {
+        softCount++;
+      } else {
+        hardCount++;
+      }
+    });
+
+    return { softCount, hardCount, expiredCount };
+  }, [rejectedOpportunities, eligibilityMap]);
+
+  // Helper to get latest user action on an opportunity
+  const getOppAction = useCallback(
+    (oppId: string): ActionType | undefined => {
+      return actionsSummary?.latest_actions_by_opp?.[oppId];
+    },
+    [actionsSummary]
+  );
+
+  // Action Handlers
+  async function handleToggleSave(opp: PolymorphicOpportunity) {
+    const currentAction = getOppAction(opp.opportunity_id);
+    const newAction: ActionType = currentAction === 'SAVED' ? 'DISMISSED' : 'SAVED';
+    try {
+      await recordOpportunityAction(opp.opportunity_id, {
+        user_id: candidateProfile.user_id,
+        action_type: newAction,
+        reason_category: newAction === 'SAVED' ? 'GENERAL' : 'GENERAL',
+        user_notes: newAction === 'SAVED' ? 'Saved from discovery workstation' : 'Unsaved from discovery workstation',
+      });
+      await loadActions();
+    } catch (err) {
+      console.error('Failed to toggle save on opportunity:', err);
+    }
+  }
+
+  async function handleApply(opp: PolymorphicOpportunity) {
+    try {
+      await recordOpportunityAction(opp.opportunity_id, {
+        user_id: candidateProfile.user_id,
+        action_type: 'APPLIED',
+        reason_category: 'GENERAL',
+        user_notes: 'Candidate marked applied',
+      });
+      await loadActions();
+    } catch (err) {
+      console.error('Failed to record applied action:', err);
+    }
+    if (opp.source_url) {
+      window.open(opp.source_url, '_blank', 'noopener,noreferrer');
+    }
+  }
+
+  async function handleConfirmDismiss() {
+    if (!dismissTargetOpp) return;
+    setIsSubmittingDismiss(true);
+    try {
+      await recordOpportunityAction(dismissTargetOpp.opportunity_id, {
+        user_id: candidateProfile.user_id,
+        action_type: 'DISMISSED',
+        reason_category: dismissReasonCategory,
+        user_notes: dismissReasonNotes.trim() || undefined,
+      });
+      await loadActions();
+      setDismissTargetOpp(null);
+      setDismissReasonNotes('');
+    } catch (err) {
+      console.error('Failed to record dismiss action:', err);
+    } finally {
+      setIsSubmittingDismiss(false);
+    }
+  }
+
+  async function handleConfirmOverride() {
+    if (!overrideTargetOpp) return;
+    if (!overrideRationale.trim()) {
+      setOverrideError('Please provide a rationale explaining why this soft constraint should be bypassed for you.');
+      return;
+    }
+    setIsSubmittingOverride(true);
+    setOverrideError(null);
+    try {
+      await recordOpportunityAction(overrideTargetOpp.opportunity_id, {
+        user_id: candidateProfile.user_id,
+        action_type: 'SOFT_OVERRIDDEN',
+        reason_category: 'EXPERIENCE_OVERRIDE',
+        soft_override_rationale: overrideRationale.trim(),
+        user_notes: 'Candidate soft constraint override',
+      });
+      await loadActions();
+      setOverrideTargetOpp(null);
+      setOverrideRationale('');
+    } catch (err) {
+      console.error('Failed to record soft override action:', err);
+      setOverrideError(err instanceof Error ? err.message : 'Failed to save soft override');
+    } finally {
+      setIsSubmittingOverride(false);
+    }
+  }
+
+  const handleInspectRawOpportunity = (opp: PolymorphicOpportunity) => {
+    const rec = recommendations.find((r) => r.opportunity.opportunity_id === opp.opportunity_id);
+    if (rec) {
+      setExaminedOpportunity(rec);
+    } else {
+      const dimensions: RankingDimension[] = [
+        'SKILL_ALIGNMENT',
+        'CAREER_ALIGNMENT',
+        'GROWTH_POTENTIAL',
+        'MARKET_RELEVANCE',
+        'PREFERENCE_FIT',
+        'QUALIFICATION_FIT',
+      ];
+      const defaultScores = {} as Record<RankingDimension, DimensionScoreBreakdown>;
+      dimensions.forEach((dim) => {
+        defaultScores[dim] = {
+          dimension: dim,
+          raw_score: 0.5,
+          weight: 0.166,
+          weighted_score: 0.083,
+          rationale: 'Discovered opportunity evaluation pending',
+          caveats_or_missing_data: [],
+        };
+      });
+
+      const el = eligibilityMap.get(opp.opportunity_id);
+      setExaminedOpportunity({
+        rank: 0,
+        overall_fit_score: 0.5,
+        opportunity: opp,
+        eligibility_status: el?.status || 'ELIGIBLE',
+        is_eligible: el?.status === 'ELIGIBLE',
+        eligibility_caveats: el?.uncertainty_caveats || [],
+        dimension_scores: defaultScores,
+        matched_skills: [],
+        missing_skills: [],
+        growth_skills: [],
+        recommendation_rationale: 'Discovered opportunity record inspection',
+        key_tradeoffs_or_risks: [],
+        provenance_info: { source: 'canonical_discovery' },
+      });
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -797,223 +1039,722 @@ export function DiscoveryWorkspace({
         </div>
       )}
 
-      {/* 3. Ranked Opportunity Recommendations Feed */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-              Ranked Opportunity Matches
-            </h3>
-            {recommendations.length > 0 && (
-              <span className="text-xs text-zinc-500 font-mono">
-                ({recommendations.length} recommendations ranked by deterministic 6D fit)
+      {/* 3. Primary Discovery Views: Recommended | All Discovered | Rejected */}
+      <div className="space-y-5">
+        {/* Navigation & Summary Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setActiveView('recommended')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                activeView === 'recommended'
+                  ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+              }`}
+            >
+              <Target className="w-3.5 h-3.5" />
+              <span>Recommended Matches</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-teal-600 text-white font-mono">
+                {recommendations.length}
               </span>
-            )}
+            </button>
+
+            <button
+              onClick={() => setActiveView('all')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                activeView === 'all'
+                  ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>All Discovered</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200 font-mono">
+                {canonicalOpportunities.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveView('rejected')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                activeView === 'rejected'
+                  ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+              }`}
+            >
+              <XCircle className="w-3.5 h-3.5 text-rose-500" />
+              <span>Rejected & Disqualified</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 font-mono">
+                {rejectedOpportunities.length}
+              </span>
+            </button>
           </div>
 
-          {recommendations.length > 0 && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => onNavigateTab('profile')}
-                className="text-xs text-teal-600 dark:text-teal-400 hover:underline flex items-center gap-1 font-medium"
-              >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                Review Profile Evidence
-              </button>
+          {/* Persistent Action Summary Ticker */}
+          {actionsSummary && (
+            <div className="flex items-center gap-3 text-xs font-mono text-zinc-500 shrink-0">
+              <span className="flex items-center gap-1 text-teal-700 dark:text-teal-400">
+                <Bookmark className="w-3 h-3" />
+                <span>{actionsSummary.saved_opportunity_ids?.length || 0} saved</span>
+              </span>
+              <span>•</span>
+              <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400">
+                <Check className="w-3 h-3" />
+                <span>{actionsSummary.applied_opportunity_ids?.length || 0} applied</span>
+              </span>
+              <span>•</span>
+              <span className="flex items-center gap-1 text-zinc-400">
+                <ThumbsDown className="w-3 h-3" />
+                <span>{actionsSummary.dismissed_opportunity_ids?.length || 0} dismissed</span>
+              </span>
+              {(actionsSummary.soft_overridden_opportunity_ids?.length || 0) > 0 && (
+                <>
+                  <span>•</span>
+                  <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold">
+                    <Sparkles className="w-3 h-3" />
+                    <span>{actionsSummary.soft_overridden_opportunity_ids.length} overridden</span>
+                  </span>
+                </>
+              )}
             </div>
           )}
         </div>
 
-        {recommendations.length === 0 ? (
-          <div className="p-12 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-center space-y-4 shadow-xs">
-            <div className="mx-auto w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400">
-              <Search className="w-6 h-6" />
+        {/* ================================================================= */}
+        {/* VIEW A: RECOMMENDED OPPORTUNITIES                                */}
+        {/* ================================================================= */}
+        {activeView === 'recommended' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-zinc-500 font-mono">
+                Showing {recommendations.length} recommendations ranked by deterministic 6D fit.
+              </span>
+              <button
+                onClick={() => onNavigateTab('career')}
+                className="text-xs text-teal-600 dark:text-teal-400 hover:underline flex items-center gap-1 font-medium cursor-pointer"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Review Profile Evidence & Memory
+              </button>
             </div>
-            <div className="space-y-1">
-              <h4 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-                {discoveryResponse ? 'No Qualified Matches Found' : 'No Opportunities Discovered Yet'}
-              </h4>
-              <p className="text-xs text-zinc-500 max-w-md mx-auto">
-                {discoveryResponse
-                  ? `Searched live sources for ${candidateName}, but zero listings satisfied hard deterministic eligibility requirements. No synthetic listings are shown.`
-                  : 'Click "Launch Discovery Workflow" above to query live opportunity sources and compute verifiable candidate-job fit scores.'}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4">
-            {recommendations.map((rec) => {
-              const opp = rec.opportunity;
-              const fitPercent = rec.overall_fit_score * 100;
 
-              return (
-                <div
-                  key={opp.opportunity_id}
-                  className="p-5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150 shadow-xs space-y-4"
-                >
-                  {/* Card Top Row: Rank, Title, Company, Score */}
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="px-2 py-0.5 rounded bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-mono text-xs font-bold">
-                          #{rec.rank}
-                        </span>
-
-                        <h4 className="text-base font-bold text-zinc-900 dark:text-zinc-100 hover:text-teal-600 transition-colors">
-                          {opp.title}
-                        </h4>
-
-                        {opp.company_domain_verified && (
-                          <Badge variant="verified" size="sm" icon={<ShieldCheck className="w-3 h-3" />}>
-                            Verified Employer
-                          </Badge>
-                        )}
-
-                        <Badge variant="outline" size="sm" mono>
-                          {opp.eligibility_rules?.opportunity_category || 'FULL_TIME_JOB'}
-                        </Badge>
-                      </div>
-
-                      <div className="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400 flex-wrap">
-                        <span className="font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1">
-                          <Building2 className="w-3.5 h-3.5" />
-                          {opp.company_name}
-                        </span>
-                        <span>•</span>
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3.5 h-3.5" />
-                          {formatOpportunityLocation(opp)}
-                        </span>
-                        <span>•</span>
-                        <span className="font-mono">
-                          Mode: {opp.eligibility_rules?.work_mode || 'REMOTE'}
-                        </span>
-                        <span>•</span>
-                        <span className="font-mono text-[11px] text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60 px-1.5 py-0.5 rounded border border-teal-200 dark:border-teal-800">
-                          {(() => {
-                            const minMonths = opp.eligibility_rules?.min_experience_months ?? 0;
-                            const candMonths = candidateProfile?.eligibility_constraints?.total_full_time_experience_months ?? 0;
-                            if (minMonths <= 0) return 'Entry Level';
-                            const reqYrs = (minMonths / 12).toFixed(minMonths % 12 === 0 ? 0 : 1);
-                            const candYrs = (candMonths / 12).toFixed(1);
-                            if (candMonths >= minMonths) {
-                              return `Req: ${reqYrs}+ yrs • ✓ Qualified (${candYrs} yrs)`;
-                            }
-                            return `Req: ${reqYrs}+ yrs • You have ${candYrs} yrs`;
-                          })()}
-                        </span>
-                        <span>•</span>
-                        <span className="text-[11px] font-mono text-zinc-400">
-                          Source: {String(opp.category_specific_attributes?.source_system || 'ats_direct')}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Overall Fit Score Ticker */}
-                    <div className="flex sm:flex-col items-center sm:items-end justify-between shrink-0 bg-zinc-50 dark:bg-zinc-800/50 p-2.5 rounded-lg border border-zinc-200/60 dark:border-zinc-700/60">
-                      <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">
-                        Fit Score
-                      </span>
-                      <div className="text-xl font-bold font-mono text-teal-600 dark:text-teal-400 flex items-baseline gap-0.5">
-                        <NumberTicker value={fitPercent} decimals={1} />
-                      </div>
-                      <span className="text-[10px] text-zinc-400 font-mono">
-                        Deterministic 6D
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Recommendation Rationale */}
-                  <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
-                    {rec.recommendation_rationale}
+            {recommendations.length === 0 ? (
+              <div className="p-12 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-center space-y-4 shadow-xs">
+                <div className="mx-auto w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400">
+                  <Search className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+                    {discoveryResponse ? 'No Qualified Matches Found' : 'No Opportunities Discovered Yet'}
+                  </h4>
+                  <p className="text-xs text-zinc-500 max-w-md mx-auto">
+                    {discoveryResponse
+                      ? `Searched authentic sources for ${candidateName}, but zero listings satisfied hard deterministic eligibility constraints. Check the Rejected tab to inspect failed rules or override soft criteria.`
+                      : 'Click "Launch Discovery Workflow" above to query live opportunity sources and compute verifiable candidate-job fit scores.'}
                   </p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4">
+                {recommendations.map((rec) => {
+                  const opp = rec.opportunity;
+                  const fitPercent = rec.overall_fit_score * 100;
+                  const userAction = getOppAction(opp.opportunity_id);
 
-                  {/* 6D Fit Spectrum Mini-Bar */}
-                  <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/80 space-y-1.5">
-                    <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">
-                      Six-Dimensional Fit Spectrum
-                    </span>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs">
-                      {Object.entries(rec.dimension_scores).map(([dim, breakdown]) => (
-                        <div key={dim} className="space-y-1">
-                          <div className="flex items-center justify-between text-[11px]">
-                            <span className="text-zinc-500 font-medium truncate">
-                              {dim.replace('_', ' ').toLowerCase()}
+                  return (
+                    <div
+                      key={opp.opportunity_id}
+                      className={`p-5 rounded-xl bg-white dark:bg-zinc-900 border transition-all duration-150 shadow-xs space-y-4 ${
+                        userAction === 'DISMISSED'
+                          ? 'border-zinc-200/50 dark:border-zinc-800/50 opacity-60'
+                          : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
+                      }`}
+                    >
+                      {/* Top Row: Rank, Title, Company, Action Badge, Score */}
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="px-2 py-0.5 rounded bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-mono text-xs font-bold">
+                              #{rec.rank}
                             </span>
-                            <span className="font-mono font-semibold text-zinc-800 dark:text-zinc-200">
-                              {(breakdown.raw_score * 100).toFixed(0)}%
-                            </span>
+
+                            <h4 className="text-base font-bold text-zinc-900 dark:text-zinc-100 hover:text-teal-600 transition-colors">
+                              {opp.title}
+                            </h4>
+
+                            {opp.company_domain_verified && (
+                              <Badge variant="verified" size="sm" icon={<ShieldCheck className="w-3 h-3" />}>
+                                Verified Employer
+                              </Badge>
+                            )}
+
+                            <Badge variant="outline" size="sm" mono>
+                              {opp.eligibility_rules?.opportunity_category || 'FULL_TIME_JOB'}
+                            </Badge>
+
+                            {/* Candidate Action Badges */}
+                            {userAction === 'SAVED' && (
+                              <Badge variant="teal" size="sm" icon={<Bookmark className="w-3 h-3" />}>
+                                Saved
+                              </Badge>
+                            )}
+                            {userAction === 'APPLIED' && (
+                              <Badge variant="verified" size="sm" icon={<Check className="w-3 h-3" />}>
+                                Applied
+                              </Badge>
+                            )}
+                            {userAction === 'DISMISSED' && (
+                              <Badge variant="caveat" size="sm" icon={<X className="w-3 h-3" />}>
+                                Dismissed
+                              </Badge>
+                            )}
+                            {userAction === 'SOFT_OVERRIDDEN' && (
+                              <Badge variant="outline" size="sm" icon={<Sparkles className="w-3 h-3 text-amber-500" />}>
+                                Soft Override Active
+                              </Badge>
+                            )}
                           </div>
-                          <div className="h-1 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-teal-500 rounded-full"
-                              style={{ width: `${breakdown.raw_score * 100}%` }}
-                            />
+
+                          <div className="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400 flex-wrap">
+                            <span className="font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-1">
+                              <Building2 className="w-3.5 h-3.5" />
+                              {opp.company_name}
+                            </span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1">
+                              <MapPin className="w-3.5 h-3.5" />
+                              {formatOpportunityLocation(opp)}
+                            </span>
+                            <span>•</span>
+                            <span className="font-mono">
+                              Mode: {opp.eligibility_rules?.work_mode || 'REMOTE'}
+                            </span>
+                            <span>•</span>
+                            <span className="font-mono text-[11px] text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60 px-1.5 py-0.5 rounded border border-teal-200 dark:border-teal-800">
+                              {(() => {
+                                const minMonths = opp.eligibility_rules?.min_experience_months ?? 0;
+                                const candMonths =
+                                  candidateProfile?.eligibility_constraints?.total_full_time_experience_months ?? 0;
+                                if (minMonths <= 0) return 'Entry Level';
+                                const reqYrs = (minMonths / 12).toFixed(minMonths % 12 === 0 ? 0 : 1);
+                                const candYrs = (candMonths / 12).toFixed(1);
+                                if (candMonths >= minMonths) {
+                                  return `Req: ${reqYrs}+ yrs • ✓ Qualified (${candYrs} yrs)`;
+                                }
+                                return `Req: ${reqYrs}+ yrs • You have ${candYrs} yrs`;
+                              })()}
+                            </span>
+                            <span>•</span>
+                            <span className="text-[11px] font-mono text-zinc-400">
+                              Source: {String(opp.category_specific_attributes?.source_system || 'ats_direct')}
+                            </span>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
 
-                  {/* Bottom Row: Skills, Audit Trigger & External Apply */}
-                  <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[11px] text-zinc-400 font-mono mr-1">Matched:</span>
-                      {rec.matched_skills.slice(0, 3).map((ms) => (
-                        <Badge key={ms.skill_name} variant="verified" size="sm">
-                          {ms.skill_name}
-                        </Badge>
-                      ))}
+                        {/* Overall Fit Score Ticker */}
+                        <div className="flex sm:flex-col items-center sm:items-end justify-between shrink-0 bg-zinc-50 dark:bg-zinc-800/50 p-2.5 rounded-lg border border-zinc-200/60 dark:border-zinc-700/60">
+                          <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">
+                            Fit Score
+                          </span>
+                          <div className="text-xl font-bold font-mono text-teal-600 dark:text-teal-400 flex items-baseline gap-0.5">
+                            <NumberTicker value={fitPercent} decimals={1} />
+                          </div>
+                          <span className="text-[10px] text-zinc-400 font-mono">
+                            Deterministic 6D
+                          </span>
+                        </div>
+                      </div>
 
-                      {rec.missing_skills.length > 0 && (
-                        <>
-                          <span className="text-[11px] text-zinc-400 font-mono ml-2 mr-1">Gaps:</span>
-                          {rec.missing_skills.slice(0, 2).map((gap) => (
-                            <Badge key={gap.skill_name} variant="caveat" size="sm">
-                              {gap.skill_name}
+                      {/* Recommendation Rationale */}
+                      <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                        {rec.recommendation_rationale}
+                      </p>
+
+                      {/* 6D Fit Spectrum Mini-Bar */}
+                      <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/80 space-y-1.5">
+                        <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">
+                          Six-Dimensional Fit Spectrum
+                        </span>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs">
+                          {Object.entries(rec.dimension_scores).map(([dim, breakdown]) => (
+                            <div key={dim} className="space-y-1">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-zinc-500 font-medium truncate">
+                                  {dim.replace('_', ' ').toLowerCase()}
+                                </span>
+                                <span className="font-mono font-semibold text-zinc-800 dark:text-zinc-200">
+                                  {(breakdown.raw_score * 100).toFixed(0)}%
+                                </span>
+                              </div>
+                              <div className="h-1 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-teal-500 rounded-full"
+                                  style={{ width: `${breakdown.raw_score * 100}%` }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Bottom Row: Skills, Actions & External Apply */}
+                      <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[11px] text-zinc-400 font-mono mr-1">Matched:</span>
+                          {rec.matched_skills.slice(0, 3).map((ms) => (
+                            <Badge key={ms.skill_name} variant="verified" size="sm">
+                              {ms.skill_name}
                             </Badge>
                           ))}
-                        </>
-                      )}
+
+                          {rec.missing_skills.length > 0 && (
+                            <>
+                              <span className="text-[11px] text-zinc-400 font-mono ml-2 mr-1">Gaps:</span>
+                              {rec.missing_skills.slice(0, 2).map((gap) => (
+                                <Badge key={gap.skill_name} variant="caveat" size="sm">
+                                  {gap.skill_name}
+                                </Badge>
+                              ))}
+                            </>
+                          )}
+                        </div>
+
+                        {/* Interactive Opportunity Actions */}
+                        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                          {/* Save Button */}
+                          <button
+                            onClick={() => handleToggleSave(opp)}
+                            className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer ${
+                              userAction === 'SAVED'
+                                ? 'bg-teal-50 border-teal-300 text-teal-700 dark:bg-teal-950/60 dark:border-teal-700 dark:text-teal-300'
+                                : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                            }`}
+                            title={userAction === 'SAVED' ? 'Remove from saved' : 'Save opportunity'}
+                          >
+                            <Bookmark className={`w-3.5 h-3.5 ${userAction === 'SAVED' ? 'fill-current' : ''}`} />
+                            <span>{userAction === 'SAVED' ? 'Saved' : 'Save'}</span>
+                          </button>
+
+                          {/* Dismiss Button */}
+                          <button
+                            onClick={() => {
+                              setDismissTargetOpp(opp);
+                              setDismissReasonCategory('SALARY');
+                              setDismissReasonNotes('');
+                            }}
+                            className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer ${
+                              userAction === 'DISMISSED'
+                                ? 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-zinc-400'
+                                : 'border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:text-rose-600 hover:border-rose-300 dark:hover:text-rose-400'
+                            }`}
+                            title="Dismiss opportunity with reason"
+                          >
+                            <ThumbsDown className="w-3.5 h-3.5" />
+                            <span>{userAction === 'DISMISSED' ? 'Dismissed' : 'Dismiss'}</span>
+                          </button>
+
+                          {/* Examine Role & Fit */}
+                          <button
+                            onClick={() => setExaminedOpportunity(rec)}
+                            className="px-3 py-1.5 rounded-lg bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-xs font-semibold text-teal-800 dark:text-teal-300 transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+                            <span>Examine</span>
+                          </button>
+
+                          {/* Audit Button */}
+                          <button
+                            onClick={() => {
+                              setAuditedOpportunity(rec);
+                              setAuditDrawerTab('fit');
+                            }}
+                            className="px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium text-zinc-600 dark:text-zinc-400 transition-colors flex items-center gap-1 cursor-pointer"
+                            title="Inspect raw audit and deterministic evidence records"
+                          >
+                            <FileText className="w-3 h-3 text-zinc-400" />
+                            <span className="hidden sm:inline">Audit</span>
+                          </button>
+
+                          {/* External Apply */}
+                          {opp.source_url && (
+                            <button
+                              onClick={() => handleApply(opp)}
+                              className="px-3.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-semibold transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
+                            >
+                              <span>{userAction === 'APPLIED' ? 'Applied ✓' : 'Apply'}</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        onClick={() => setExaminedOpportunity(rec)}
-                        className="px-3.5 py-1.5 rounded-lg bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-xs font-semibold text-teal-800 dark:text-teal-300 transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+        {/* ================================================================= */}
+        {/* VIEW B: ALL DISCOVERED OPPORTUNITIES                             */}
+        {/* ================================================================= */}
+        {activeView === 'all' && (
+          <div className="space-y-4">
+            {/* Filter Bar */}
+            <div className="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="relative flex-1 max-w-md">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-zinc-400" />
+                <input
+                  type="text"
+                  placeholder="Filter by title, company, or location..."
+                  value={allSearchQuery}
+                  onChange={(e) => setAllSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-zinc-400 font-mono">Status:</span>
+                {(['ALL', 'ELIGIBLE', 'INELIGIBLE'] as const).map((st) => (
+                  <button
+                    key={st}
+                    onClick={() => setAllStatusFilter(st)}
+                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                      allStatusFilter === st
+                        ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900'
+                    }`}
+                  >
+                    {st === 'ALL' ? 'All Leads' : st === 'ELIGIBLE' ? 'Eligible' : 'Ineligible'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {canonicalOpportunities.length === 0 ? (
+              <div className="p-12 text-center rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-500">
+                No opportunities discovered in this session yet. Launch discovery above to search authentic sources.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3">
+                {canonicalOpportunities
+                  .filter((opp) => {
+                    if (allSearchQuery.trim()) {
+                      const q = allSearchQuery.toLowerCase();
+                      const match =
+                        opp.title.toLowerCase().includes(q) ||
+                        opp.company_name.toLowerCase().includes(q) ||
+                        formatOpportunityLocation(opp).toLowerCase().includes(q);
+                      if (!match) return false;
+                    }
+                    if (allStatusFilter !== 'ALL') {
+                      const el = eligibilityMap.get(opp.opportunity_id);
+                      if (allStatusFilter === 'ELIGIBLE' && el?.status !== 'ELIGIBLE') return false;
+                      if (allStatusFilter === 'INELIGIBLE' && el?.status === 'ELIGIBLE') return false;
+                    }
+                    return true;
+                  })
+                  .map((opp) => {
+                    const el = eligibilityMap.get(opp.opportunity_id);
+                    const userAction = getOppAction(opp.opportunity_id);
+                    const isEligible = el?.status === 'ELIGIBLE';
+                    const isSoft = el?.is_soft_ineligible || (el?.soft_disqualifications?.length ?? 0) > 0;
+                    const isExpired =
+                      el?.is_vacancy_expired ||
+                      el?.disqualification_reasons?.includes('VACANCY_EXPIRED_UNAVAILABLE');
+
+                    return (
+                      <div
+                        key={opp.opportunity_id}
+                        className="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
                       >
-                        <Eye className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
-                        <span>Examine Role & Fit</span>
-                      </button>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="font-bold text-sm text-zinc-900 dark:text-zinc-100">
+                              {opp.title}
+                            </h4>
+                            <span className="font-semibold text-teal-700 dark:text-teal-400">
+                              @{opp.company_name}
+                            </span>
+                            {isEligible ? (
+                              <Badge variant="verified" size="sm">
+                                Verified Eligible
+                              </Badge>
+                            ) : isExpired ? (
+                              <Badge variant="neutral" size="sm">
+                                Vacancy Unavailable
+                              </Badge>
+                            ) : isSoft ? (
+                              <Badge variant="caveat" size="sm">
+                                Soft Constraint Mismatch
+                              </Badge>
+                            ) : (
+                              <Badge variant="disqualified" size="sm">
+                                Disqualified
+                              </Badge>
+                            )}
 
-                      <button
-                        onClick={() => {
-                          setAuditedOpportunity(rec);
-                          setAuditDrawerTab('fit');
-                        }}
-                        className="px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium text-zinc-600 dark:text-zinc-400 transition-colors flex items-center gap-1"
-                        title="Inspect raw audit and deterministic evidence records"
+                            {userAction && (
+                              <Badge variant="teal" size="sm" mono>
+                                {userAction}
+                              </Badge>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-3 text-zinc-500 font-mono text-[11px] flex-wrap">
+                            <span>{formatOpportunityLocation(opp)}</span>
+                            <span>•</span>
+                            <span>Mode: {opp.eligibility_rules?.work_mode || 'REMOTE'}</span>
+                            <span>•</span>
+                            <span>Source: {String(opp.category_specific_attributes?.source_system || 'ats')}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => handleInspectRawOpportunity(opp)}
+                            className="px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium cursor-pointer"
+                          >
+                            Examine
+                          </button>
+
+                          <button
+                            onClick={() => handleToggleSave(opp)}
+                            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                              userAction === 'SAVED'
+                                ? 'bg-teal-50 border-teal-300 text-teal-700 dark:bg-teal-950/60 dark:border-teal-700 dark:text-teal-300'
+                                : 'border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                            }`}
+                            title={userAction === 'SAVED' ? 'Saved' : 'Save'}
+                          >
+                            <Bookmark className={`w-3.5 h-3.5 ${userAction === 'SAVED' ? 'fill-current' : ''}`} />
+                          </button>
+
+                          {opp.source_url && (
+                            <button
+                              onClick={() => handleApply(opp)}
+                              className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>Apply</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ================================================================= */}
+        {/* VIEW C: REJECTED & DISQUALIFIED OPPORTUNITIES                     */}
+        {/* ================================================================= */}
+        {activeView === 'rejected' && (
+          <div className="space-y-4">
+            {/* Deterministic Primacy Callout */}
+            <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800 flex items-start gap-3 text-xs leading-relaxed">
+              <ShieldCheck className="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <span className="font-bold text-zinc-900 dark:text-zinc-100">
+                  Deterministic Eligibility & Constraint Gating
+                </span>
+                <p className="text-zinc-600 dark:text-zinc-400">
+                  JobFalcon never uses probabilistic LLMs to invent eligibility. Hard constraints (visa sponsorship, degree requirements, student enrollment) are invariant. Soft constraints (experience shortfalls, location preferences) may be overridden with verifiable candidate rationale, ranking them in your recommendations without modifying the audit record.
+                </p>
+              </div>
+            </div>
+
+            {/* Sub-Filters */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => setRejectedSubFilter('ALL')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                  rejectedSubFilter === 'ALL'
+                    ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                    : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700'
+                }`}
+              >
+                All Rejected ({rejectedOpportunities.length})
+              </button>
+
+              <button
+                onClick={() => setRejectedSubFilter('SOFT')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  rejectedSubFilter === 'SOFT'
+                    ? 'bg-amber-600 text-white'
+                    : 'bg-white dark:bg-zinc-800 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                }`}
+              >
+                <span>Soft Mismatches (Overrideable)</span>
+                <span className="font-mono text-[11px]">({rejectedMetrics.softCount})</span>
+              </button>
+
+              <button
+                onClick={() => setRejectedSubFilter('HARD')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  rejectedSubFilter === 'HARD'
+                    ? 'bg-rose-700 text-white'
+                    : 'bg-white dark:bg-zinc-800 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800'
+                }`}
+              >
+                <span>Hard Disqualifications</span>
+                <span className="font-mono text-[11px]">({rejectedMetrics.hardCount})</span>
+              </button>
+
+              <button
+                onClick={() => setRejectedSubFilter('EXPIRED')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  rejectedSubFilter === 'EXPIRED'
+                    ? 'bg-zinc-700 text-white'
+                    : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700'
+                }`}
+              >
+                <span>Vacancy Expired / Unavailable</span>
+                <span className="font-mono text-[11px]">({rejectedMetrics.expiredCount})</span>
+              </button>
+            </div>
+
+            {rejectedOpportunities.length === 0 ? (
+              <div className="p-12 text-center rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-500">
+                Zero opportunities have been disqualified in this discovery run.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3">
+                {rejectedOpportunities
+                  .filter((opp) => {
+                    const el = eligibilityMap.get(opp.opportunity_id);
+                    if (!el) return false;
+                    const isExpired =
+                      el.is_vacancy_expired ||
+                      el.disqualification_reasons?.includes('VACANCY_EXPIRED_UNAVAILABLE');
+                    const isSoft = el.is_soft_ineligible || (el.soft_disqualifications?.length ?? 0) > 0;
+
+                    if (rejectedSubFilter === 'EXPIRED') return isExpired;
+                    if (rejectedSubFilter === 'SOFT') return isSoft && !isExpired;
+                    if (rejectedSubFilter === 'HARD') return !isSoft && !isExpired;
+                    return true;
+                  })
+                  .map((opp) => {
+                    const el = eligibilityMap.get(opp.opportunity_id);
+                    const userAction = getOppAction(opp.opportunity_id);
+                    const isOverridden = userAction === 'SOFT_OVERRIDDEN';
+                    const isExpired =
+                      el?.is_vacancy_expired ||
+                      el?.disqualification_reasons?.includes('VACANCY_EXPIRED_UNAVAILABLE');
+                    const isSoft = el?.is_soft_ineligible || (el?.soft_disqualifications?.length ?? 0) > 0;
+
+                    return (
+                      <div
+                        key={opp.opportunity_id}
+                        className="p-5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3"
                       >
-                        <FileText className="w-3 h-3 text-zinc-400" />
-                        <span className="hidden sm:inline">Audit</span>
-                      </button>
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-bold text-sm text-zinc-900 dark:text-zinc-100">
+                                {opp.title}
+                              </h4>
+                              <span className="font-semibold text-teal-700 dark:text-teal-400 text-xs">
+                                @{opp.company_name}
+                              </span>
 
-                      {opp.source_url && (
-                        <a
-                          href={opp.source_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-semibold transition-colors flex items-center gap-1 shadow-xs"
-                        >
-                          <span>Apply</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+                              {isExpired ? (
+                                <Badge variant="neutral" size="sm">
+                                  Vacancy Unavailable
+                                </Badge>
+                              ) : isSoft ? (
+                                <Badge variant="caveat" size="sm">
+                                  Soft Constraint Mismatch
+                                </Badge>
+                              ) : (
+                                <Badge variant="disqualified" size="sm">
+                                  Hard Disqualification
+                                </Badge>
+                              )}
+
+                              {isOverridden && (
+                                <Badge variant="verified" size="sm" icon={<Sparkles className="w-3 h-3 text-amber-500" />}>
+                                  Soft Override Active
+                                </Badge>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-3 text-xs text-zinc-500 font-mono">
+                              <span>{formatOpportunityLocation(opp)}</span>
+                              <span>•</span>
+                              <span>Mode: {opp.eligibility_rules?.work_mode || 'REMOTE'}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {isSoft && !isExpired && (
+                              <button
+                                onClick={() => {
+                                  setOverrideTargetOpp(opp);
+                                  setOverrideRationale('');
+                                  setOverrideError(null);
+                                }}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                                  isOverridden
+                                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
+                                    : 'bg-amber-600 hover:bg-amber-500 text-white shadow-xs'
+                                }`}
+                              >
+                                <Sparkles className="w-3.5 h-3.5" />
+                                <span>{isOverridden ? 'Update Override' : 'Override Soft Rejection'}</span>
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => handleInspectRawOpportunity(opp)}
+                              className="px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs text-zinc-700 dark:text-zinc-300 cursor-pointer"
+                            >
+                              Examine
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Rejection Diagnostics Details */}
+                        <div className="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/70 dark:border-zinc-800 space-y-1.5 text-xs">
+                          <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-300 font-medium">
+                            <AlertCircle className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                            <span>
+                              {isExpired
+                                ? 'Application Deadline Elapsed or Vacancy Closed'
+                                : isSoft
+                                ? 'Soft Qualification Shortfall (Candidate Preference or Experience Gap)'
+                                : 'Hard Mandatory Disqualification (Visa, Degree Level or Status)'}
+                            </span>
+                          </div>
+
+                          {el && (el.disqualification_reasons?.length ?? 0) > 0 && (
+                            <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                              <span className="text-[10px] text-zinc-400 font-mono">Failed Rule Codes:</span>
+                              {el.disqualification_reasons.map((code: string) => (
+                                <span
+                                  key={code}
+                                  className="px-2 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-mono text-[10px]"
+                                >
+                                  {code}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {el && (
+                            <p className="text-zinc-600 dark:text-zinc-400 text-[11px] pt-1 leading-relaxed">
+                              {Object.values(el.constraint_checks || {}).find((c) => c.status === 'FAILED')?.message ||
+                                el.disqualification_reasons?.join(', ')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1271,6 +2012,168 @@ export function DiscoveryWorkspace({
           candidateProfile={candidateProfile}
           onClose={() => setExaminedOpportunity(null)}
         />
+      )}
+
+      {/* 6. Reason-Aware Dismissal Modal */}
+      {dismissTargetOpp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-6 space-y-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                  Dismiss Opportunity
+                </h3>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  {dismissTargetOpp.title} • {dismissTargetOpp.company_name}
+                </p>
+              </div>
+              <button
+                onClick={() => setDismissTargetOpp(null)}
+                className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="font-semibold text-zinc-700 dark:text-zinc-300 block mb-1.5">
+                  Primary Reason for Dismissing:
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { cat: 'SALARY' as ActionReasonCategory, label: 'Salary / Comp' },
+                    { cat: 'LOCATION' as ActionReasonCategory, label: 'Location / Commute' },
+                    { cat: 'ROLE_MISMATCH' as ActionReasonCategory, label: 'Role Misalignment' },
+                    { cat: 'EXPERIENCE_MISMATCH' as ActionReasonCategory, label: 'Seniority Level' },
+                    { cat: 'COMPANY_PREFERENCE' as ActionReasonCategory, label: 'Company / Industry' },
+                    { cat: 'OTHER' as ActionReasonCategory, label: 'Other Reason' },
+                  ].map(({ cat, label }) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setDismissReasonCategory(cat)}
+                      className={`p-2 rounded-lg border text-left font-medium transition-all ${
+                        dismissReasonCategory === cat
+                          ? 'border-teal-500 bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-200 font-semibold'
+                          : 'border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-300'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg bg-teal-50/50 dark:bg-teal-950/20 border border-teal-200/60 dark:border-teal-800/50 text-[11px] text-teal-800 dark:text-teal-300 leading-relaxed">
+                Dismissing due to salary or location isolates those constraints and will <strong>not</strong> penalize this role category or technical domain in future recommendations.
+              </div>
+
+              <div>
+                <label className="font-semibold text-zinc-700 dark:text-zinc-300 block mb-1">
+                  Additional Notes (Optional):
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Expected min $140k base, or requires on-site 4 days/wk"
+                  value={dismissReasonNotes}
+                  onChange={(e) => setDismissReasonNotes(e.target.value)}
+                  className="w-full p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+              <button
+                onClick={() => setDismissTargetOpp(null)}
+                className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDismiss}
+                disabled={isSubmittingDismiss}
+                className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-xs disabled:opacity-50"
+              >
+                {isSubmittingDismiss ? 'Dismissing...' : 'Confirm Dismissal'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7. Soft Rejection Override Modal */}
+      {overrideTargetOpp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-6 space-y-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                  <Sparkles className="w-4 h-4" />
+                  <span className="text-xs font-bold uppercase font-mono tracking-wider">Candidate Override</span>
+                </div>
+                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 mt-1">
+                  Override Soft Rejection
+                </h3>
+                <p className="text-xs text-zinc-500">
+                  {overrideTargetOpp.title} • {overrideTargetOpp.company_name}
+                </p>
+              </div>
+              <button
+                onClick={() => setOverrideTargetOpp(null)}
+                className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 rounded-lg bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-800/50 space-y-1">
+                <span className="font-semibold text-amber-800 dark:text-amber-300 block">
+                  Deterministic Audit Invariant
+                </span>
+                <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed">
+                  The original qualification audit remains immutable. Overriding records your candidate rationale and flags this opportunity to be actively ranked and recommended.
+                </p>
+              </div>
+
+              {overrideError && (
+                <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-700 dark:text-rose-300 text-xs">
+                  {overrideError}
+                </div>
+              )}
+
+              <div>
+                <label className="font-semibold text-zinc-700 dark:text-zinc-300 block mb-1">
+                  Candidate Rationale (Mandatory):
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Explain why this soft shortfall (e.g. 1 year experience gap, commute distance) is acceptable (e.g. 'I have 2 years open-source production experience equivalent to 3 years full-time')"
+                  value={overrideRationale}
+                  onChange={(e) => setOverrideRationale(e.target.value)}
+                  className="w-full p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+              <button
+                onClick={() => setOverrideTargetOpp(null)}
+                className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmOverride}
+                disabled={isSubmittingOverride}
+                className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-xs disabled:opacity-50"
+              >
+                {isSubmittingOverride ? 'Saving...' : 'Apply Soft Override'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

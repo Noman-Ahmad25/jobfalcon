@@ -11,6 +11,7 @@ from app.schemas.discovery import (
     RoleMappingTarget,
 )
 from app.schemas.eligibility import EligibilityResult
+from app.schemas.market import MarketResearchReportRecord
 from app.schemas.opportunity import PolymorphicOpportunity
 from app.schemas.orchestration import (
     AdaptationEvent,
@@ -105,6 +106,8 @@ class AdaptiveDiscoveryGraphState(TypedDict, total=False):
     weight_profile_name: str
     persist_to_repository: bool
     recommendations: Optional[RankingResponse]
+    market_report: Optional[MarketResearchReportRecord]
+    overridden_opportunity_ids: list[str]
 
     # Execution Observability & Safety
     timeline_events: Annotated[list[WorkflowTimelineEvent], operator.add]

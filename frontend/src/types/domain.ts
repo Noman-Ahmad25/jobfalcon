@@ -144,6 +144,8 @@ export interface ConstraintCheckResult {
   rule_code: string;
   message: string;
   details: Record<string, unknown>;
+  is_soft_failure?: boolean;
+  is_vacancy_unavailable?: boolean;
 }
 
 export interface EligibilityResult {
@@ -152,6 +154,10 @@ export interface EligibilityResult {
   status: EligibilityStatus;
   is_eligible: boolean;
   disqualification_reasons: string[];
+  hard_disqualifications?: string[];
+  soft_disqualifications?: string[];
+  is_vacancy_expired?: boolean;
+  is_soft_ineligible?: boolean;
   uncertainty_caveats: string[];
   constraint_checks: Record<string, ConstraintCheckResult>;
   evaluated_at: string;
@@ -712,7 +718,7 @@ export type GapStatus =
 
 export type GapImportance = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'NICE_TO_HAVE';
 
-export type ActionType =
+export type GapActionType =
   | 'PROJECT_ENHANCEMENT'
   | 'PORTFOLIO_BUILD'
   | 'CONCEPT_STUDY'
@@ -736,7 +742,7 @@ export interface CareerGapItem {
 
 export interface CareerImprovementSuggestion {
   suggestion_id: string;
-  action_type: ActionType;
+  action_type: GapActionType;
   title: string;
   description: string;
   proportional_stage: string;
@@ -856,7 +862,7 @@ export interface DevelopmentActionItem {
   motivating_gap_description: string;
   target_roles_supported: string[];
   supported_opportunities_count: number;
-  action_type: ActionType;
+  action_type: GapActionType;
   horizon: ActionHorizon;
   concrete_activity: string;
   measurable_completion_criterion: string;
@@ -990,6 +996,161 @@ export interface MarketIntelligenceResponse {
   }>;
   data_integrity_notice: string;
 }
+
+// =============================================================================
+// Candidate Opportunity Actions & Interaction Transitions
+// =============================================================================
+
+export type ActionType =
+  | 'SAVED'
+  | 'APPLIED'
+  | 'DISMISSED'
+  | 'SOFT_OVERRIDDEN'
+  | 'UNSAVED'
+  | 'RESTORED';
+
+export type ActionReasonCategory =
+  | 'SALARY'
+  | 'LOCATION'
+  | 'ROLE_MISMATCH'
+  | 'COMPANY_PREFERENCE'
+  | 'EXPERIENCE_OVERRIDE'
+  | 'COMMUTE_OVERRIDE'
+  | 'QUALIFICATION_OVERRIDE'
+  | 'GENERAL';
+
+export interface CandidateOpportunityActionRecord {
+  id: string;
+  user_id: string;
+  opportunity_id: string;
+  action_type: ActionType;
+  previous_state?: string | null;
+  reason_category?: ActionReasonCategory | null;
+  user_notes?: string | null;
+  soft_override_rationale?: string | null;
+  created_at: string;
+}
+
+export interface RecordActionRequest {
+  user_id?: string | null;
+  action_type: ActionType;
+  reason_category?: ActionReasonCategory | null;
+  user_notes?: string | null;
+  soft_override_rationale?: string | null;
+}
+
+export interface CandidateActionsSummary {
+  user_id: string;
+  saved_opportunity_ids: string[];
+  applied_opportunity_ids: string[];
+  dismissed_opportunity_ids: string[];
+  soft_overridden_opportunity_ids: string[];
+  latest_actions_by_opp: Record<string, ActionType>;
+  total_actions_recorded: number;
+}
+
+// =============================================================================
+// Career Memory & Lineage
+// =============================================================================
+
+export type MemoryType =
+  | 'CAREER_GOAL'
+  | 'SKILL_CORRECTION'
+  | 'PREFERENCE_SHIFT'
+  | 'FEEDBACK_SIGNAL'
+  | 'MARKET_NOTE';
+
+export type ProvenanceLevel =
+  | 'VERIFIED'
+  | 'USER_PROVIDED'
+  | 'AI_INFERRED'
+  | 'OUTDATED';
+
+export interface CandidateCareerMemoryItem {
+  memory_id: string;
+  user_id: string;
+  memory_type: MemoryType;
+  statement: string;
+  provenance_level: ProvenanceLevel;
+  source_context?: string | null;
+  confidence_score: number;
+  version: number;
+  superseded_by?: string | null;
+  change_reason?: string | null;
+  is_active: boolean;
+  effective_from: string;
+  effective_to?: string | null;
+  created_at: string;
+}
+
+export interface CreateMemoryRequest {
+  memory_type: MemoryType;
+  statement: string;
+  provenance_level?: ProvenanceLevel;
+  source_context?: string;
+  confidence_score?: number;
+}
+
+export interface UpdateMemoryRequest {
+  statement: string;
+  change_reason: string;
+  provenance_level?: ProvenanceLevel;
+  confidence_score?: number;
+}
+
+export interface MemoryHistoryResponse {
+  memory_id: string;
+  user_id: string;
+  active_version?: CandidateCareerMemoryItem | null;
+  version_history: CandidateCareerMemoryItem[];
+}
+
+// =============================================================================
+// Grounded Market Intelligence & Visual Analytics
+// =============================================================================
+
+export type SampleConfidenceTier =
+  | 'HIGH'
+  | 'MODERATE'
+  | 'DIRECTIONAL'
+  | 'EMERGING'
+  | 'EMPTY';
+
+export interface SalaryDistributionMetrics {
+  sample_size: number;
+  currency?: string | null;
+  min?: number | null;
+  p25?: number | null;
+  median?: number | null;
+  p75?: number | null;
+  max?: number | null;
+}
+
+export interface MarketResearchReportRecord {
+  report_id: string;
+  role_title: string;
+  country_code: string;
+  mapped_occupation_code?: string | null;
+  career_track: string;
+  sample_size: number;
+  confidence_score: number;
+  sample_confidence_tier: SampleConfidenceTier;
+  core_skills: MarketSkillDemand[];
+  preferred_skills: MarketSkillDemand[];
+  top_skill_combinations: MarketSkillCombination[];
+  salary_distribution?: SalaryDistributionMetrics | null;
+  work_mode_distribution: Record<string, number>;
+  experience_distribution: Record<string, number>;
+  top_role_families: Array<{ occupation_code: string; count: number; percentage: number }>;
+  unique_employers_count: number;
+  top_employers: string[];
+  adjacent_career_paths: Array<{ path_title: string; opportunity_count: number; overlap_ratio: number }>;
+  synthesis_markdown: string;
+  data_integrity_notice: string;
+  generated_at: string;
+  expires_at?: string | null;
+}
+
 
 
 

@@ -232,7 +232,7 @@ class JobSpyMCPConnector(BaseDiscoveryConnector):
     ) -> list[PolymorphicOpportunity]:
         """Invokes MCP tool 'search_jobs' and optionally 'get_job_details' through the MCP client."""
         settings = get_settings()
-        results_wanted = min(limit, settings.MCP_JOBSPY_RESULTS_WANTED)
+        results_wanted = max(min(limit, 50), min(settings.MCP_JOBSPY_RESULTS_WANTED, 50))
         search_term = self._clean_mcp_search_term(query)
         country_code = resolve_jobspy_country(
             query.target_country_codes, default_fallback=settings.MCP_JOBSPY_COUNTRY

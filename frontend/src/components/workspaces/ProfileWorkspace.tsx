@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import {
   User,
   GraduationCap,
@@ -31,10 +31,14 @@ import {
   Cloud,
   Award,
   Globe,
+  Brain,
+  History,
+  Clock,
 } from 'lucide-react';
 import {
   CandidateCareerProfile,
   CandidateProfilingRequest,
+  CandidateCareerMemoryItem,
   DegreeLevel,
   ExtractedWorkExperience,
   ExtractedProject,
@@ -42,12 +46,20 @@ import {
   AssessedSkill,
   WorkMode,
   EvidenceRecord,
+  MemoryType,
+  ProvenanceLevel,
 } from '@/types/domain';
 import {
   extractCandidateProfile,
   parseResumeFile,
   updateCandidateProfile,
+  getCandidateMemories,
+  createCandidateMemory,
+  updateCandidateMemory,
+  deactivateCandidateMemory,
+  getMemoryLineage,
 } from '@/lib/api';
+import { Badge } from '@/components/ui/Badge';
 import { WorkspaceTab } from '@/components/layout/Header';
 
 // =============================================================================
@@ -402,6 +414,147 @@ export function ProfileWorkspace({
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
   const [expandedSkillEvidenceId, setExpandedSkillEvidenceId] = useState<string | null>(null);
   const [showCompletenessDetails, setShowCompletenessDetails] = useState(false);
+
+  // ===========================================================================
+  // Career Memory & Versioned Goals State
+  // ===========================================================================
+  const [memories, setMemories] = useState<CandidateCareerMemoryItem[]>([]);
+  const [isLoadingMemories, setIsLoadingMemories] = useState(false);
+  const [memoryModal, setMemoryModal] = useState<'none' | 'add' | 'update' | 'lineage'>('none');
+  const [activeMemory, setActiveMemory] = useState<CandidateCareerMemoryItem | null>(null);
+  const [memoryLineage, setMemoryLineage] = useState<CandidateCareerMemoryItem[]>([]);
+  const [isLoadingLineage, setIsLoadingLineage] = useState(false);
+
+  // Add / Edit memory form state
+  const [memoryTypeInput, setMemoryTypeInput] = useState<MemoryType>('CAREER_GOAL');
+  const [memoryStatementInput, setMemoryStatementInput] = useState('');
+  const [memoryProvenanceInput, setMemoryProvenanceInput] = useState<ProvenanceLevel>('USER_PROVIDED');
+  const [memoryChangeReasonInput, setMemoryChangeReasonInput] = useState('');
+  const [memoryError, setMemoryError] = useState<string | null>(null);
+  const [isSavingMemory, setIsSavingMemory] = useState(false);
+
+  const loadMemories = useCallback(async () => {
+    setIsLoadingMemories(true);
+    try {
+      const data = await getCandidateMemories(profile.user_id, undefined, false);
+      setMemories(data);
+    } catch (err) {
+      console.warn('Failed to load career memories:', err);
+    } finally {
+      setIsLoadingMemories(false);
+    }
+  }, [profile.user_id]);
+
+  useEffect(() => {
+    let ignore = false;
+    async function init() {
+      try {
+        const data = await getCandidateMemories(profile.user_id, undefined, false);
+        if (!ignore) setMemories(data);
+      } catch (err) {
+        console.warn('Failed to load career memories:', err);
+      } finally {
+        if (!ignore) setIsLoadingMemories(false);
+      }
+    }
+    init();
+    return () => {
+      ignore = true;
+    };
+  }, [profile.user_id]);
+
+  const openAddMemory = () => {
+    setMemoryTypeInput('CAREER_GOAL');
+    setMemoryStatementInput('');
+    setMemoryProvenanceInput('USER_PROVIDED');
+    setMemoryChangeReasonInput('Initial candidate profile statement');
+    setMemoryError(null);
+    setMemoryModal('add');
+  };
+
+  const openUpdateMemory = (mem: CandidateCareerMemoryItem) => {
+    setActiveMemory(mem);
+    setMemoryTypeInput(mem.memory_type);
+    setMemoryStatementInput(mem.statement);
+    setMemoryProvenanceInput(mem.provenance_level);
+    setMemoryChangeReasonInput('');
+    setMemoryError(null);
+    setMemoryModal('update');
+  };
+
+  const openLineage = async (mem: CandidateCareerMemoryItem) => {
+    setActiveMemory(mem);
+    setIsLoadingLineage(true);
+    setMemoryModal('lineage');
+    try {
+      const history = await getMemoryLineage(profile.user_id, mem.memory_id);
+      setMemoryLineage(history.version_history || [mem]);
+    } catch (err) {
+      console.warn('Failed to fetch memory lineage:', err);
+      setMemoryLineage([mem]);
+    } finally {
+      setIsLoadingLineage(false);
+    }
+  };
+
+  const handleSaveNewMemory = async () => {
+    if (!memoryStatementInput.trim()) {
+      setMemoryError('Please enter a statement or career goal.');
+      return;
+    }
+    setIsSavingMemory(true);
+    setMemoryError(null);
+    try {
+      await createCandidateMemory(profile.user_id, {
+        memory_type: memoryTypeInput,
+        statement: memoryStatementInput.trim(),
+        provenance_level: memoryProvenanceInput,
+        confidence_score: 1.0,
+      });
+      await loadMemories();
+      setMemoryModal('none');
+    } catch (err) {
+      setMemoryError(err instanceof Error ? err.message : 'Failed to record memory');
+    } finally {
+      setIsSavingMemory(false);
+    }
+  };
+
+  const handleSaveUpdatedMemory = async () => {
+    if (!activeMemory) return;
+    if (!memoryStatementInput.trim()) {
+      setMemoryError('Statement cannot be blank.');
+      return;
+    }
+    if (!memoryChangeReasonInput.trim()) {
+      setMemoryError('Please specify the reason for this change to preserve provenance.');
+      return;
+    }
+    setIsSavingMemory(true);
+    setMemoryError(null);
+    try {
+      await updateCandidateMemory(profile.user_id, activeMemory.memory_id, {
+        statement: memoryStatementInput.trim(),
+        change_reason: memoryChangeReasonInput.trim(),
+        provenance_level: memoryProvenanceInput,
+      });
+      await loadMemories();
+      setMemoryModal('none');
+    } catch (err) {
+      setMemoryError(err instanceof Error ? err.message : 'Failed to update memory');
+    } finally {
+      setIsSavingMemory(false);
+    }
+  };
+
+  const handleDeleteMemory = async (mem: CandidateCareerMemoryItem) => {
+    try {
+      await deactivateCandidateMemory(profile.user_id, mem.memory_id);
+      await loadMemories();
+    } catch (err) {
+      console.error('Failed to deactivate memory:', err);
+    }
+  };
 
   // ===========================================================================
   // Memoized Skill Groups & Completeness
@@ -1986,6 +2139,138 @@ export function ProfileWorkspace({
         </div>
       </div>
 
+      {/* 9. Persistent Career Memory & Goals Evolution */}
+      <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-4">
+          <div className="space-y-0.5">
+            <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+              <Brain className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+              <span>Career Memory & Versioned Goals</span>
+              <span className="text-xs font-normal text-zinc-400 font-mono">
+                ({memories.length} active facts)
+              </span>
+            </h2>
+            <p className="text-xs text-zinc-500">
+              Persistent candidate intelligence preserved across sessions with immutable version history and provenance.
+            </p>
+          </div>
+
+          <button
+            onClick={openAddMemory}
+            className="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs self-start sm:self-auto"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add Career Goal / Fact</span>
+          </button>
+        </div>
+
+        {isLoadingMemories ? (
+          <div className="py-8 text-center text-xs text-zinc-400 flex items-center justify-center gap-2">
+            <RotateCw className="w-4 h-4 animate-spin text-teal-600" />
+            <span>Loading career memory records...</span>
+          </div>
+        ) : memories.length === 0 ? (
+          <div className="p-8 text-center rounded-xl bg-zinc-50 dark:bg-zinc-800/30 border border-dashed border-zinc-300 dark:border-zinc-700 space-y-2 text-xs">
+            <Brain className="w-6 h-6 text-zinc-400 mx-auto" />
+            <p className="font-semibold text-zinc-700 dark:text-zinc-300">
+              No career memory facts recorded yet.
+            </p>
+            <p className="text-zinc-500 max-w-md mx-auto">
+              Record long-term career goals, target industries, relocation plans, or key constraints. JobFalcon version-controls each statement as your career evolves.
+            </p>
+            <button
+              onClick={openAddMemory}
+              className="text-teal-600 dark:text-teal-400 font-semibold hover:underline cursor-pointer pt-1 inline-block"
+            >
+              + Record your first career memory fact
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {memories.map((mem) => (
+              <div
+                key={mem.memory_id}
+                className="p-4 rounded-xl bg-zinc-50/70 dark:bg-zinc-800/40 border border-zinc-200/80 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors space-y-2.5 text-xs"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2 py-0.5 rounded bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 text-teal-800 dark:text-teal-300 font-mono font-bold text-[11px]">
+                      v{mem.version}
+                    </span>
+
+                    <Badge variant="outline" size="sm" mono>
+                      {mem.memory_type}
+                    </Badge>
+
+                    <Badge
+                      variant={
+                        mem.provenance_level === 'VERIFIED'
+                          ? 'verified'
+                          : mem.provenance_level === 'USER_PROVIDED'
+                          ? 'teal'
+                          : 'caveat'
+                      }
+                      size="sm"
+                    >
+                      {mem.provenance_level}
+                    </Badge>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => openLineage(mem)}
+                      className="px-2 py-1 rounded-md border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 flex items-center gap-1 text-[11px] font-medium cursor-pointer"
+                      title="Inspect complete version history and audit lineage"
+                    >
+                      <History className="w-3 h-3 text-teal-600 dark:text-teal-400" />
+                      <span>Lineage</span>
+                    </button>
+
+                    <button
+                      onClick={() => openUpdateMemory(mem)}
+                      className="p-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-teal-600 transition-colors cursor-pointer"
+                      title="Update statement (creates new version with change reason)"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
+
+                    <button
+                      onClick={() => handleDeleteMemory(mem)}
+                      className="p-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-rose-600 transition-colors cursor-pointer"
+                      title="Deactivate memory fact"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Statement Body */}
+                <p className="text-zinc-800 dark:text-zinc-200 text-sm font-medium leading-relaxed">
+                  {mem.statement}
+                </p>
+
+                {/* Provenance & Metadata Strip */}
+                <div className="flex items-center gap-3 text-[11px] text-zinc-500 font-mono flex-wrap pt-1 border-t border-zinc-200/50 dark:border-zinc-800/60">
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-zinc-400" />
+                    <span>Active since {new Date(mem.effective_from).toLocaleDateString()}</span>
+                  </span>
+
+                  {mem.change_reason && (
+                    <>
+                      <span>•</span>
+                      <span className="italic text-zinc-600 dark:text-zinc-400">
+                        Reason: &quot;{mem.change_reason}&quot;
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* ===================================================================== */}
       {/* MODAL 1: Structured AI Resume Draft Review Drawer/Modal               */}
       {/* ===================================================================== */}
@@ -2962,6 +3247,281 @@ export function ProfileWorkspace({
                 className="px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold cursor-pointer"
               >
                 Apply Preferences
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL 7: Add Career Memory Fact Modal                                  */}
+      {/* ===================================================================== */}
+      {memoryModal === 'add' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-6 space-y-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-1.5 text-teal-600 dark:text-teal-400">
+                  <Brain className="w-4 h-4" />
+                  <span className="text-xs font-bold uppercase font-mono tracking-wider">Career Intelligence Memory</span>
+                </div>
+                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 mt-1">
+                  Record Career Memory Fact
+                </h3>
+              </div>
+              <button
+                onClick={() => setMemoryModal('none')}
+                className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-zinc-600 dark:text-zinc-400 mb-1 font-medium">
+                    Memory Category
+                  </label>
+                  <select
+                    value={memoryTypeInput}
+                    onChange={(e) => setMemoryTypeInput(e.target.value as MemoryType)}
+                    className="w-full p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  >
+                    <option value="CAREER_GOAL">Career Goal</option>
+                    <option value="STRENGTH">Demonstrated Strength</option>
+                    <option value="CONSTRAINT">Hard Constraint</option>
+                    <option value="TRAJECTORY_PREFERENCE">Trajectory Preference</option>
+                    <option value="INTEREST">Domain Interest</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-zinc-600 dark:text-zinc-400 mb-1 font-medium">
+                    Provenance Level
+                  </label>
+                  <select
+                    value={memoryProvenanceInput}
+                    onChange={(e) => setMemoryProvenanceInput(e.target.value as ProvenanceLevel)}
+                    className="w-full p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  >
+                    <option value="USER_PROVIDED">User Provided</option>
+                    <option value="VERIFIED">Verified Evidence</option>
+                    <option value="AI_INFERRED">AI Inferred</option>
+                  </select>
+                </div>
+              </div>
+
+              {memoryError && (
+                <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-700 dark:text-rose-300 text-xs">
+                  {memoryError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-zinc-600 dark:text-zinc-400 mb-1 font-medium">
+                  Memory Statement / Goal
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. Targeting Senior Backend roles at Series A-B startups with Rust or Go stacks; open to remote or Bengaluru hybrid."
+                  value={memoryStatementInput}
+                  onChange={(e) => setMemoryStatementInput(e.target.value)}
+                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+              <button
+                onClick={() => setMemoryModal('none')}
+                className="px-3.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveNewMemory}
+                disabled={isSavingMemory}
+                className="px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
+              >
+                {isSavingMemory ? 'Recording...' : 'Record Memory Fact'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL 8: Update Career Memory Fact (Versioned) Modal                   */}
+      {/* ===================================================================== */}
+      {memoryModal === 'update' && activeMemory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-6 space-y-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-1.5 text-teal-600 dark:text-teal-400">
+                  <Brain className="w-4 h-4" />
+                  <span className="text-xs font-bold uppercase font-mono tracking-wider">
+                    Evolving Version (v{activeMemory.version} → v{activeMemory.version + 1})
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 mt-1">
+                  Update Career Memory Fact
+                </h3>
+              </div>
+              <button
+                onClick={() => setMemoryModal('none')}
+                className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 rounded-lg bg-teal-50/50 dark:bg-teal-950/20 border border-teal-200/60 dark:border-teal-800/50 text-[11px] text-teal-800 dark:text-teal-300 leading-relaxed">
+                Updating this fact creates a new version while preserving the previous statement, effective dates, and change rationale in your permanent career lineage.
+              </div>
+
+              {memoryError && (
+                <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 text-rose-700 dark:text-rose-300 text-xs">
+                  {memoryError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-zinc-600 dark:text-zinc-400 mb-1 font-medium">
+                  Updated Memory Statement
+                </label>
+                <textarea
+                  rows={3}
+                  value={memoryStatementInput}
+                  onChange={(e) => setMemoryStatementInput(e.target.value)}
+                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                />
+              </div>
+
+              <div>
+                <label className="block text-zinc-600 dark:text-zinc-400 mb-1 font-medium">
+                  Reason for Change (Mandatory Provenance):
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Completed AWS Solution Architect; shifting focus to Cloud Infrastructure"
+                  value={memoryChangeReasonInput}
+                  onChange={(e) => setMemoryChangeReasonInput(e.target.value)}
+                  className="w-full p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+              <button
+                onClick={() => setMemoryModal('none')}
+                className="px-3.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveUpdatedMemory}
+                disabled={isSavingMemory}
+                className="px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
+              >
+                {isSavingMemory ? 'Saving Version...' : 'Save New Version'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL 9: Memory Lineage Audit Drawer / Modal                           */}
+      {/* ===================================================================== */}
+      {memoryModal === 'lineage' && activeMemory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-6 space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-1.5 text-teal-600 dark:text-teal-400">
+                  <History className="w-4 h-4" />
+                  <span className="text-xs font-bold uppercase font-mono tracking-wider">Immutable Version Lineage</span>
+                </div>
+                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 mt-1">
+                  Career Memory Evolution Audit
+                </h3>
+                <p className="text-xs text-zinc-500 font-mono">
+                  Memory ID: {activeMemory.memory_id}
+                </p>
+              </div>
+              <button
+                onClick={() => setMemoryModal('none')}
+                className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs">
+              {isLoadingLineage ? (
+                <div className="py-8 text-center text-zinc-400 flex items-center justify-center gap-2">
+                  <RotateCw className="w-4 h-4 animate-spin text-teal-600" />
+                  <span>Loading full version trail...</span>
+                </div>
+              ) : memoryLineage.length === 0 ? (
+                <p className="text-zinc-500 italic text-center py-6">No previous versions on record.</p>
+              ) : (
+                memoryLineage.map((item) => (
+                  <div
+                    key={item.memory_id}
+                    className={`p-4 rounded-xl border space-y-2 ${
+                      item.is_active
+                        ? 'bg-teal-50/40 dark:bg-teal-950/20 border-teal-300 dark:border-teal-800'
+                        : 'bg-zinc-50/70 dark:bg-zinc-800/40 border-zinc-200/80 dark:border-zinc-800 opacity-80'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-mono font-bold text-[10px]">
+                          v{item.version}
+                        </span>
+
+                        <Badge
+                          variant={item.is_active ? 'verified' : 'neutral'}
+                          size="sm"
+                        >
+                          {item.is_active ? 'CURRENT ACTIVE' : 'SUPERSEDED'}
+                        </Badge>
+
+                        <Badge variant="outline" size="sm" mono>
+                          {item.provenance_level}
+                        </Badge>
+                      </div>
+
+                      <span className="text-[11px] text-zinc-400 font-mono">
+                        {new Date(item.effective_from).toLocaleDateString()}
+                        {item.effective_to ? ` → ${new Date(item.effective_to).toLocaleDateString()}` : ' → Present'}
+                      </span>
+                    </div>
+
+                    <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 leading-relaxed">
+                      {item.statement}
+                    </p>
+
+                    {item.change_reason && (
+                      <div className="pt-1.5 border-t border-zinc-200/50 dark:border-zinc-700/50 text-[11px] text-zinc-600 dark:text-zinc-400 italic">
+                        <strong>Change Reason:</strong> &quot;{item.change_reason}&quot;
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="flex items-center justify-end pt-2 border-t border-zinc-100 dark:border-zinc-800">
+              <button
+                onClick={() => setMemoryModal('none')}
+                className="px-4 py-1.5 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-semibold cursor-pointer"
+              >
+                Close Audit
               </button>
             </div>
           </div>

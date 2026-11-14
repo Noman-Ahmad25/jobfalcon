@@ -3,6 +3,11 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional, Sequence
 
+from app.schemas.action import (
+    ActionType,
+    CandidateActionsSummary,
+    CandidateOpportunityActionRecord,
+)
 from app.schemas.career_path import (
     ActionProgressStatus,
     CareerPathAssessmentResponse,
@@ -11,6 +16,12 @@ from app.schemas.career_path import (
 )
 from app.schemas.deduplication import DuplicateRecord, OpportunityCluster
 from app.schemas.eligibility import EligibilityResult
+from app.schemas.market import MarketResearchReportRecord
+from app.schemas.memory import (
+    CandidateCareerMemoryItem,
+    MemoryType,
+    ProvenanceLevel,
+)
 from app.schemas.opportunity import PolymorphicOpportunity
 from app.schemas.orchestration import DiscoveryRun
 from app.schemas.profile import CandidateCareerProfile
@@ -218,6 +229,111 @@ class DiscoveryRunRepository(ABC):
     def get_active_run_for_candidate(self, candidate_id: str) -> Optional[DiscoveryRun]:
         """Retrieves any currently executing (non-terminal) discovery run for a candidate."""
         raise NotImplementedError
+
+
+class CandidateActionRepository(ABC):
+    """Abstract port for candidate opportunity interaction tracking and history."""
+
+    @abstractmethod
+    def record_action(self, action: CandidateOpportunityActionRecord) -> None:
+        """Records an immutable opportunity action transition event."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_latest_actions(self, user_id: str) -> dict[str, CandidateOpportunityActionRecord]:
+        """Returns map of opportunity_id to latest action record for user."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_actions_summary(self, user_id: str) -> CandidateActionsSummary:
+        """Returns consolidated interaction summary (saved, applied, dismissed, soft-overridden)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_action_history(
+        self, user_id: str, opportunity_id: Optional[str] = None, limit: int = 100
+    ) -> list[CandidateOpportunityActionRecord]:
+        """Retrieves event-sourced action transition audit trail."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_overridden_opportunity_ids(self, user_id: str) -> list[str]:
+        """Returns list of opportunity IDs currently soft-overridden by the candidate."""
+        raise NotImplementedError
+
+
+class CareerMemoryRepository(ABC):
+    """Abstract port for persistent versioned candidate career memory."""
+
+    @abstractmethod
+    def add_memory(self, memory: CandidateCareerMemoryItem) -> None:
+        """Persists a new versioned career memory fact."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_memory(self, memory_id: str) -> Optional[CandidateCareerMemoryItem]:
+        """Retrieves a specific memory item by memory_id."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def update_memory(
+        self,
+        user_id: str,
+        current_memory_id: str,
+        new_statement: str,
+        change_reason: str,
+        provenance_level: Optional[ProvenanceLevel] = None,
+        confidence_score: Optional[float] = None,
+    ) -> CandidateCareerMemoryItem:
+        """Supersedes existing memory fact with version increment and links history."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def deactivate_memory(self, user_id: str, memory_id: str, reason: str) -> bool:
+        """Deactivates/archives an active memory fact."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_active_memories(
+        self, user_id: str, memory_type: Optional[MemoryType] = None
+    ) -> list[CandidateCareerMemoryItem]:
+        """Retrieves currently active memory facts for a candidate."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_memory_history(self, user_id: str, memory_id: str) -> list[CandidateCareerMemoryItem]:
+        """Retrieves full version audit history for a memory lineage."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_all_memories_for_candidate(
+        self, user_id: str, include_inactive: bool = False
+    ) -> list[CandidateCareerMemoryItem]:
+        """Lists all memory items for a candidate."""
+        raise NotImplementedError
+
+
+class MarketReportRepository(ABC):
+    """Abstract port for cached market intelligence research reports."""
+
+    @abstractmethod
+    def save_report(self, report: MarketResearchReportRecord) -> None:
+        """Persists or updates a market research report."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_report(
+        self, role_title: str, country_code: str, max_age_hours: int = 48
+    ) -> Optional[MarketResearchReportRecord]:
+        """Retrieves an active cached market report for a role and geography."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_reports(self, limit: int = 20) -> list[MarketResearchReportRecord]:
+        """Lists recently generated market research reports."""
+        raise NotImplementedError
+
+
 
 
 
