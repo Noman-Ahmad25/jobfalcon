@@ -81,7 +81,7 @@ export function EvidenceCard({
         </div>
       </div>
 
-      <blockquote className="italic text-zinc-700 dark:text-zinc-300 font-sans border-l-2 border-teal-500/70 pl-2.5 py-0.5 leading-relaxed">
+      <blockquote className="italic text-zinc-700 dark:text-zinc-300 font-sans border-l-2 border-teal-500/70 pl-2.5 py-0.5 leading-relaxed break-words">
         &ldquo;{extractedSnippet}&rdquo;
       </blockquote>
 

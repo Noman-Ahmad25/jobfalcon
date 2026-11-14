@@ -961,7 +961,7 @@ Python, FastAPI, PostgreSQL, Docker, Go, Redis, TypeScript, Next.js, Git`;
                   {[
                     { id: 'REMOTE', label: 'Remote' },
                     { id: 'HYBRID', label: 'Hybrid' },
-                    { id: 'ON_SITE', label: 'On-Site' },
+                    { id: 'ON_SITE', label: 'On-site' },
                   ].map((mode) => {
                     const active = allowedWorkModes.includes(mode.id);
                     return (

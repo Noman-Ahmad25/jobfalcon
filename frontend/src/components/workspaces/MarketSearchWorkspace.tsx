@@ -21,6 +21,11 @@ import { searchOpportunities } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
 import { OpportunityDetailModal } from '@/components/ui/OpportunityDetailModal';
 import { formatOpportunityLocation } from '@/lib/location';
+import {
+  formatWorkMode,
+  formatSourceSystem,
+  formatOpportunityCategory,
+} from '@/lib/formatters';
 
 interface MarketSearchWorkspaceProps {
   candidateProfile: CandidateCareerProfile;
@@ -188,7 +193,7 @@ export function MarketSearchWorkspace({
                 <option value="">Any Work Mode</option>
                 <option value="REMOTE">Remote</option>
                 <option value="HYBRID">Hybrid</option>
-                <option value="ON_SITE">On-Site</option>
+                <option value="ON_SITE">On-site</option>
               </select>
             </div>
 
@@ -277,10 +282,11 @@ export function MarketSearchWorkspace({
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4">
             {opportunities.map((opp) => {
-              const origin: string =
+              const origin: string = formatSourceSystem(
                 typeof opp.category_specific_attributes?.source_system === 'string'
                   ? opp.category_specific_attributes.source_system
-                  : 'Web Search';
+                  : 'web_search'
+              );
               const minExp = opp.eligibility_rules.min_experience_months;
               let expLabel = 'Not stated';
               if (minExp === 0) expLabel = 'Entry level';
@@ -294,10 +300,10 @@ export function MarketSearchWorkspace({
                   <div className="space-y-2 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-[11px] font-semibold text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60 border border-teal-200/80 dark:border-teal-800/80 px-2 py-0.5 rounded-md">
-                        {opp.eligibility_rules.opportunity_category.replace(/_/g, ' ')}
+                        {formatOpportunityCategory(opp.eligibility_rules.opportunity_category)}
                       </span>
-                      <Badge variant="verified" size="sm" mono>
-                        {opp.eligibility_rules.work_mode}
+                      <Badge variant="verified" size="sm">
+                        {formatWorkMode(opp.eligibility_rules.work_mode)}
                       </Badge>
                       <span className="text-[11px] text-zinc-500 font-mono">
                         Experience: {expLabel}

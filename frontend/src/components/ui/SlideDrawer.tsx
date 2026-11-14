@@ -59,7 +59,7 @@ export function SlideDrawer({
         <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-start justify-between gap-3 bg-zinc-50/80 dark:bg-zinc-900/80 backdrop-blur-sm sticky top-0 z-20">
           <div className="space-y-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 id="drawer-title" className="text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
+              <h2 id="drawer-title" className="text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-100 tracking-tight break-words">
                 {title}
               </h2>
               {badge}

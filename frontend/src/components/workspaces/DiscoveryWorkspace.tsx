@@ -56,6 +56,13 @@ import {
   startDiscoveryRun,
 } from '@/lib/api';
 import { formatOpportunityLocation } from '@/lib/location';
+import {
+  formatWorkMode,
+  formatSourceSystem,
+  formatOpportunityCategory,
+  formatActionType,
+  formatAgentSummary,
+} from '@/lib/formatters';
 import { Badge } from '@/components/ui/Badge';
 import { NumberTicker } from '@/components/ui/NumberTicker';
 import { ScoreBar } from '@/components/ui/ScoreBar';
@@ -949,7 +956,7 @@ export function DiscoveryWorkspace({
                         {new Date(evt.timestamp).toLocaleTimeString([], { hour12: false })}
                       </span>
                       <span className="text-zinc-800 dark:text-zinc-200 font-sans flex-1 leading-relaxed">
-                        {evt.summary}
+                        {formatAgentSummary(evt.summary)}
                       </span>
                     </div>
                   ))
@@ -976,7 +983,7 @@ export function DiscoveryWorkspace({
                   {liveRawCount}
                 </div>
                 <div className="text-[10px] text-zinc-500 truncate mt-0.5">
-                  {activeRun?.sources_queried?.length ? activeRun.sources_queried.join(', ') : 'SearXNG / MCP'}
+                  {activeRun?.sources_queried?.length ? activeRun.sources_queried.map(formatSourceSystem).join(', ') : 'SearXNG / MCP'}
                 </div>
               </div>
 
@@ -1171,14 +1178,14 @@ export function DiscoveryWorkspace({
                       }`}
                     >
                       {/* Top Row: Rank, Title, Company, Action Badge, Score */}
-                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="px-2 py-0.5 rounded bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-mono text-xs font-bold">
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 min-w-0">
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap min-w-0">
+                            <span className="px-2 py-0.5 rounded bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-mono text-xs font-bold shrink-0">
                               #{rec.rank}
                             </span>
 
-                            <h4 className="text-base font-bold text-zinc-900 dark:text-zinc-100 hover:text-teal-600 transition-colors">
+                            <h4 className="text-base font-bold text-zinc-900 dark:text-zinc-100 hover:text-teal-600 transition-colors break-words">
                               {opp.title}
                             </h4>
 
@@ -1188,8 +1195,8 @@ export function DiscoveryWorkspace({
                               </Badge>
                             )}
 
-                            <Badge variant="outline" size="sm" mono>
-                              {opp.eligibility_rules?.opportunity_category || 'FULL_TIME_JOB'}
+                            <Badge variant="outline" size="sm">
+                              {formatOpportunityCategory(opp.eligibility_rules?.opportunity_category)}
                             </Badge>
 
                             {/* Candidate Action Badges */}
@@ -1227,7 +1234,7 @@ export function DiscoveryWorkspace({
                             </span>
                             <span>•</span>
                             <span className="font-mono">
-                              Mode: {opp.eligibility_rules?.work_mode || 'REMOTE'}
+                              Mode: {formatWorkMode(opp.eligibility_rules?.work_mode)}
                             </span>
                             <span>•</span>
                             <span className="font-mono text-[11px] text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60 px-1.5 py-0.5 rounded border border-teal-200 dark:border-teal-800">
@@ -1246,7 +1253,7 @@ export function DiscoveryWorkspace({
                             </span>
                             <span>•</span>
                             <span className="text-[11px] font-mono text-zinc-400">
-                              Source: {String(opp.category_specific_attributes?.source_system || 'ats_direct')}
+                              Source: {formatSourceSystem(opp.category_specific_attributes?.source_system as string || 'ats_direct')}
                             </span>
                           </div>
                         </div>
@@ -1494,8 +1501,8 @@ export function DiscoveryWorkspace({
                             )}
 
                             {userAction && (
-                              <Badge variant="teal" size="sm" mono>
-                                {userAction}
+                              <Badge variant="teal" size="sm">
+                                {formatActionType(userAction)}
                               </Badge>
                             )}
                           </div>
@@ -1503,9 +1510,9 @@ export function DiscoveryWorkspace({
                           <div className="flex items-center gap-3 text-zinc-500 font-mono text-[11px] flex-wrap">
                             <span>{formatOpportunityLocation(opp)}</span>
                             <span>•</span>
-                            <span>Mode: {opp.eligibility_rules?.work_mode || 'REMOTE'}</span>
+                            <span>Mode: {formatWorkMode(opp.eligibility_rules?.work_mode)}</span>
                             <span>•</span>
-                            <span>Source: {String(opp.category_specific_attributes?.source_system || 'ats')}</span>
+                            <span>Source: {formatSourceSystem(opp.category_specific_attributes?.source_system as string || 'ats')}</span>
                           </div>
                         </div>
 
@@ -1683,7 +1690,7 @@ export function DiscoveryWorkspace({
                             <div className="flex items-center gap-3 text-xs text-zinc-500 font-mono">
                               <span>{formatOpportunityLocation(opp)}</span>
                               <span>•</span>
-                              <span>Mode: {opp.eligibility_rules?.work_mode || 'REMOTE'}</span>
+                              <span>Mode: {formatWorkMode(opp.eligibility_rules?.work_mode)}</span>
                             </div>
                           </div>
 

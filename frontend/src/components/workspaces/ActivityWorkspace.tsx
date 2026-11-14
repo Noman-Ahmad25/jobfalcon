@@ -29,6 +29,11 @@ import {
 } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
 import { WorkspaceTab } from '@/components/layout/Header';
+import {
+  formatActionType,
+  formatMemoryType,
+  formatProvenanceLevel,
+} from '@/lib/formatters';
 
 interface ActivityWorkspaceProps {
   candidateProfile: CandidateCareerProfile;
@@ -312,20 +317,22 @@ export function ActivityWorkspace({
                     key={action.id}
                     className="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs space-y-2.5"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {isSave && <Badge variant="teal" size="sm">SAVED</Badge>}
-                        {isApply && <Badge variant="verified" size="sm">APPLIED</Badge>}
-                        {isDismiss && <Badge variant="outline" size="sm">DISMISSED</Badge>}
-                        {isOverride && <Badge variant="caveat" size="sm">SOFT OVERRIDE</Badge>}
+                    <div className="flex items-start justify-between gap-3 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
+                        <Badge
+                          variant={isSave ? 'teal' : isApply ? 'verified' : isOverride ? 'caveat' : 'outline'}
+                          size="sm"
+                        >
+                          {formatActionType(action.action_type)}
+                        </Badge>
 
-                        <span className="font-mono text-xs font-bold text-zinc-800 dark:text-zinc-200">
+                        <span className="font-mono text-xs font-bold text-zinc-800 dark:text-zinc-200 break-words">
                           {action.opportunity_id}
                         </span>
 
                         {action.previous_state && (
                           <span className="text-[11px] font-mono text-zinc-400">
-                            (transitioned from <span className="font-semibold">{action.previous_state}</span>)
+                            (transitioned from <span className="font-semibold">{formatActionType(action.previous_state)}</span>)
                           </span>
                         )}
                       </div>
@@ -420,13 +427,13 @@ export function ActivityWorkspace({
                         v{mem.version}
                       </span>
                       <Badge variant={mem.is_active ? 'verified' : 'neutral'} size="sm">
-                        {mem.is_active ? 'ACTIVE' : 'SUPERSEDED'}
+                        {mem.is_active ? 'Active' : 'Superseded'}
                       </Badge>
-                      <Badge variant="outline" size="sm" mono>
-                        {mem.memory_type}
+                      <Badge variant="outline" size="sm">
+                        {formatMemoryType(mem.memory_type)}
                       </Badge>
                       <Badge variant="teal" size="sm">
-                        {mem.provenance_level}
+                        {formatProvenanceLevel(mem.provenance_level)}
                       </Badge>
                     </div>
 
@@ -435,7 +442,7 @@ export function ActivityWorkspace({
                     </span>
                   </div>
 
-                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mt-2 font-sans">
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mt-2 font-sans break-words">
                     {mem.statement}
                   </p>
 

@@ -25,6 +25,7 @@ import {
 import { getMarketResearchReport } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
 import { WorkspaceTab } from '@/components/layout/Header';
+import { formatWorkMode } from '@/lib/formatters';
 
 interface MarketIntelligenceWorkspaceProps {
   candidateProfile: CandidateCareerProfile;
@@ -304,24 +305,24 @@ export function MarketIntelligenceWorkspace({
                   const hasSkill = candidateSkillsSet.has(skill.skill_name.toLowerCase().trim());
                   return (
                     <div key={skill.skill_name} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                      <div className="flex items-center justify-between text-xs gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <span className="font-semibold text-zinc-800 dark:text-zinc-200 truncate">
                             {skill.skill_name}
                           </span>
                           {hasSkill ? (
-                            <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800 flex items-center gap-0.5">
+                            <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800 flex items-center gap-0.5 shrink-0">
                               <CheckCircle2 className="w-2.5 h-2.5" />
                               On Profile
                             </span>
                           ) : (
-                            <span className="text-[10px] font-mono text-zinc-400">
+                            <span className="text-[10px] font-mono text-zinc-400 shrink-0">
                               (Skill Gap)
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 font-mono text-[11px] text-zinc-500">
-                          <span>{skill.count} postings</span>
+                        <div className="flex items-center gap-2 font-mono text-[11px] text-zinc-500 shrink-0">
+                          <span className="hidden sm:inline">{skill.count} postings</span>
                           <span className="font-semibold text-zinc-800 dark:text-zinc-200">
                             {skill.percentage}%
                           </span>
@@ -369,19 +370,19 @@ export function MarketIntelligenceWorkspace({
                   const hasSkill = candidateSkillsSet.has(skill.skill_name.toLowerCase().trim());
                   return (
                     <div key={skill.skill_name} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-semibold text-zinc-800 dark:text-zinc-200">
+                      <div className="flex items-center justify-between text-xs gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <span className="font-semibold text-zinc-800 dark:text-zinc-200 truncate">
                             {skill.skill_name}
                           </span>
                           {hasSkill && (
-                            <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800">
+                            <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.2 rounded border border-emerald-200 dark:border-emerald-800 shrink-0">
                               ✓ Verified
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 font-mono text-[11px] text-zinc-500">
-                          <span>{skill.count} postings</span>
+                        <div className="flex items-center gap-2 font-mono text-[11px] text-zinc-500 shrink-0">
+                          <span className="hidden sm:inline">{skill.count} postings</span>
                           <span className="font-semibold text-zinc-800 dark:text-zinc-200">
                             {skill.percentage}%
                           </span>
@@ -417,7 +418,7 @@ export function MarketIntelligenceWorkspace({
                 return (
                   <div key={mode} className="space-y-1">
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-zinc-600 dark:text-zinc-300 font-medium">{mode}</span>
+                      <span className="text-zinc-600 dark:text-zinc-300 font-medium">{formatWorkMode(mode)}</span>
                       <span className="font-mono text-zinc-500">{count} ({pct}%)</span>
                     </div>
                     <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">

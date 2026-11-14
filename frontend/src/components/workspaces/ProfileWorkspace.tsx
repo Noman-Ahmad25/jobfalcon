@@ -61,6 +61,11 @@ import {
 } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
 import { WorkspaceTab } from '@/components/layout/Header';
+import {
+  formatWorkMode,
+  formatMemoryType,
+  formatProvenanceLevel,
+} from '@/lib/formatters';
 
 // =============================================================================
 // 1. Skill Categorization Definitions & Engine
@@ -1095,8 +1100,8 @@ export function ProfileWorkspace({
 
   return (
     <div className="space-y-6 pb-20 max-w-6xl mx-auto px-4 sm:px-6">
-      {/* 1. Header Navigation & Sticky Actions Bar */}
-      <div className="sticky top-0 z-30 py-3.5 bg-zinc-50/90 dark:bg-zinc-950/90 backdrop-blur-md border-b border-zinc-200/80 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-3">
+      {/* 1. Header Navigation & Actions Bar (Dedicated layout area, zero header overlap) */}
+      <div className="py-3 px-4 sm:px-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800/80 shadow-xs flex flex-wrap items-center justify-between gap-3">
         <button
           onClick={() => onNavigateTab('discover')}
           className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shadow-2xs"
@@ -1278,7 +1283,7 @@ export function ProfileWorkspace({
 
             <div className="space-y-2 min-w-0 flex-1">
               <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0">
-                <h1 className="text-xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 break-all min-w-0">
+                <h1 className="text-xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 break-words sm:break-normal [overflow-wrap:anywhere] min-w-0">
                   {displayName}
                 </h1>
                 <button
@@ -1429,7 +1434,7 @@ export function ProfileWorkspace({
               Work Preferences
             </span>
             <span className="font-semibold text-zinc-900 dark:text-zinc-100 truncate block text-sm">
-              {profile.eligibility_constraints.allowed_work_modes.join(', ')}
+              {profile.eligibility_constraints.allowed_work_modes.map(formatWorkMode).join(', ')}
             </span>
             <span className="text-[11px] text-zinc-500 block truncate">
               {profile.eligibility_constraints.requires_visa_sponsorship
@@ -1799,14 +1804,14 @@ export function ProfileWorkspace({
 
           <div className="flex items-center gap-2.5 flex-wrap">
             {/* Search Input */}
-            <div className="relative">
+            <div className="relative w-full sm:w-auto">
               <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 placeholder="Search competencies..."
                 value={skillSearch}
                 onChange={(e) => setSkillSearch(e.target.value)}
-                className="pl-8 pr-7 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs w-48 focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+                className="pl-8 pr-7 py-1.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs w-full sm:w-48 focus:outline-hidden focus:ring-1 focus:ring-teal-500"
               />
               {skillSearch && (
                 <button
@@ -2095,7 +2100,7 @@ export function ProfileWorkspace({
               Allowed Work Modes
             </span>
             <span className="font-semibold text-zinc-800 dark:text-zinc-200 block pt-1 text-sm">
-              {profile.eligibility_constraints.allowed_work_modes.join(', ')}
+              {profile.eligibility_constraints.allowed_work_modes.map(formatWorkMode).join(', ')}
             </span>
           </div>
 
@@ -2198,8 +2203,8 @@ export function ProfileWorkspace({
                       v{mem.version}
                     </span>
 
-                    <Badge variant="outline" size="sm" mono>
-                      {mem.memory_type}
+                    <Badge variant="outline" size="sm">
+                      {formatMemoryType(mem.memory_type)}
                     </Badge>
 
                     <Badge
@@ -2212,7 +2217,7 @@ export function ProfileWorkspace({
                       }
                       size="sm"
                     >
-                      {mem.provenance_level}
+                      {formatProvenanceLevel(mem.provenance_level)}
                     </Badge>
                   </div>
 
@@ -3178,7 +3183,7 @@ export function ProfileWorkspace({
                             : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500'
                         }`}
                       >
-                        {mode}
+                        {formatWorkMode(mode)}
                       </button>
                     );
                   })}

@@ -21,6 +21,11 @@ import {
 import { Badge } from '@/components/ui/Badge';
 import { ScoreBar } from '@/components/ui/ScoreBar';
 import { formatOpportunityLocation } from '@/lib/location';
+import {
+  formatWorkMode,
+  formatSourceSystem,
+  formatOpportunityCategory,
+} from '@/lib/formatters';
 
 interface OpportunityDetailModalProps {
   opportunity: PolymorphicOpportunity | RankedOpportunity | null;
@@ -82,10 +87,11 @@ export function OpportunityDetailModal({
   }
 
   // Source attribution
-  const originSource: string =
+  const originSource: string = formatSourceSystem(
     typeof opp.category_specific_attributes?.source_system === 'string'
       ? opp.category_specific_attributes.source_system
-      : 'Web Search';
+      : 'web_search'
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
@@ -96,12 +102,12 @@ export function OpportunityDetailModal({
         {/* Modal Header */}
         <div className="p-4 sm:p-6 border-b border-zinc-200 dark:border-zinc-800 flex items-start justify-between gap-3 sm:gap-4 bg-zinc-50/50 dark:bg-zinc-900/50">
           <div className="space-y-1.5 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
               <span className="text-xs font-semibold text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800/80 px-2 py-0.5 rounded-md">
-                {opp.eligibility_rules.opportunity_category.replace(/_/g, ' ')}
+                {formatOpportunityCategory(opp.eligibility_rules.opportunity_category)}
               </span>
-              <Badge variant="verified" size="sm" mono>
-                {opp.eligibility_rules.work_mode}
+              <Badge variant="verified" size="sm">
+                {formatWorkMode(opp.eligibility_rules.work_mode)}
               </Badge>
               {isRanked && (
                 <span className="text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-md">
@@ -110,14 +116,14 @@ export function OpportunityDetailModal({
               )}
             </div>
 
-            <h2 className="text-lg sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight leading-snug">
+            <h2 className="text-lg sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight leading-snug break-words">
               {opp.title}
             </h2>
 
             <div className="flex items-center gap-2 sm:gap-3 text-xs text-zinc-600 dark:text-zinc-400 flex-wrap pt-1">
-              <div className="flex items-center gap-1 font-medium text-zinc-900 dark:text-zinc-200">
+              <div className="flex items-center gap-1 font-medium text-zinc-900 dark:text-zinc-200 min-w-0">
                 <Building2 className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-                <span className="truncate">{opp.company_name}</span>
+                <span className="break-words">{opp.company_name}</span>
                 {opp.company_domain_verified && (
                   <span className="text-[10px] text-teal-600 dark:text-teal-400 font-mono hidden sm:inline">
                     (Verified Employer)
@@ -136,7 +142,7 @@ export function OpportunityDetailModal({
 
               <div className="flex items-center gap-1 text-zinc-500 font-mono text-[11px]">
                 <span>Source:</span>
-                <span className="font-semibold text-zinc-700 dark:text-zinc-300 capitalize">{originSource}</span>
+                <span className="font-semibold text-zinc-700 dark:text-zinc-300">{originSource}</span>
               </div>
             </div>
           </div>
