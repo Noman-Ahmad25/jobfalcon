@@ -98,8 +98,8 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             </div>
 
-            {/* Primary Four Product Destinations */}
-            <nav className="flex items-center gap-1 sm:gap-1.5">
+            {/* Primary Four Product Destinations (Desktop >= 1024px) */}
+            <nav className="hidden lg:flex items-center gap-1.5" aria-label="Desktop Navigation">
               <button
                 onClick={() => onTabChange('discover')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
@@ -175,7 +175,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
-                className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl border transition-all ${
+                className={`flex items-center gap-2 sm:gap-2.5 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border transition-all ${
                   menuOpen
                     ? 'border-teal-500 bg-teal-50/50 dark:bg-teal-950/40 text-zinc-900 dark:text-zinc-100 ring-2 ring-teal-500/20'
                     : 'border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/80 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200'
@@ -183,10 +183,10 @@ export const Header: React.FC<HeaderProps> = ({
                 aria-expanded={menuOpen}
                 aria-label="User profile and settings menu"
               >
-                <div className="w-7 h-7 rounded-lg bg-teal-600 dark:bg-teal-500 text-white font-bold text-xs flex items-center justify-center shadow-2xs">
+                <div className="w-7 h-7 rounded-lg bg-teal-600 dark:bg-teal-500 text-white font-bold text-xs flex items-center justify-center shadow-2xs shrink-0">
                   {initials}
                 </div>
-                <div className="flex flex-col items-start text-left leading-tight pr-0.5">
+                <div className="flex flex-col items-start text-left leading-tight pr-0.5 hidden sm:flex">
                   <span className="font-semibold text-xs text-zinc-900 dark:text-zinc-100 truncate max-w-[130px]">
                     {candidateName}
                   </span>
@@ -194,12 +194,12 @@ export const Header: React.FC<HeaderProps> = ({
                     {candidateRole}
                   </span>
                 </div>
-                <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${menuOpen ? 'rotate-180 text-teal-600' : ''}`} />
+                <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 shrink-0 transition-transform ${menuOpen ? 'rotate-180 text-teal-600' : ''}`} />
               </button>
 
               {/* Profile Dropdown Menu */}
               {menuOpen && (
-                <div className="absolute right-0 mt-2 w-72 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-lg py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-1.5rem)] rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-lg py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                   {/* Current Active Candidate Header */}
                   <div className="px-4 py-2.5 border-b border-zinc-100 dark:border-zinc-800/80">
                     <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 block">
@@ -296,6 +296,63 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Mobile & Tablet Bottom Navigation Bar (Fixed for screens < 1024px) */}
+      <nav
+        aria-label="Mobile Navigation"
+        className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 lg:hidden px-2 py-1 shadow-lg"
+        style={{ paddingBottom: 'calc(0.4rem + env(safe-area-inset-bottom, 0px))' }}
+      >
+        <div className="grid grid-cols-4 max-w-md mx-auto">
+          <button
+            onClick={() => onTabChange('discover')}
+            className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-xl transition-all min-h-[48px] active:scale-95 ${
+              activeTab === 'discover'
+                ? 'text-teal-600 dark:text-teal-400 font-semibold'
+                : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
+            }`}
+          >
+            <Compass className={`w-5 h-5 mb-0.5 ${activeTab === 'discover' ? 'text-teal-600 dark:text-teal-400' : ''}`} />
+            <span className="text-[10px] leading-tight font-medium">Discovery</span>
+          </button>
+
+          <button
+            onClick={() => onTabChange('career')}
+            className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-xl transition-all min-h-[48px] active:scale-95 ${
+              activeTab === 'career' || activeTab === 'profile'
+                ? 'text-teal-600 dark:text-teal-400 font-semibold'
+                : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
+            }`}
+          >
+            <User className={`w-5 h-5 mb-0.5 ${activeTab === 'career' || activeTab === 'profile' ? 'text-teal-600 dark:text-teal-400' : ''}`} />
+            <span className="text-[10px] leading-tight font-medium">My Career</span>
+          </button>
+
+          <button
+            onClick={() => onTabChange('market')}
+            className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-xl transition-all min-h-[48px] active:scale-95 ${
+              activeTab === 'market'
+                ? 'text-teal-600 dark:text-teal-400 font-semibold'
+                : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
+            }`}
+          >
+            <TrendingUp className={`w-5 h-5 mb-0.5 ${activeTab === 'market' ? 'text-teal-600 dark:text-teal-400' : ''}`} />
+            <span className="text-[10px] leading-tight font-medium truncate max-w-full">Market</span>
+          </button>
+
+          <button
+            onClick={() => onTabChange('activity')}
+            className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-xl transition-all min-h-[48px] active:scale-95 ${
+              activeTab === 'activity'
+                ? 'text-teal-600 dark:text-teal-400 font-semibold'
+                : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
+            }`}
+          >
+            <History className={`w-5 h-5 mb-0.5 ${activeTab === 'activity' ? 'text-teal-600 dark:text-teal-400' : ''}`} />
+            <span className="text-[10px] leading-tight font-medium">Activity</span>
+          </button>
+        </div>
+      </nav>
     </header>
   );
 };

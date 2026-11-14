@@ -602,16 +602,16 @@ export function DiscoveryWorkspace({
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {/* 1. Header & Discovery Control Bar */}
-      <div className="p-6 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-6">
+      <div className="p-4 sm:p-6 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-5 sm:space-y-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="p-1.5 rounded-md bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-800/80">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="p-1.5 rounded-md bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-400 border border-teal-200 dark:border-teal-800/80 shrink-0">
                 <Compass className="w-4 h-4" />
               </span>
-              <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+              <h2 className="text-lg sm:text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
                 Personalized Opportunity Discovery
               </h2>
               {activeRun && (
@@ -625,7 +625,7 @@ export function DiscoveryWorkspace({
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
             {activeRun && !isExecuting && (
               <span className="text-[11px] font-mono text-zinc-500 hidden sm:inline-block">
                 Run ID: <span className="font-semibold text-zinc-800 dark:text-zinc-200">{activeRun.run_id}</span>
@@ -635,7 +635,7 @@ export function DiscoveryWorkspace({
             <button
               onClick={handleLaunchDiscovery}
               disabled={isExecuting}
-              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-semibold shadow-xs transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-hidden focus:ring-2 focus:ring-teal-500"
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-semibold shadow-xs transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-hidden focus:ring-2 focus:ring-teal-500 min-h-[42px] sm:min-h-0 w-full sm:w-auto"
             >
               {isExecuting ? (
                 <>
@@ -822,16 +822,16 @@ export function DiscoveryWorkspace({
       {(isExecuting || activeRun || discoveryResponse) && (
         <div className="rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs overflow-hidden space-y-4">
           {/* Stepper Header Strip */}
-          <div className="px-6 py-4 bg-zinc-50/70 dark:bg-zinc-800/40 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between flex-wrap gap-3">
+          <div className="px-4 sm:px-6 py-3.5 sm:py-4 bg-zinc-50/70 dark:bg-zinc-800/40 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
               <span
-                className={`w-2.5 h-2.5 rounded-full ${
+                className={`w-2.5 h-2.5 rounded-full shrink-0 ${
                   isExecuting ? 'bg-teal-500 animate-pulse' : 'bg-emerald-500'
                 }`}
               />
               <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
-                <Compass className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                Multi-Agent Career Opportunity Discovery
+                <Compass className="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0" />
+                <span className="truncate">Multi-Agent Career Opportunity Discovery</span>
               </span>
               {activeRun?.status && (
                 <Badge
@@ -851,7 +851,7 @@ export function DiscoveryWorkspace({
             </div>
 
             {/* Live Funnel Counts */}
-            <div className="flex items-center gap-4 text-xs font-mono text-zinc-500">
+            <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs font-mono text-zinc-500">
               <span className="flex items-center gap-1">
                 <span className="font-bold text-zinc-800 dark:text-zinc-200">
                   <NumberTicker value={liveRawCount} />
@@ -871,7 +871,7 @@ export function DiscoveryWorkspace({
               </span>
               <button
                 onClick={() => setShowTimeline(!showTimeline)}
-                className="text-[11px] text-teal-600 hover:underline font-sans ml-2"
+                className="text-[11px] text-teal-600 hover:underline font-sans ml-1 sm:ml-2"
               >
                 {showTimeline ? 'Hide Activity' : 'Show Activity'}
               </button>
@@ -880,12 +880,12 @@ export function DiscoveryWorkspace({
 
           {/* Adaptive Cycle Notice */}
           {adaptations.length > 0 && (
-            <div className="mx-6 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 flex items-center justify-between text-xs text-amber-800 dark:text-amber-300 font-mono">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-                <span className="font-bold">Adaptive Loop Active: Iteration {currentIteration}</span>
-                <span>•</span>
-                <span className="truncate max-w-xl text-[11px] font-sans">
+            <div className="mx-3 sm:mx-6 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs text-amber-800 dark:text-amber-300 font-mono">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping shrink-0" />
+                <span className="font-bold shrink-0">Adaptive Loop: Iteration {currentIteration}</span>
+                <span className="hidden sm:inline">•</span>
+                <span className="truncate text-[11px] font-sans">
                   {adaptations[adaptations.length - 1].action_summary}
                 </span>
               </div>
@@ -893,7 +893,7 @@ export function DiscoveryWorkspace({
           )}
 
           {/* Active Specialized Agent Indicator */}
-          <div className="px-6 py-1">
+          <div className="px-3 sm:px-6 py-1">
             <div className="p-3 rounded-lg bg-teal-50/50 dark:bg-teal-950/20 border border-teal-200/80 dark:border-teal-800/60 flex items-center justify-between text-xs">
               <div className="flex items-center gap-3">
                 <div className="p-1.5 rounded-md bg-teal-600 text-white shrink-0">
@@ -908,7 +908,7 @@ export function DiscoveryWorkspace({
                   )}
                 </div>
                 <div>
-                  <div className="font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <div className="font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2 flex-wrap">
                     <span>
                       {currentStage === 'SEARCHING'
                         ? 'Discovery Agent Active'
@@ -936,7 +936,7 @@ export function DiscoveryWorkspace({
 
           {/* Clean Agent Activity Stream */}
           {showTimeline && (
-            <div className="px-6 pb-6">
+            <div className="px-3 sm:px-6 pb-4 sm:pb-6">
               <div className="p-4 rounded-lg bg-zinc-50/80 dark:bg-zinc-800/40 border border-zinc-200/80 dark:border-zinc-800 max-h-56 overflow-y-auto space-y-2.5 text-xs divide-y divide-zinc-200/40 dark:divide-zinc-800/50">
                 {liveEvents.length === 0 ? (
                   <div className="text-zinc-400 text-center py-4 text-xs font-sans">
@@ -1043,10 +1043,10 @@ export function DiscoveryWorkspace({
       <div className="space-y-5">
         {/* Navigation & Summary Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-800 pb-3">
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar flex-nowrap sm:flex-wrap pb-1 w-full sm:w-auto">
             <button
               onClick={() => setActiveView('recommended')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shrink-0 whitespace-nowrap min-h-[38px] ${
                 activeView === 'recommended'
                   ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs'
                   : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800'
@@ -1061,7 +1061,7 @@ export function DiscoveryWorkspace({
 
             <button
               onClick={() => setActiveView('all')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shrink-0 whitespace-nowrap min-h-[38px] ${
                 activeView === 'all'
                   ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs'
                   : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800'
@@ -1076,7 +1076,7 @@ export function DiscoveryWorkspace({
 
             <button
               onClick={() => setActiveView('rejected')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shrink-0 whitespace-nowrap min-h-[38px] ${
                 activeView === 'rejected'
                   ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-xs'
                   : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800'
@@ -1092,7 +1092,7 @@ export function DiscoveryWorkspace({
 
           {/* Persistent Action Summary Ticker */}
           {actionsSummary && (
-            <div className="flex items-center gap-3 text-xs font-mono text-zinc-500 shrink-0">
+            <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs font-mono text-zinc-500 shrink-0">
               <span className="flex items-center gap-1 text-teal-700 dark:text-teal-400">
                 <Bookmark className="w-3 h-3" />
                 <span>{actionsSummary.saved_opportunity_ids?.length || 0} saved</span>
@@ -1320,11 +1320,11 @@ export function DiscoveryWorkspace({
                         </div>
 
                         {/* Interactive Opportunity Actions */}
-                        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto shrink-0">
                           {/* Save Button */}
                           <button
                             onClick={() => handleToggleSave(opp)}
-                            className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer ${
+                            className={`px-3 py-2 sm:py-1.5 rounded-lg border text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer min-h-[40px] sm:min-h-0 ${
                               userAction === 'SAVED'
                                 ? 'bg-teal-50 border-teal-300 text-teal-700 dark:bg-teal-950/60 dark:border-teal-700 dark:text-teal-300'
                                 : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
@@ -1342,7 +1342,7 @@ export function DiscoveryWorkspace({
                               setDismissReasonCategory('SALARY');
                               setDismissReasonNotes('');
                             }}
-                            className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer ${
+                            className={`px-3 py-2 sm:py-1.5 rounded-lg border text-xs font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer min-h-[40px] sm:min-h-0 ${
                               userAction === 'DISMISSED'
                                 ? 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700 text-zinc-400'
                                 : 'border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:text-rose-600 hover:border-rose-300 dark:hover:text-rose-400'
@@ -1356,33 +1356,32 @@ export function DiscoveryWorkspace({
                           {/* Examine Role & Fit */}
                           <button
                             onClick={() => setExaminedOpportunity(rec)}
-                            className="px-3 py-1.5 rounded-lg bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-xs font-semibold text-teal-800 dark:text-teal-300 transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                            className="px-3 py-2 sm:py-1.5 rounded-lg bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 dark:hover:bg-teal-900/60 text-xs font-semibold text-teal-800 dark:text-teal-300 transition-colors flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer min-h-[40px] sm:min-h-0"
                           >
                             <Eye className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
                             <span>Examine</span>
                           </button>
 
-                          {/* Audit Button */}
-                          <button
-                            onClick={() => {
-                              setAuditedOpportunity(rec);
-                              setAuditDrawerTab('fit');
-                            }}
-                            className="px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium text-zinc-600 dark:text-zinc-400 transition-colors flex items-center gap-1 cursor-pointer"
-                            title="Inspect raw audit and deterministic evidence records"
-                          >
-                            <FileText className="w-3 h-3 text-zinc-400" />
-                            <span className="hidden sm:inline">Audit</span>
-                          </button>
-
-                          {/* External Apply */}
-                          {opp.source_url && (
+                          {/* External Apply or Audit */}
+                          {opp.source_url ? (
                             <button
                               onClick={() => handleApply(opp)}
-                              className="px-3.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-semibold transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
+                              className="px-3 py-2 sm:py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-semibold transition-colors flex items-center justify-center gap-1 shadow-xs cursor-pointer min-h-[40px] sm:min-h-0"
                             >
                               <span>{userAction === 'APPLIED' ? 'Applied ✓' : 'Apply'}</span>
                               <ExternalLink className="w-3 h-3" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setAuditedOpportunity(rec);
+                                setAuditDrawerTab('fit');
+                              }}
+                              className="px-2.5 py-2 sm:py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-medium text-zinc-600 dark:text-zinc-400 transition-colors flex items-center justify-center gap-1 cursor-pointer min-h-[40px] sm:min-h-0"
+                              title="Inspect raw audit and deterministic evidence records"
+                            >
+                              <FileText className="w-3 h-3 text-zinc-400" />
+                              <span>Audit</span>
                             </button>
                           )}
                         </div>
@@ -2016,9 +2015,9 @@ export function DiscoveryWorkspace({
 
       {/* 6. Reason-Aware Dismissal Modal */}
       {dismissTargetOpp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-6 space-y-4">
-            <div className="flex items-start justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-lg max-h-[90vh] bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-4 sm:p-6 space-y-4 flex flex-col overflow-hidden">
+            <div className="flex items-start justify-between shrink-0">
               <div>
                 <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
                   Dismiss Opportunity
@@ -2035,7 +2034,7 @@ export function DiscoveryWorkspace({
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3 text-xs overflow-y-auto flex-1 pr-1">
               <div>
                 <label className="font-semibold text-zinc-700 dark:text-zinc-300 block mb-1.5">
                   Primary Reason for Dismissing:
@@ -2078,22 +2077,22 @@ export function DiscoveryWorkspace({
                   placeholder="e.g. Expected min $140k base, or requires on-site 4 days/wk"
                   value={dismissReasonNotes}
                   onChange={(e) => setDismissReasonNotes(e.target.value)}
-                  className="w-full p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none"
+                  className="w-full p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-base sm:text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800 shrink-0">
               <button
                 onClick={() => setDismissTargetOpp(null)}
-                className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                className="px-3 py-2 sm:py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 min-h-[38px] sm:min-h-0"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmDismiss}
                 disabled={isSubmittingDismiss}
-                className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-xs disabled:opacity-50"
+                className="px-3.5 py-2 sm:py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-xs disabled:opacity-50 min-h-[38px] sm:min-h-0"
               >
                 {isSubmittingDismiss ? 'Dismissing...' : 'Confirm Dismissal'}
               </button>
@@ -2104,9 +2103,9 @@ export function DiscoveryWorkspace({
 
       {/* 7. Soft Rejection Override Modal */}
       {overrideTargetOpp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-6 space-y-4">
-            <div className="flex items-start justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-lg max-h-[90vh] bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-4 sm:p-6 space-y-4 flex flex-col overflow-hidden">
+            <div className="flex items-start justify-between shrink-0">
               <div>
                 <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
                   <Sparkles className="w-4 h-4" />
@@ -2127,7 +2126,7 @@ export function DiscoveryWorkspace({
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3 text-xs overflow-y-auto flex-1 pr-1">
               <div className="p-3 rounded-lg bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-800/50 space-y-1">
                 <span className="font-semibold text-amber-800 dark:text-amber-300 block">
                   Deterministic Audit Invariant
@@ -2152,22 +2151,22 @@ export function DiscoveryWorkspace({
                   placeholder="Explain why this soft shortfall (e.g. 1 year experience gap, commute distance) is acceptable (e.g. 'I have 2 years open-source production experience equivalent to 3 years full-time')"
                   value={overrideRationale}
                   onChange={(e) => setOverrideRationale(e.target.value)}
-                  className="w-full p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none"
+                  className="w-full p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-base sm:text-xs focus:ring-1 focus:ring-teal-500 focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800 shrink-0">
               <button
                 onClick={() => setOverrideTargetOpp(null)}
-                className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                className="px-3 py-2 sm:py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 min-h-[38px] sm:min-h-0"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmOverride}
                 disabled={isSubmittingOverride}
-                className="px-3.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-xs disabled:opacity-50"
+                className="px-3.5 py-2 sm:py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-xs disabled:opacity-50 min-h-[38px] sm:min-h-0"
               >
                 {isSubmittingOverride ? 'Saving...' : 'Apply Soft Override'}
               </button>

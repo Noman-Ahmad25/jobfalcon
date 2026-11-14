@@ -1163,7 +1163,7 @@ export function ProfileWorkspace({
 
       {/* 2. Resume Ingestion & Parsing Drawer (Collapsed by default, opens on user demand) */}
       {showUploadDrawer && (
-        <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-teal-200 dark:border-teal-900/80 shadow-lg space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="p-4 sm:p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-teal-200 dark:border-teal-900/80 shadow-lg space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
             <div className="flex items-center gap-2">
               <div className="p-2 rounded-lg bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400">
@@ -1268,22 +1268,22 @@ export function ProfileWorkspace({
       )}
 
       {/* 3. Hero Card: Professional Career Profile Header */}
-      <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-6">
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-          <div className="flex items-start gap-5">
+      <div className="p-4 sm:p-8 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-6 min-w-0">
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 min-w-0">
+          <div className="flex items-start gap-3 sm:gap-5 min-w-0 flex-1">
             {/* Avatar Initials Badge */}
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-700 text-white flex items-center justify-center text-xl sm:text-2xl font-bold font-mono shadow-md shrink-0">
+            <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-700 text-white flex items-center justify-center text-lg sm:text-2xl font-bold font-mono shadow-md shrink-0">
               {initials}
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+            <div className="space-y-2 min-w-0 flex-1">
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0">
+                <h1 className="text-xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 break-all min-w-0">
                   {displayName}
                 </h1>
                 <button
                   onClick={openEditOverview}
-                  className="px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:border-teal-500 bg-zinc-50 dark:bg-zinc-800 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:text-teal-600 dark:hover:text-teal-400 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  className="px-2.5 py-1 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:border-teal-500 bg-zinc-50 dark:bg-zinc-800 text-xs font-medium text-zinc-600 dark:text-zinc-300 hover:text-teal-600 dark:hover:text-teal-400 transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0"
                   title="Edit profile summary and contact details"
                 >
                   <Edit3 className="w-3 h-3" />
@@ -1291,27 +1291,27 @@ export function ProfileWorkspace({
                 </button>
               </div>
 
-              <p className="text-sm font-semibold text-teal-600 dark:text-teal-400">
+              <p className="text-sm font-semibold text-teal-600 dark:text-teal-400 break-words">
                 {profile.headline || targetRole}
               </p>
 
-              <div className="flex items-center gap-4 text-xs text-zinc-600 dark:text-zinc-400 flex-wrap pt-0.5">
+              <div className="flex items-center gap-3 sm:gap-4 text-xs text-zinc-600 dark:text-zinc-400 flex-wrap pt-0.5">
                 {profile.location && (
-                  <span className="flex items-center gap-1.5">
+                  <span className="flex items-center gap-1.5 shrink-0">
                     <MapPin className="w-3.5 h-3.5 text-zinc-400" />
                     <span>{profile.location}</span>
                   </span>
                 )}
-                <span className="flex items-center gap-1.5 font-mono">
-                  <User className="w-3.5 h-3.5 text-zinc-400" />
-                  <span>ID: {profile.user_id}</span>
+                <span className="flex items-center gap-1.5 font-mono min-w-0 max-w-full">
+                  <User className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                  <span className="truncate">ID: {profile.user_id}</span>
                 </span>
-                <span className="flex items-center gap-1.5">
+                <span className="flex items-center gap-1.5 shrink-0">
                   <Briefcase className="w-3.5 h-3.5 text-zinc-400" />
                   <span>{expDisplay}</span>
                 </span>
                 {profile.eligibility_constraints.is_currently_enrolled_student && (
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 font-medium">
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 font-medium shrink-0">
                     Currently Enrolled Student
                   </span>
                 )}
@@ -1441,7 +1441,7 @@ export function ProfileWorkspace({
       </div>
 
       {/* 4. Work Experience & Internships Section */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-5">
+      <div className="p-4 sm:p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-4">
           <div className="space-y-0.5">
             <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
@@ -1565,7 +1565,7 @@ export function ProfileWorkspace({
       </div>
 
       {/* 5. Projects & Engineering Portfolio Section */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-5">
+      <div className="p-4 sm:p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-4">
           <div className="space-y-0.5">
             <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
@@ -1685,7 +1685,7 @@ export function ProfileWorkspace({
       </div>
 
       {/* 6. Education & Academic Credentials Section */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-5">
+      <div className="p-4 sm:p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-4">
           <div className="space-y-0.5">
             <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
@@ -1782,7 +1782,7 @@ export function ProfileWorkspace({
       </div>
 
       {/* 7. Skills & Demonstrated Evidence (Categorized Accordion) */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-6">
+      <div className="p-4 sm:p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-zinc-100 dark:border-zinc-800 pb-4">
           <div className="space-y-0.5">
             <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
@@ -1842,10 +1842,10 @@ export function ProfileWorkspace({
         </div>
 
         {/* Category Filter Pills (Compact Overview Bar) */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 text-xs">
           <button
             onClick={() => setSelectedCategoryFilter('ALL')}
-            className={`px-3 py-1.5 rounded-lg font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+            className={`px-3 py-2 sm:py-1.5 rounded-lg font-semibold whitespace-nowrap transition-colors cursor-pointer shrink-0 min-h-[38px] ${
               selectedCategoryFilter === 'ALL'
                 ? 'bg-teal-600 text-white shadow-2xs'
                 : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
@@ -1864,7 +1864,7 @@ export function ProfileWorkspace({
               <button
                 key={cat.key}
                 onClick={() => setSelectedCategoryFilter(cat.key)}
-                className={`px-2.5 py-1.5 rounded-lg font-medium whitespace-nowrap flex items-center gap-1.5 transition-colors cursor-pointer ${
+                className={`px-2.5 py-2 sm:py-1.5 rounded-lg font-medium whitespace-nowrap flex items-center gap-1.5 transition-colors cursor-pointer shrink-0 min-h-[38px] ${
                   isSelected
                     ? 'bg-teal-600 text-white shadow-2xs'
                     : 'bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200/70 dark:border-zinc-700/70 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700'
@@ -1978,14 +1978,14 @@ export function ProfileWorkspace({
                                 <div className="flex items-center gap-1 shrink-0">
                                   <button
                                     onClick={() => openEditSkill(realIdx)}
-                                    className="p-1.5 rounded-md text-zinc-500 hover:text-teal-600 dark:hover:text-teal-400 hover:bg-zinc-200/60 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                                    className="p-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-zinc-500 hover:text-teal-600 dark:hover:text-teal-400 hover:bg-zinc-200/60 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
                                     title="Edit skill proficiency"
                                   >
                                     <Edit3 className="w-3.5 h-3.5" />
                                   </button>
                                   <button
                                     onClick={() => handleDeleteSkill(realIdx)}
-                                    className="p-1.5 rounded-md text-zinc-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                                    className="p-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-zinc-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
                                     title="Delete skill"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
@@ -2052,7 +2052,7 @@ export function ProfileWorkspace({
       </div>
 
       {/* 8. Career Direction & Eligibility Constraints */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-5">
+      <div className="p-4 sm:p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-4">
           <div className="space-y-0.5">
             <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
@@ -2140,7 +2140,7 @@ export function ProfileWorkspace({
       </div>
 
       {/* 9. Persistent Career Memory & Goals Evolution */}
-      <div className="p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-5">
+      <div className="p-4 sm:p-6 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xs space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-4">
           <div className="space-y-0.5">
             <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
@@ -2219,16 +2219,16 @@ export function ProfileWorkspace({
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       onClick={() => openLineage(mem)}
-                      className="px-2 py-1 rounded-md border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 flex items-center gap-1 text-[11px] font-medium cursor-pointer"
+                      className="px-2.5 py-1.5 min-h-[36px] rounded-lg border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 flex items-center gap-1 text-xs font-medium cursor-pointer"
                       title="Inspect complete version history and audit lineage"
                     >
-                      <History className="w-3 h-3 text-teal-600 dark:text-teal-400" />
+                      <History className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
                       <span>Lineage</span>
                     </button>
 
                     <button
                       onClick={() => openUpdateMemory(mem)}
-                      className="p-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-teal-600 transition-colors cursor-pointer"
+                      className="p-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-teal-600 transition-colors cursor-pointer"
                       title="Update statement (creates new version with change reason)"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
@@ -2236,7 +2236,7 @@ export function ProfileWorkspace({
 
                     <button
                       onClick={() => handleDeleteMemory(mem)}
-                      className="p-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-rose-600 transition-colors cursor-pointer"
+                      className="p-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-rose-600 transition-colors cursor-pointer"
                       title="Deactivate memory fact"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -2511,21 +2511,21 @@ export function ProfileWorkspace({
       {/* MODAL 2: Add / Edit Work Experience                                   */}
       {/* ===================================================================== */}
       {activeModal === 'experience' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-lg max-h-[90vh] bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 sm:p-6 space-y-4 shadow-xl flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3 shrink-0">
               <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
                 {editingIndex !== null ? 'Edit Work Position' : 'Add Work Position'}
               </h3>
               <button
                 onClick={() => setActiveModal('none')}
-                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer p-1"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3 text-xs overflow-y-auto flex-1 pr-1">
               <div>
                 <label className="block text-zinc-600 dark:text-zinc-400 mb-1 font-medium">
                   Job Title / Role *
@@ -2620,16 +2620,16 @@ export function ProfileWorkspace({
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800 shrink-0">
               <button
                 onClick={() => setActiveModal('none')}
-                className="px-3.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+                className="px-3.5 py-2 sm:py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer min-h-[38px] sm:min-h-0"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveExperience}
-                className="px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold cursor-pointer"
+                className="px-4 py-2 sm:py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold cursor-pointer min-h-[38px] sm:min-h-0"
               >
                 Save Position
               </button>
@@ -2642,21 +2642,21 @@ export function ProfileWorkspace({
       {/* MODAL 3: Add / Edit Project                                           */}
       {/* ===================================================================== */}
       {activeModal === 'project' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-lg max-h-[90vh] bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 sm:p-6 space-y-4 shadow-xl flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3 shrink-0">
               <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
                 {editingIndex !== null ? 'Edit Project' : 'Add Project Showcase'}
               </h3>
               <button
                 onClick={() => setActiveModal('none')}
-                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer p-1"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3 text-xs overflow-y-auto flex-1 pr-1">
               <div>
                 <label className="block text-zinc-600 dark:text-zinc-400 mb-1 font-medium">
                   Project Name *
@@ -2666,7 +2666,7 @@ export function ProfileWorkspace({
                   value={projName}
                   onChange={(e) => setProjName(e.target.value)}
                   placeholder="e.g. Distributed Semantic Search Engine"
-                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-base sm:text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                 />
               </div>
 
@@ -2679,7 +2679,7 @@ export function ProfileWorkspace({
                   value={projDescription}
                   onChange={(e) => setProjDescription(e.target.value)}
                   placeholder="Built a sub-50ms vector search engine indexing 500k documents using pgvector and FastAPI."
-                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs leading-relaxed focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-base sm:text-xs leading-relaxed focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                 />
               </div>
 
@@ -2692,7 +2692,7 @@ export function ProfileWorkspace({
                   value={projTechnologies}
                   onChange={(e) => setProjTechnologies(e.target.value)}
                   placeholder="Next.js, TypeScript, Tailwind, Python, Redis"
-                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-base sm:text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                 />
               </div>
 
@@ -2705,21 +2705,21 @@ export function ProfileWorkspace({
                   value={projRepoUrl}
                   onChange={(e) => setProjRepoUrl(e.target.value)}
                   placeholder="https://github.com/username/project"
-                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-base sm:text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800 shrink-0">
               <button
                 onClick={() => setActiveModal('none')}
-                className="px-3.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+                className="px-3.5 py-2 sm:py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer min-h-[38px] sm:min-h-0"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveProject}
-                className="px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold cursor-pointer"
+                className="px-4 py-2 sm:py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold cursor-pointer min-h-[38px] sm:min-h-0"
               >
                 Save Project
               </button>
@@ -2732,21 +2732,21 @@ export function ProfileWorkspace({
       {/* MODAL 4: Add / Edit Education                                         */}
       {/* ===================================================================== */}
       {activeModal === 'education' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-lg max-h-[90vh] bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 sm:p-6 space-y-4 shadow-xl flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3 shrink-0">
               <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
                 {editingIndex !== null ? 'Edit Education' : 'Add Education Record'}
               </h3>
               <button
                 onClick={() => setActiveModal('none')}
-                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer p-1"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3 text-xs overflow-y-auto flex-1 pr-1">
               <div>
                 <label className="block text-zinc-600 dark:text-zinc-400 mb-1 font-medium">
                   Institution Name *
@@ -2756,7 +2756,7 @@ export function ProfileWorkspace({
                   value={eduInstitution}
                   onChange={(e) => setEduInstitution(e.target.value)}
                   placeholder="e.g. University of Engineering and Technology"
-                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-base sm:text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                 />
               </div>
 
@@ -2768,7 +2768,7 @@ export function ProfileWorkspace({
                   <select
                     value={eduDegreeLevel}
                     onChange={(e) => setEduDegreeLevel(e.target.value as DegreeLevel)}
-                    className="w-full p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                    className="w-full p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-base sm:text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                   >
                     <option value="BACHELORS">Bachelors</option>
                     <option value="MASTERS">Masters</option>
@@ -2789,7 +2789,7 @@ export function ProfileWorkspace({
                     value={eduField}
                     onChange={(e) => setEduField(e.target.value)}
                     placeholder="e.g. Computer Science"
-                    className="w-full p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                    className="w-full p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-base sm:text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                   />
                 </div>
               </div>
@@ -2803,7 +2803,7 @@ export function ProfileWorkspace({
                   value={eduGradDate}
                   onChange={(e) => setEduGradDate(e.target.value)}
                   placeholder="e.g. 2024 or Expected May 2025"
-                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-base sm:text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                 />
               </div>
 
@@ -2821,16 +2821,16 @@ export function ProfileWorkspace({
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800 shrink-0">
               <button
                 onClick={() => setActiveModal('none')}
-                className="px-3.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+                className="px-3.5 py-2 sm:py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer min-h-[38px] sm:min-h-0"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveEducation}
-                className="px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold cursor-pointer"
+                className="px-4 py-2 sm:py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold cursor-pointer min-h-[38px] sm:min-h-0"
               >
                 Save Education
               </button>
@@ -2843,21 +2843,21 @@ export function ProfileWorkspace({
       {/* MODAL 5: Add / Edit Skill (Evidence is purely OPTIONAL!)              */}
       {/* ===================================================================== */}
       {activeModal === 'skill' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-md max-h-[90vh] bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 sm:p-6 space-y-4 shadow-xl flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3 shrink-0">
               <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
                 {editingIndex !== null ? 'Edit Skill Competency' : 'Add Skill Competency'}
               </h3>
               <button
                 onClick={() => setActiveModal('none')}
-                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer p-1"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3.5 text-xs">
+            <div className="space-y-3.5 text-xs overflow-y-auto flex-1 pr-1">
               <div>
                 <label className="block text-zinc-600 dark:text-zinc-400 mb-1 font-medium">
                   Skill / Technology Name *
@@ -2867,7 +2867,7 @@ export function ProfileWorkspace({
                   value={skillNameInput}
                   onChange={(e) => setSkillNameInput(e.target.value)}
                   placeholder="e.g. PyTorch, Next.js, Docker, SQL"
-                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-base sm:text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                 />
               </div>
 
@@ -2905,7 +2905,7 @@ export function ProfileWorkspace({
                   value={skillEvidenceInput}
                   onChange={(e) => setSkillEvidenceInput(e.target.value)}
                   placeholder="Optional verbatim excerpt or project note. Leave empty for self-reported skills."
-                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs leading-relaxed focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-base sm:text-xs leading-relaxed focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                 />
                 <p className="text-[11px] text-zinc-400 mt-1">
                   No resume upload or evidence quote is required to add skills.
@@ -2913,16 +2913,16 @@ export function ProfileWorkspace({
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800 shrink-0">
               <button
                 onClick={() => setActiveModal('none')}
-                className="px-3.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+                className="px-3.5 py-2 sm:py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer min-h-[38px] sm:min-h-0"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveSkill}
-                className="px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold cursor-pointer"
+                className="px-4 py-2 sm:py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold cursor-pointer min-h-[38px] sm:min-h-0"
               >
                 Save Skill
               </button>
@@ -2935,21 +2935,21 @@ export function ProfileWorkspace({
       {/* MODAL 6: Edit Profile Overview & Bio                                  */}
       {/* ===================================================================== */}
       {activeModal === 'overview' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-lg max-h-[90vh] bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 sm:p-6 space-y-4 shadow-xl flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3 shrink-0">
               <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
                 Edit Profile Overview
               </h3>
               <button
                 onClick={() => setActiveModal('none')}
-                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer p-1"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3 text-xs overflow-y-auto flex-1 pr-1">
               <div>
                 <label className="block text-zinc-600 dark:text-zinc-400 mb-1 font-medium">
                   Full Name
@@ -2958,7 +2958,7 @@ export function ProfileWorkspace({
                   type="text"
                   value={overviewName}
                   onChange={(e) => setOverviewName(e.target.value)}
-                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-sm focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-base sm:text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                 />
               </div>
 
@@ -2971,7 +2971,7 @@ export function ProfileWorkspace({
                   value={overviewHeadline}
                   onChange={(e) => setOverviewHeadline(e.target.value)}
                   placeholder="e.g. Full-Stack Software Engineer & AI Systems Developer"
-                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-base sm:text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                 />
               </div>
 
@@ -2984,7 +2984,7 @@ export function ProfileWorkspace({
                   value={overviewLocation}
                   onChange={(e) => setOverviewLocation(e.target.value)}
                   placeholder="e.g. Lahore, Pakistan or Remote"
-                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-base sm:text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                 />
               </div>
 
@@ -2997,21 +2997,21 @@ export function ProfileWorkspace({
                   value={overviewBio}
                   onChange={(e) => setOverviewBio(e.target.value)}
                   placeholder="Passionate engineer with experience in distributed systems, AI agents, and web applications..."
-                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs leading-relaxed focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-base sm:text-xs leading-relaxed focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800 shrink-0">
               <button
                 onClick={() => setActiveModal('none')}
-                className="px-3.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+                className="px-3.5 py-2 sm:py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer min-h-[38px] sm:min-h-0"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveOverview}
-                className="px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold cursor-pointer"
+                className="px-4 py-2 sm:py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold cursor-pointer min-h-[38px] sm:min-h-0"
               >
                 Save Overview
               </button>
@@ -3024,21 +3024,21 @@ export function ProfileWorkspace({
       {/* MODAL 7: Edit Career Preferences & Eligibility Constraints            */}
       {/* ===================================================================== */}
       {activeModal === 'preferences' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-lg max-h-[90vh] bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-4 sm:p-6 space-y-4 shadow-xl flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3 shrink-0">
               <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
                 Edit Career Preferences
               </h3>
               <button
                 onClick={() => setActiveModal('none')}
-                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer p-1"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-4 text-xs">
+            <div className="space-y-4 text-xs overflow-y-auto flex-1 pr-1">
               {/* Target Roles */}
               <div>
                 <label className="block text-zinc-600 dark:text-zinc-400 mb-1 font-medium">
@@ -3235,16 +3235,16 @@ export function ProfileWorkspace({
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800 shrink-0">
               <button
                 onClick={() => setActiveModal('none')}
-                className="px-3.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+                className="px-3.5 py-2 sm:py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer min-h-[38px] sm:min-h-0"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSavePreferences}
-                className="px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold cursor-pointer"
+                className="px-4 py-2 sm:py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold cursor-pointer min-h-[38px] sm:min-h-0"
               >
                 Apply Preferences
               </button>
@@ -3257,9 +3257,9 @@ export function ProfileWorkspace({
       {/* MODAL 7: Add Career Memory Fact Modal                                  */}
       {/* ===================================================================== */}
       {memoryModal === 'add' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-6 space-y-4">
-            <div className="flex items-start justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-lg max-h-[90vh] bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-4 sm:p-6 space-y-4 flex flex-col overflow-hidden">
+            <div className="flex items-start justify-between shrink-0">
               <div>
                 <div className="flex items-center gap-1.5 text-teal-600 dark:text-teal-400">
                   <Brain className="w-4 h-4" />
@@ -3277,7 +3277,7 @@ export function ProfileWorkspace({
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3 text-xs overflow-y-auto flex-1 pr-1">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-zinc-600 dark:text-zinc-400 mb-1 font-medium">
@@ -3286,7 +3286,7 @@ export function ProfileWorkspace({
                   <select
                     value={memoryTypeInput}
                     onChange={(e) => setMemoryTypeInput(e.target.value as MemoryType)}
-                    className="w-full p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                    className="w-full p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-base sm:text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                   >
                     <option value="CAREER_GOAL">Career Goal</option>
                     <option value="STRENGTH">Demonstrated Strength</option>
@@ -3303,7 +3303,7 @@ export function ProfileWorkspace({
                   <select
                     value={memoryProvenanceInput}
                     onChange={(e) => setMemoryProvenanceInput(e.target.value as ProvenanceLevel)}
-                    className="w-full p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                    className="w-full p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-base sm:text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                   >
                     <option value="USER_PROVIDED">User Provided</option>
                     <option value="VERIFIED">Verified Evidence</option>
@@ -3327,22 +3327,22 @@ export function ProfileWorkspace({
                   placeholder="e.g. Targeting Senior Backend roles at Series A-B startups with Rust or Go stacks; open to remote or Bengaluru hybrid."
                   value={memoryStatementInput}
                   onChange={(e) => setMemoryStatementInput(e.target.value)}
-                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-base sm:text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800 shrink-0">
               <button
                 onClick={() => setMemoryModal('none')}
-                className="px-3.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+                className="px-3.5 py-2 sm:py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer min-h-[38px] sm:min-h-0"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveNewMemory}
                 disabled={isSavingMemory}
-                className="px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 sm:py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold cursor-pointer disabled:opacity-50 min-h-[38px] sm:min-h-0"
               >
                 {isSavingMemory ? 'Recording...' : 'Record Memory Fact'}
               </button>
@@ -3355,9 +3355,9 @@ export function ProfileWorkspace({
       {/* MODAL 8: Update Career Memory Fact (Versioned) Modal                   */}
       {/* ===================================================================== */}
       {memoryModal === 'update' && activeMemory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-6 space-y-4">
-            <div className="flex items-start justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-lg max-h-[90vh] bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-4 sm:p-6 space-y-4 flex flex-col overflow-hidden">
+            <div className="flex items-start justify-between shrink-0">
               <div>
                 <div className="flex items-center gap-1.5 text-teal-600 dark:text-teal-400">
                   <Brain className="w-4 h-4" />
@@ -3377,7 +3377,7 @@ export function ProfileWorkspace({
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-3 text-xs overflow-y-auto flex-1 pr-1">
               <div className="p-3 rounded-lg bg-teal-50/50 dark:bg-teal-950/20 border border-teal-200/60 dark:border-teal-800/50 text-[11px] text-teal-800 dark:text-teal-300 leading-relaxed">
                 Updating this fact creates a new version while preserving the previous statement, effective dates, and change rationale in your permanent career lineage.
               </div>
@@ -3396,7 +3396,7 @@ export function ProfileWorkspace({
                   rows={3}
                   value={memoryStatementInput}
                   onChange={(e) => setMemoryStatementInput(e.target.value)}
-                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  className="w-full p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-base sm:text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                 />
               </div>
 
@@ -3409,22 +3409,22 @@ export function ProfileWorkspace({
                   placeholder="e.g. Completed AWS Solution Architect; shifting focus to Cloud Infrastructure"
                   value={memoryChangeReasonInput}
                   onChange={(e) => setMemoryChangeReasonInput(e.target.value)}
-                  className="w-full p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+                  className="w-full p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-base sm:text-xs focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800 shrink-0">
               <button
                 onClick={() => setMemoryModal('none')}
-                className="px-3.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+                className="px-3.5 py-2 sm:py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer min-h-[38px] sm:min-h-0"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveUpdatedMemory}
                 disabled={isSavingMemory}
-                className="px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 sm:py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold cursor-pointer disabled:opacity-50 min-h-[38px] sm:min-h-0"
               >
                 {isSavingMemory ? 'Saving Version...' : 'Save New Version'}
               </button>
@@ -3437,9 +3437,9 @@ export function ProfileWorkspace({
       {/* MODAL 9: Memory Lineage Audit Drawer / Modal                           */}
       {/* ===================================================================== */}
       {memoryModal === 'lineage' && activeMemory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-6 space-y-4 max-h-[85vh] flex flex-col">
-            <div className="flex items-start justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-4 sm:p-6 space-y-4 max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="flex items-start justify-between shrink-0">
               <div>
                 <div className="flex items-center gap-1.5 text-teal-600 dark:text-teal-400">
                   <History className="w-4 h-4" />
@@ -3516,10 +3516,10 @@ export function ProfileWorkspace({
               )}
             </div>
 
-            <div className="flex items-center justify-end pt-2 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="flex items-center justify-end pt-2 border-t border-zinc-100 dark:border-zinc-800 shrink-0">
               <button
                 onClick={() => setMemoryModal('none')}
-                className="px-4 py-1.5 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-semibold cursor-pointer"
+                className="px-4 py-2 sm:py-1.5 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-semibold cursor-pointer min-h-[38px] sm:min-h-0"
               >
                 Close Audit
               </button>
